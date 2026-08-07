@@ -133,6 +133,28 @@
                             </button>
                         </div>
 
+                        <!-- Local Data Backup & Restore -->
+                        <div class="py-1.5 space-y-0.5">
+                            <div class="px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center">
+                                <i class="fa-solid fa-hard-drive text-indigo-400 mr-1.5 text-xs"></i>
+                                <span>Local Database Backup</span>
+                            </div>
+
+                            <button onclick="takeLocalBackup(); closeUserDropdown();" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors flex items-center space-x-3 group" title="Export entire database locally as JSON file">
+                                <div class="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center group-hover:bg-indigo-500/20">
+                                    <i class="fa-solid fa-download text-xs"></i>
+                                </div>
+                                <span>Take Backup Locally (JSON)</span>
+                            </button>
+
+                            <button onclick="triggerLocalRestoreFileSelect(); closeUserDropdown();" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors flex items-center space-x-3 group" title="Restore entire database from local JSON file">
+                                <div class="w-6 h-6 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:bg-purple-500/20">
+                                    <i class="fa-solid fa-upload text-xs"></i>
+                                </div>
+                                <span>Restore Local Backup</span>
+                            </button>
+                        </div>
+
                         <!-- System / Logout -->
                         <div class="py-1.5">
                             {% if (current_user.email or '').strip().lower() == 'niraj.choudhary1995@gmail.com' %}

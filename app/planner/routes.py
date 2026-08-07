@@ -308,12 +308,14 @@ def dashboard():
 @planner.route('/weekly', methods=['GET', 'POST'])
 @login_required
 def weekly():
+    today = date.today()
+    current_year, current_week, _ = today.isocalendar()
+
     year_param = request.args.get('year', type=int)
     week_param = request.args.get('week', type=int)
 
-    today = date.today()
     if not year_param or not week_param:
-        year_param, week_param, _ = today.isocalendar()
+        year_param, week_param = current_year, current_week
 
     first_day_of_year = date(year_param, 1, 4)
     start_of_week = first_day_of_year + timedelta(weeks=week_param - 1) - timedelta(days=first_day_of_year.weekday())
@@ -544,6 +546,9 @@ def weekly():
         'planner/weekly.html',
         selected_year=year_param,
         selected_week=week_param,
+        today=today,
+        current_year=current_year,
+        current_week=current_week,
         start_of_week=start_of_week,
         end_of_week=end_of_week,
         days_of_week=days_of_week,
@@ -578,14 +583,15 @@ def weekly():
 @planner.route('/daily', methods=['GET', 'POST'])
 @login_required
 def daily():
+    today = date.today()
     date_param = request.args.get('date')
-    if date_param:
+    if date_param and date_param.lower() != 'today':
         try:
             selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
         except ValueError:
-            selected_date = date.today()
+            selected_date = today
     else:
-        selected_date = date.today()
+        selected_date = today
 
     # Automatically process spillover tasks and daily routine defaults up to selected_date
     process_task_spillovers(current_user.id, selected_date)
@@ -690,9 +696,13 @@ def daily():
 
             for time_slot in default_slots:
                 slot_id = time_slot.replace(':', '_').replace(' ', '_').replace('-', '_')
-                act = request.form.get(f'slot_act_{slot_id}', request.form.get(f'slot_{time_slot}', '')).strip()
-                mood = request.form.get(f'slot_mood_{slot_id}', '').strip()
-                is_def = bool(request.form.get(f'slot_def_{slot_id}'))
+                meridiem = time_slot.split(' ')[-1] if ' ' in time_slot else ''
+                start_part = time_slot.split(' - ')[0] if ' - ' in time_slot else time_slot
+                start_time = f"{start_part} {meridiem}".strip() if meridiem and not start_part.endswith(meridiem) else start_part
+                start_slot_id = start_time.replace(':', '_').replace(' ', '_')
+                act = (request.form.get(f'slot_act_{slot_id}') or request.form.get(f'slot_act_{start_slot_id}') or request.form.get(f'slot_{time_slot}') or '').strip()
+                mood = (request.form.get(f'slot_mood_{slot_id}') or request.form.get(f'slot_mood_{start_slot_id}') or '').strip()
+                is_def = bool(request.form.get(f'slot_def_{slot_id}') or request.form.get(f'slot_def_{start_slot_id}'))
 
                 if act or mood or is_def or (isinstance(raw_sched, dict) and time_slot in raw_sched):
                     new_schedule[time_slot] = {'activity': act, 'mood': mood, 'is_default': is_def}
@@ -786,6 +796,7 @@ def daily():
     return render_template(
         'planner/daily.html',
         selected_date=selected_date,
+        today=today,
         plan=plan,
         tasks=plan.tasks if plan else [],
         schedule=normalized_schedule,
@@ -1207,6 +1218,7 @@ def yearly():
     return render_template(
         'planner/yearly.html',
         selected_year=selected_year,
+        today=today,
         plan=plan,
         resolutions=plan.resolutions if plan else [],
         objectives=plan.objectives if plan else [],
@@ -1445,6 +1457,35 @@ def api_backup_export_json():
     json_bytes = io.BytesIO(json.dumps(payload, indent=2).encode('utf-8'))
     filename = f"Chronos_Planner_Backup_{current_user.username}.json"
     return send_file(json_bytes, download_name=filename, as_attachment=True, mimetype="application/json")
+
+
+# Direct Local JSON Backup Restore Endpoint
+@planner.route('/api/backup/restore_json', methods=['POST'])
+@login_required
+def api_backup_restore_json():
+    from app.services.google_service import import_user_data_payload
+    try:
+        if 'backup_file' in request.files:
+            file = request.files['backup_file']
+            if not file.filename or file.filename == '':
+                return jsonify({'success': False, 'message': 'No backup file selected'}), 400
+            content = file.read().decode('utf-8')
+            payload = json.loads(content)
+        elif request.is_json:
+            payload = request.get_json()
+        else:
+            return jsonify({'success': False, 'message': 'No backup file or JSON payload provided'}), 400
+
+        res = import_user_data_payload(current_user, payload)
+        if res:
+            flash('Successfully restored planner data from local JSON backup across all tables!', 'success')
+            return jsonify({'success': True, 'message': 'Local backup restored successfully across all tables!'})
+        return jsonify({'success': False, 'message': 'Failed to restore local backup'}), 400
+    except json.JSONDecodeError:
+        return jsonify({'success': False, 'message': 'Invalid JSON file format'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Restore error: {str(e)}'}), 500
 
 
 

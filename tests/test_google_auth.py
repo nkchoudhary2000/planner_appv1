@@ -6,6 +6,7 @@ from config import Config
 class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 30}}
     SECRET_KEY = 'test-secret-key'
     WTF_CSRF_ENABLED = False
     GOOGLE_CLIENT_ID = 'MOCK_GOOGLE_CLIENT_ID'

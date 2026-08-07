@@ -1,10 +1,10 @@
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from authlib.integrations.flask_client import OAuth
 from flask import url_for, current_app
 from sqlalchemy.orm.attributes import flag_modified
 from app import db
-from app.models import User, DailyPlan, MonthlyPlan, YearlyPlan
+from app.models import User, DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan
 
 oauth = OAuth()
 
@@ -26,8 +26,9 @@ def init_google_oauth(app):
     )
 
 def export_user_data_payload(user):
-    """Serialize all plans for a user into a clean JSON structure."""
+    """Serialize all plans (Daily, Weekly, Monthly, Yearly) for a user into a clean JSON structure."""
     daily_plans = DailyPlan.query.filter_by(user_id=user.id).all()
+    weekly_plans = WeeklyPlan.query.filter_by(user_id=user.id).all()
     monthly_plans = MonthlyPlan.query.filter_by(user_id=user.id).all()
     yearly_plans = YearlyPlan.query.filter_by(user_id=user.id).all()
 
@@ -45,9 +46,23 @@ def export_user_data_payload(user):
                 "date": dp.date.strftime('%Y-%m-%d'),
                 "schedule": dp.schedule or {},
                 "tasks": dp.tasks or [],
-                "notes": dp.notes or ''
+                "notes": dp.notes or '',
+                "depression_episodes": dp.depression_episodes or []
             }
             for dp in daily_plans
+        ],
+        "weekly_plans": [
+            {
+                "year": wp.year,
+                "week_number": wp.week_number,
+                "start_date": wp.start_date.strftime('%Y-%m-%d') if wp.start_date else None,
+                "goals": wp.goals or [],
+                "daily_todos": wp.daily_todos or {},
+                "shopping_list": wp.shopping_list or [],
+                "meals_menu": wp.meals_menu or {},
+                "notes": wp.notes or ''
+            }
+            for wp in weekly_plans
         ],
         "monthly_plans": [
             {
@@ -56,6 +71,7 @@ def export_user_data_payload(user):
                 "goals": mp.goals or [],
                 "habits": mp.habits or [],
                 "milestones": mp.milestones or [],
+                "calendar_days": mp.calendar_days or {},
                 "notes": mp.notes or ''
             }
             for mp in monthly_plans
@@ -73,15 +89,15 @@ def export_user_data_payload(user):
     return payload
 
 def import_user_data_payload(user, payload):
-    """Restore database records for a user from a JSON payload."""
+    """Restore database records for a user from a JSON payload across all tables."""
     if not isinstance(payload, dict):
-        raise ValueError("Invalid backup format")
+        raise ValueError("Invalid backup format: payload must be a JSON object")
 
     # Restore Daily Plans
     for dp_data in payload.get('daily_plans', []):
         try:
             plan_date = datetime.strptime(dp_data['date'], '%Y-%m-%d').date()
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             continue
 
         dp = DailyPlan.query.filter_by(user_id=user.id, date=plan_date).first()
@@ -92,8 +108,45 @@ def import_user_data_payload(user, payload):
         dp.schedule = dp_data.get('schedule', {})
         dp.tasks = dp_data.get('tasks', [])
         dp.notes = dp_data.get('notes', '')
+        dp.depression_episodes = dp_data.get('depression_episodes', [])
         flag_modified(dp, 'schedule')
         flag_modified(dp, 'tasks')
+        flag_modified(dp, 'depression_episodes')
+
+    # Restore Weekly Plans
+    for wp_data in payload.get('weekly_plans', []):
+        year = wp_data.get('year')
+        week_number = wp_data.get('week_number')
+        if not year or not week_number:
+            continue
+
+        start_date_val = wp_data.get('start_date')
+        if start_date_val:
+            try:
+                start_date_obj = datetime.strptime(start_date_val, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                first_day = date(year, 1, 4)
+                start_date_obj = first_day + timedelta(weeks=week_number - 1) - timedelta(days=first_day.weekday())
+        else:
+            first_day = date(year, 1, 4)
+            start_date_obj = first_day + timedelta(weeks=week_number - 1) - timedelta(days=first_day.weekday())
+
+        wp = WeeklyPlan.query.filter_by(user_id=user.id, year=year, week_number=week_number).first()
+        if not wp:
+            wp = WeeklyPlan(user_id=user.id, year=year, week_number=week_number, start_date=start_date_obj)
+            db.session.add(wp)
+        else:
+            wp.start_date = start_date_obj
+
+        wp.goals = wp_data.get('goals', [])
+        wp.daily_todos = wp_data.get('daily_todos', {})
+        wp.shopping_list = wp_data.get('shopping_list', [])
+        wp.meals_menu = wp_data.get('meals_menu', {})
+        wp.notes = wp_data.get('notes', '')
+        flag_modified(wp, 'goals')
+        flag_modified(wp, 'daily_todos')
+        flag_modified(wp, 'shopping_list')
+        flag_modified(wp, 'meals_menu')
 
     # Restore Monthly Plans
     for mp_data in payload.get('monthly_plans', []):
@@ -110,10 +163,12 @@ def import_user_data_payload(user, payload):
         mp.goals = mp_data.get('goals', [])
         mp.habits = mp_data.get('habits', [])
         mp.milestones = mp_data.get('milestones', [])
+        mp.calendar_days = mp_data.get('calendar_days', {})
         mp.notes = mp_data.get('notes', '')
         flag_modified(mp, 'goals')
         flag_modified(mp, 'habits')
         flag_modified(mp, 'milestones')
+        flag_modified(mp, 'calendar_days')
 
     # Restore Yearly Plans
     for yp_data in payload.get('yearly_plans', []):

@@ -7,6 +7,7 @@ from config import Config
 class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 30}}
     SECRET_KEY = 'test-secret-key'
     WTF_CSRF_ENABLED = False
 
@@ -185,11 +186,11 @@ class PlannerTestCase(unittest.TestCase):
         user = User.query.filter_by(username='testuser').first()
         daily_plan = DailyPlan.query.filter_by(user_id=user.id, date=date.today()).first()
         self.assertIsNotNone(daily_plan)
-        self.assertIn('09:00 AM', daily_plan.schedule)
-        self.assertEqual(daily_plan.schedule['09:00 AM']['activity'], 'Deep Work & Strategy Sync')
-        self.assertEqual(daily_plan.schedule['09:00 AM']['mood'], '😄')
-        self.assertEqual(daily_plan.schedule['02:00 PM']['activity'], 'Team Retrospective')
-        self.assertEqual(daily_plan.schedule['02:00 PM']['mood'], '😊')
+        self.assertIn('09:00 - 10:00 AM', daily_plan.schedule)
+        self.assertEqual(daily_plan.schedule['09:00 - 10:00 AM']['activity'], 'Deep Work & Strategy Sync')
+        self.assertEqual(daily_plan.schedule['09:00 - 10:00 AM']['mood'], '😄')
+        self.assertEqual(daily_plan.schedule['02:00 - 03:00 PM']['activity'], 'Team Retrospective')
+        self.assertEqual(daily_plan.schedule['02:00 - 03:00 PM']['mood'], '😊')
 
     def test_depression_episode_logging(self):
         self.register_and_login()
@@ -395,6 +396,137 @@ class PlannerTestCase(unittest.TestCase):
         create_data = res_create.get_json()
         self.assertTrue(create_data['success'])
         self.assertEqual(create_data['folder_name'], 'Chronos Custom Folder')
+
+    def test_today_current_defaults_for_all_planners(self):
+        self.register_and_login()
+        today = date.today()
+        today_str = today.strftime('%Y-%m-%d')
+        iso_year, iso_week, _ = today.isocalendar()
+
+        # Daily Planner defaults to Today
+        res_daily = self.client.get('/daily')
+        self.assertEqual(res_daily.status_code, 200)
+        self.assertIn(today.strftime('%A, %B %d, %Y').encode(), res_daily.data)
+
+        # Weekly Planner defaults to Current Week
+        res_weekly = self.client.get('/weekly')
+        self.assertEqual(res_weekly.status_code, 200)
+        self.assertIn(f'Week {iso_week}, {iso_year}'.encode(), res_weekly.data)
+
+        # Monthly Planner defaults to Current Month and Year
+        res_monthly = self.client.get('/monthly')
+        self.assertEqual(res_monthly.status_code, 200)
+        self.assertIn(today.strftime('%B %Y').encode(), res_monthly.data)
+
+        # Yearly Planner defaults to Current Year
+        res_yearly = self.client.get('/yearly')
+        self.assertEqual(res_yearly.status_code, 200)
+        self.assertIn(f'Year {today.year}'.encode(), res_yearly.data)
+
+    def test_full_database_local_backup_export_and_restore(self):
+        self.register_and_login()
+        user = User.query.filter_by(username='testuser').first()
+        today = date.today()
+
+        # 1. Create records in DailyPlan
+        dp = DailyPlan(
+            user_id=user.id,
+            date=today,
+            schedule={"09:00 - 10:00 AM": {"activity": "Focus Work", "mood": "😄"}},
+            tasks=[{"id": "t1", "text": "Finish Feature", "completed": True, "priority": "High"}],
+            notes="Daily Note Test",
+            depression_episodes=[{"id": "e1", "start_time": "10:00 AM", "duration": "30m", "intensity": 4, "coping_mechanism": "Walk"}]
+        )
+        db.session.add(dp)
+
+        # 2. Create records in WeeklyPlan
+        iso_year, iso_week, _ = today.isocalendar()
+        wp = WeeklyPlan(
+            user_id=user.id,
+            year=iso_year,
+            week_number=iso_week,
+            start_date=today,
+            goals=[{"id": "wg1", "title": "Ship MVP", "completed": True}],
+            daily_todos={"Mon": [{"id": "wt1", "text": "Plan Sprint", "completed": True}]},
+            shopping_list=[{"id": "ws1", "item": "Coffee", "category": "Groceries", "bought": True}],
+            meals_menu={"Mon": {"breakfast": "Oatmeal", "lunch": "Salad", "dinner": "Soup"}},
+            notes="Weekly Note Test"
+        )
+        db.session.add(wp)
+
+        # 3. Create records in MonthlyPlan
+        mp = MonthlyPlan(
+            user_id=user.id,
+            year=today.year,
+            month=today.month,
+            goals=[{"id": "mg1", "title": "Run 20km", "category": "Fitness"}],
+            habits=[{"id": "mh1", "name": "Meditation", "completed_days": [1, 2, 5]}],
+            milestones=[{"id": "mm1", "title": "Launch Alpha", "date": "15", "completed": True}],
+            calendar_days={"15": {"items": [{"id": "c1", "text": "Key Demo", "type": "target"}], "sticker": "🚀"}},
+            notes="Monthly Note Test"
+        )
+        db.session.add(mp)
+
+        # 4. Create records in YearlyPlan
+        yp = YearlyPlan(
+            user_id=user.id,
+            year=today.year,
+            resolutions=[{"id": "yr1", "text": "Read 12 books", "completed": False}],
+            objectives=[{"id": "yo1", "title": "Learn Flask", "status": "Done"}],
+            reflections="Yearly Reflection Test"
+        )
+        db.session.add(yp)
+        db.session.commit()
+
+        # 5. Export JSON backup via API
+        export_res = self.client.get('/api/backup/export_json')
+        self.assertEqual(export_res.status_code, 200)
+        import json
+        payload = json.loads(export_res.data.decode('utf-8'))
+
+        # Verify exported payload contains all 4 tables & nested fields
+        self.assertEqual(len(payload['daily_plans']), 1)
+        self.assertEqual(len(payload['weekly_plans']), 1)
+        self.assertEqual(len(payload['monthly_plans']), 1)
+        self.assertEqual(len(payload['yearly_plans']), 1)
+        self.assertEqual(payload['daily_plans'][0]['depression_episodes'][0]['coping_mechanism'], "Walk")
+        self.assertEqual(payload['weekly_plans'][0]['shopping_list'][0]['item'], "Coffee")
+        self.assertEqual(payload['monthly_plans'][0]['calendar_days']['15']['sticker'], "🚀")
+
+        # 6. Clear database records
+        DailyPlan.query.filter_by(user_id=user.id).delete()
+        WeeklyPlan.query.filter_by(user_id=user.id).delete()
+        MonthlyPlan.query.filter_by(user_id=user.id).delete()
+        YearlyPlan.query.filter_by(user_id=user.id).delete()
+        db.session.commit()
+
+        self.assertEqual(DailyPlan.query.filter_by(user_id=user.id).count(), 0)
+        self.assertEqual(WeeklyPlan.query.filter_by(user_id=user.id).count(), 0)
+
+        # 7. Restore via JSON API
+        restore_res = self.client.post('/api/backup/restore_json', json=payload)
+        self.assertEqual(restore_res.status_code, 200)
+        res_data = restore_res.get_json()
+        self.assertTrue(res_data['success'])
+
+        # 8. Query database afresh and assert all 4 tables are restored cleanly
+        db.session.expire_all()
+        restored_dp = DailyPlan.query.filter_by(user_id=user.id, date=today).first()
+        self.assertIsNotNone(restored_dp)
+        self.assertEqual(restored_dp.tasks[0]['text'], "Finish Feature")
+        self.assertEqual(restored_dp.depression_episodes[0]['coping_mechanism'], "Walk")
+
+        restored_wp = WeeklyPlan.query.filter_by(user_id=user.id, year=iso_year, week_number=iso_week).first()
+        self.assertIsNotNone(restored_wp)
+        self.assertEqual(restored_wp.shopping_list[0]['item'], "Coffee")
+
+        restored_mp = MonthlyPlan.query.filter_by(user_id=user.id, year=today.year, month=today.month).first()
+        self.assertIsNotNone(restored_mp)
+        self.assertEqual(restored_mp.calendar_days['15']['sticker'], "🚀")
+
+        restored_yp = YearlyPlan.query.filter_by(user_id=user.id, year=today.year).first()
+        self.assertIsNotNone(restored_yp)
+        self.assertEqual(restored_yp.reflections, "Yearly Reflection Test")
 
 if __name__ == '__main__':
     unittest.main()

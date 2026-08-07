@@ -183,4 +183,55 @@ async function restoreFromGoogleDrive() {
     }
 }
 
+// Local JSON Backup Export
+function takeLocalBackup() {
+    showToast('Preparing full database backup JSON download...', 'info');
+    window.location.href = '/api/backup/export_json';
+}
+
+// Local JSON Backup Restore
+function triggerLocalRestoreFileSelect() {
+    let input = document.getElementById('local-backup-file-input');
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'file';
+        input.id = 'local-backup-file-input';
+        input.accept = '.json';
+        input.className = 'hidden';
+        input.onchange = function() { uploadLocalBackupFile(this); };
+        document.body.appendChild(input);
+    }
+    input.value = '';
+    input.click();
+}
+
+async function uploadLocalBackupFile(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (!confirm(`Are you sure you want to restore database from "${file.name}"? This will update your planner tables.`)) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('backup_file', file);
+
+    showToast('Restoring database tables from local backup...', 'info');
+    try {
+        const response = await fetch('/api/backup/restore_json', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        if (data.success) {
+            showToast(data.message || 'Local backup restored successfully across all tables!', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast(data.message || 'Failed to restore local backup file.', 'danger');
+        }
+    } catch (err) {
+        console.error('Local backup restore error:', err);
+        showToast('Error uploading local backup file.', 'danger');
+    }
+}
+
 
