@@ -149,13 +149,14 @@ def populate_daily_defaults(user_id, target_date):
                     continue
 
                 if isinstance(sdata, dict):
-                    resolved_slots.add(slot)
-                    if sdata.get('is_default') and sdata.get('activity'):
-                        default_schedule_master[slot] = {
-                            'activity': sdata.get('activity', ''),
-                            'mood': sdata.get('mood', ''),
-                            'is_default': True
-                        }
+                    if p.date < target_date or sdata.get('activity') or sdata.get('is_default'):
+                        resolved_slots.add(slot)
+                        if sdata.get('is_default') and sdata.get('activity'):
+                            default_schedule_master[slot] = {
+                                'activity': sdata.get('activity', ''),
+                                'mood': sdata.get('mood', ''),
+                                'is_default': True
+                            }
 
     if not default_tasks_master and not default_schedule_master:
         return
