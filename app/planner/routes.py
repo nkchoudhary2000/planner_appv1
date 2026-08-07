@@ -1,4 +1,10 @@
-from datetime import date, datetime, timedelta
+import os
+from datetime import date, datetime, timedelta, timezone
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
+
 import calendar
 import io
 import json
@@ -8,6 +14,16 @@ from sqlalchemy.orm.attributes import flag_modified
 from app import db
 from app.planner import planner
 from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan
+
+def get_today_date():
+    """Return current date in configured timezone (default Asia/Kolkata / IST UTC+5:30)."""
+    tz_name = os.environ.get('APP_TIMEZONE', 'Asia/Kolkata')
+    if ZoneInfo:
+        try:
+            return datetime.now(ZoneInfo(tz_name)).date()
+        except Exception:
+            pass
+    return datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
 
 @planner.route('/')
 def index():
@@ -223,7 +239,7 @@ def populate_daily_defaults(user_id, target_date):
 @planner.route('/dashboard')
 @login_required
 def dashboard():
-    today = date.today()
+    today = get_today_date()
     current_year = today.year
     current_month = today.month
 
@@ -308,7 +324,7 @@ def dashboard():
 @planner.route('/weekly', methods=['GET', 'POST'])
 @login_required
 def weekly():
-    today = date.today()
+    today = get_today_date()
     current_year, current_week, _ = today.isocalendar()
 
     year_param = request.args.get('year', type=int)
@@ -583,7 +599,7 @@ def weekly():
 @planner.route('/daily', methods=['GET', 'POST'])
 @login_required
 def daily():
-    today = date.today()
+    today = get_today_date()
     date_param = request.args.get('date')
     if date_param and date_param.lower() != 'today':
         try:
@@ -809,7 +825,7 @@ def daily():
 @planner.route('/monthly', methods=['GET', 'POST'])
 @login_required
 def monthly():
-    today = date.today()
+    today = get_today_date()
     try:
         selected_year = int(request.args.get('year', today.year))
         selected_month = int(request.args.get('month', today.month))
@@ -1086,7 +1102,7 @@ def monthly():
 @planner.route('/yearly', methods=['GET', 'POST'])
 @login_required
 def yearly():
-    today = date.today()
+    today = get_today_date()
     try:
         selected_year = int(request.args.get('year', today.year))
     except (ValueError, TypeError):
@@ -1612,9 +1628,9 @@ def export_daily_excel():
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
-            target_date = date.today()
+            target_date = get_today_date()
     else:
-        target_date = date.today()
+        target_date = get_today_date()
 
     plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
 
@@ -1684,7 +1700,7 @@ def export_daily_excel():
 def export_weekly_excel():
     year_param = request.args.get('year', type=int)
     week_param = request.args.get('week', type=int)
-    today = date.today()
+    today = get_today_date()
     if not year_param or not week_param:
         year_param, week_param, _ = today.isocalendar()
 
@@ -1739,7 +1755,7 @@ def export_weekly_excel():
 @planner.route('/monthly/export_excel')
 @login_required
 def export_monthly_excel():
-    today = date.today()
+    today = get_today_date()
     selected_year = request.args.get('year', type=int, default=today.year)
     selected_month = request.args.get('month', type=int, default=today.month)
     month_name = calendar.month_name[selected_month]
@@ -1785,7 +1801,7 @@ def export_monthly_excel():
 @planner.route('/yearly/export_excel')
 @login_required
 def export_yearly_excel():
-    today = date.today()
+    today = get_today_date()
     selected_year = request.args.get('year', type=int, default=today.year)
 
     plan = YearlyPlan.query.filter_by(user_id=current_user.id, year=selected_year).first()
