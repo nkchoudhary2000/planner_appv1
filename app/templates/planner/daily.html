@@ -107,14 +107,19 @@
                             <!-- Main Task Card Header/Content -->
                             <div class="task-item flex items-center justify-between p-2.5 sm:p-3.5 gap-2">
                                 
-                                <div class="flex items-center space-x-2 sm:space-x-2.5 flex-1 min-w-0 pr-1">
+                                <div class="flex items-center space-x-1.5 sm:space-x-2 flex-1 min-w-0 pr-1">
+                                    <!-- Drag Handle (Just left of text) -->
+                                    <i class="fa-solid fa-grip-vertical text-slate-500 hover:text-slate-200 cursor-grab active:cursor-grabbing px-0.5 text-sm flex-shrink-0 drag-handle" 
+                                       draggable="true" 
+                                       title="Click and drag to re-order task"></i>
+
                                     <!-- Task Completion Checkbox -->
                                     <input type="checkbox" 
                                            {{ 'checked' if task.completed }} 
                                            onchange="toggleTask('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)"
                                            class="custom-checkbox flex-shrink-0">
 
-                                    <!-- Task Text (Max Priority & Visibility on Laptop and Mobile) -->
+                                    <!-- Task Text (Max Priority & Visibility) -->
                                     <span class="task-text text-xs sm:text-sm font-medium break-words flex-1 {{ 'line-through-fade text-slate-400' if task.completed else ('text-indigo-200 font-medium' if is_def else 'text-slate-200') }}">
                                         {{ task.text }}
                                     </span>
@@ -158,11 +163,6 @@
 
                                     <!-- Action Icon Buttons (Move Up, Move Down, Edit, Delete) -->
                                     <div class="flex items-center space-x-1.5 ml-auto">
-                                        <!-- Drag Handle Icon -->
-                                        <i class="fa-solid fa-grip-vertical text-slate-500 hover:text-slate-200 cursor-grab active:cursor-grabbing p-2 text-sm flex-shrink-0 drag-handle" 
-                                           draggable="true" 
-                                           title="Click and drag to re-order task"></i>
-
                                         <!-- Move Up Icon Button -->
                                         <button type="button" 
                                                 onclick="moveTask(this, 'up')" 
