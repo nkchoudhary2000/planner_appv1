@@ -672,17 +672,64 @@ def monthly():
                 db.session.commit()
                 flash(f'Plan item added to Day {day_str}!', 'success')
 
+        elif action == 'edit_calendar_item':
+            day_str = str(request.form.get('day', '')).strip()
+            item_id = request.form.get('item_id', '').strip()
+            item_text = request.form.get('item_text', '').strip()
+            item_type = request.form.get('item_type', 'deadline')
+            sticker = request.form.get('sticker', '').strip()
+            image_url = request.form.get('image_url', '').strip()
+
+            if day_str in calendar_days and item_id and item_text:
+                day_entry = calendar_days[day_str]
+                items = day_entry.get('items', [])
+                for item in items:
+                    if item.get('id') == item_id:
+                        item['text'] = item_text
+                        item['type'] = item_type
+                        item['sticker'] = sticker
+                        item['image_url'] = image_url
+                        break
+                day_entry['items'] = items
+
+                remaining_stickers = [i.get('sticker') for i in items if i.get('sticker')]
+                remaining_images = [i.get('image_url') for i in items if i.get('image_url')]
+                day_entry['sticker'] = remaining_stickers[-1] if remaining_stickers else ''
+                day_entry['image_url'] = remaining_images[-1] if remaining_images else ''
+
+                calendar_days[day_str] = day_entry
+                plan.calendar_days = calendar_days
+                flag_modified(plan, 'calendar_days')
+                db.session.commit()
+                flash(f'Plan item updated on Day {day_str}!', 'success')
+
         elif action == 'delete_calendar_item':
             day_str = str(request.form.get('day', '')).strip()
             item_id = request.form.get('item_id')
             if day_str in calendar_days:
                 day_entry = calendar_days[day_str]
                 day_entry['items'] = [i for i in day_entry.get('items', []) if i.get('id') != item_id]
+                
+                remaining_stickers = [i.get('sticker') for i in day_entry['items'] if i.get('sticker')]
+                remaining_images = [i.get('image_url') for i in day_entry['items'] if i.get('image_url')]
+                day_entry['sticker'] = remaining_stickers[-1] if remaining_stickers else ''
+                day_entry['image_url'] = remaining_images[-1] if remaining_images else ''
+
                 calendar_days[day_str] = day_entry
                 plan.calendar_days = calendar_days
                 flag_modified(plan, 'calendar_days')
                 db.session.commit()
                 flash('Calendar item removed.', 'info')
+
+        elif action == 'delete_day_sticker':
+            day_str = str(request.form.get('day', '')).strip()
+            if day_str in calendar_days:
+                calendar_days[day_str]['sticker'] = ''
+                calendar_days[day_str]['image_url'] = ''
+                plan.calendar_days = calendar_days
+                flag_modified(plan, 'calendar_days')
+                db.session.commit()
+                flash(f'Day sticker cleared for Day {day_str}.', 'info')
 
         elif action == 'set_day_sticker':
             day_str = str(request.form.get('day', '')).strip()

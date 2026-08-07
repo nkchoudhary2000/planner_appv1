@@ -282,12 +282,21 @@
                                     </div>
 
                                     <!-- Day Sticker / Image Badge -->
-                                    <div class="flex items-center space-x-1">
+                                    <div class="flex items-center space-x-1 group/sticker relative">
                                         {% if sticker %}
                                         <span class="text-base leading-none" title="Day Sticker">{{ sticker }}</span>
                                         {% endif %}
                                         {% if day_image %}
                                         <img src="{{ day_image }}" alt="Sticker" class="w-5 h-5 rounded object-cover border border-slate-600 shadow-sm" title="Attached Image">
+                                        {% endif %}
+                                        {% if is_curr and (sticker or day_image) %}
+                                        <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline opacity-0 group-hover/sticker:opacity-100 transition-opacity">
+                                            <input type="hidden" name="action" value="delete_day_sticker">
+                                            <input type="hidden" name="day" value="{{ d.day }}">
+                                            <button type="submit" class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors" title="Delete Day Emoji/Sticker">
+                                                <i class="fa-solid fa-xmark text-[9px]"></i>
+                                            </button>
+                                        </form>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -297,7 +306,7 @@
                                     {% if is_curr and items %}
                                         {% for item in items %}
                                             {% set badge_bg = 'bg-rose-500/15 border-rose-500/30 text-rose-300' if item.type == 'deadline' else ('bg-amber-500/15 border-amber-500/30 text-amber-300' if item.type == 'target' else 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300') %}
-                                            <div class="calendar-item-card p-1.5 rounded-xl border {{ badge_bg }} flex items-center justify-between text-xs group/item shadow-sm cursor-pointer relative transition-all hover:scale-[1.02]"
+                                            <div class="calendar-item-card p-1.5 rounded-xl border {{ badge_bg }} flex items-center justify-between text-xs group/item shadow-sm relative transition-all hover:scale-[1.02]"
                                                  data-title="{{ item.text }}"
                                                  data-type="{{ item.type }}"
                                                  data-date="{{ month_name }} {{ d.day }}, {{ selected_year }}"
@@ -306,7 +315,8 @@
                                                  onmouseenter="showItemCard(event, this)"
                                                  onmousemove="positionItemCard(event)"
                                                  onmouseleave="hideItemCard()">
-                                                <div class="flex items-center space-x-1.5 overflow-hidden">
+                                                <div class="flex items-center space-x-1.5 overflow-hidden flex-1 cursor-pointer" 
+                                                     onclick="openEditCalendarModal({{ d.day }}, '{{ item.id }}', '{{ item.text|escape }}', '{{ item.type }}', '{{ item.sticker|escape }}', '{{ item.image_url|escape }}')">
                                                     {% if item.sticker %}
                                                     <span class="text-sm leading-none flex-shrink-0">{{ item.sticker }}</span>
                                                     {% endif %}
@@ -316,15 +326,23 @@
                                                     <span class="font-medium truncate text-[11px] leading-tight" title="{{ item.text }}">{{ item.text }}</span>
                                                 </div>
 
-                                                <!-- Delete Item Action -->
-                                                <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="opacity-0 group-hover/item:opacity-100 transition-opacity ml-1 flex-shrink-0">
-                                                    <input type="hidden" name="action" value="delete_calendar_item">
-                                                    <input type="hidden" name="day" value="{{ d.day }}">
-                                                    <input type="hidden" name="item_id" value="{{ item.id }}">
-                                                    <button type="submit" class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors" title="Delete">
-                                                        <i class="fa-solid fa-xmark text-[10px]"></i>
+                                                <!-- Item Actions: Edit & Delete -->
+                                                <div class="opacity-0 group-hover/item:opacity-100 transition-opacity ml-1 flex-shrink-0 flex items-center space-x-1">
+                                                    <button type="button" 
+                                                            onclick="openEditCalendarModal({{ d.day }}, '{{ item.id }}', '{{ item.text|escape }}', '{{ item.type }}', '{{ item.sticker|escape }}', '{{ item.image_url|escape }}')" 
+                                                            class="text-slate-400 hover:text-indigo-300 p-0.5 transition-colors" 
+                                                            title="Edit Plan">
+                                                        <i class="fa-solid fa-pen-to-square text-[10px]"></i>
                                                     </button>
-                                                </form>
+                                                    <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline">
+                                                        <input type="hidden" name="action" value="delete_calendar_item">
+                                                        <input type="hidden" name="day" value="{{ d.day }}">
+                                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                                        <button type="submit" class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors" title="Delete">
+                                                            <i class="fa-solid fa-xmark text-[10px]"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             </div>
                                         {% endfor %}
                                     {% endif %}
@@ -427,7 +445,7 @@
                     <i class="fa-solid fa-calendar-plus text-sm"></i>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-white">Add Calendar Item / Sticker</h3>
+                    <h3 class="text-base font-bold text-white" id="modal-title-text">Add Calendar Item / Sticker</h3>
                     <p class="text-xs text-slate-400">Target day: <span id="modal-day-display" class="font-semibold text-brand-400">Day 1</span></p>
                 </div>
             </div>
@@ -437,19 +455,20 @@
         </div>
 
         <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="space-y-4">
-            <input type="hidden" name="action" value="add_calendar_item">
+            <input type="hidden" name="action" id="modal-action-input" value="add_calendar_item">
             <input type="hidden" name="day" id="modal-day-input" value="1">
+            <input type="hidden" name="item_id" id="modal-item-id-input" value="">
 
             <!-- Item Text -->
             <div>
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Plan / Deadline Description</label>
-                <input type="text" name="item_text" required placeholder="e.g. Q3 Financial Report Deadline..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <input type="text" name="item_text" id="modal-item-text" required placeholder="e.g. Q3 Financial Report Deadline..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
             </div>
 
             <!-- Item Type Selection -->
             <div>
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Category Type</label>
-                <select name="item_type" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <select name="item_type" id="modal-item-type" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
                     <option value="deadline">🚨 Deadline (Rose Alert)</option>
                     <option value="target">🎯 Target Date (Amber Highlight)</option>
                     <option value="plan">📝 Plan Item (Indigo Accent)</option>
@@ -472,7 +491,7 @@
             <!-- Optional Image URL -->
             <div>
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Image URL / Sticker Badge (Optional)</label>
-                <input type="url" name="image_url" placeholder="https://example.com/sticker.png" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <input type="url" name="image_url" id="modal-image-input" placeholder="https://example.com/sticker.png" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
             </div>
 
             <!-- Actions -->
@@ -495,8 +514,28 @@
 
 <script>
 function openCalendarModal(dayNum) {
+    document.getElementById('modal-action-input').value = 'add_calendar_item';
+    document.getElementById('modal-item-id-input').value = '';
+    document.getElementById('modal-title-text').innerText = 'Add Calendar Item / Sticker';
     document.getElementById('modal-day-input').value = dayNum;
     document.getElementById('modal-day-display').innerText = 'Day ' + dayNum;
+    document.getElementById('modal-item-text').value = '';
+    document.getElementById('modal-item-type').value = 'deadline';
+    document.getElementById('modal-sticker-input').value = '';
+    document.getElementById('modal-image-input').value = '';
+    document.getElementById('calendar-modal').classList.remove('hidden');
+}
+
+function openEditCalendarModal(dayNum, itemId, itemText, itemType, sticker, imageUrl) {
+    document.getElementById('modal-action-input').value = 'edit_calendar_item';
+    document.getElementById('modal-item-id-input').value = itemId;
+    document.getElementById('modal-title-text').innerText = 'Edit Calendar Item / Sticker';
+    document.getElementById('modal-day-input').value = dayNum;
+    document.getElementById('modal-day-display').innerText = 'Day ' + dayNum;
+    document.getElementById('modal-item-text').value = itemText;
+    document.getElementById('modal-item-type').value = itemType || 'plan';
+    document.getElementById('modal-sticker-input').value = sticker || '';
+    document.getElementById('modal-image-input').value = imageUrl || '';
     document.getElementById('calendar-modal').classList.remove('hidden');
 }
 
