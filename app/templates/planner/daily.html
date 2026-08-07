@@ -345,9 +345,9 @@
                     <span>Swipe horizontally to view full activity &amp; mood fields</span>
                 </p>
 
-                <!-- Horizontal Scrollable Activity Tracker Container for Mobile -->
+                <!-- Horizontal Scrollable Activity Tracker Container for Mobile & Desktop -->
                 <div class="overflow-x-auto pb-2 -mx-1 px-1">
-                    <div class="space-y-2.5 max-h-[640px] overflow-y-auto pr-1 min-w-[640px] sm:min-w-full">
+                    <div class="space-y-2.5 max-h-[640px] overflow-y-auto pr-1 min-w-[750px] sm:min-w-full">
                         {% for slot in default_slots %}
                         {% set slot_id = slot.replace(':', '_').replace(' ', '_').replace('-', '_') %}
                         {% set slot_data = schedule.get(slot, {}) %}
@@ -360,12 +360,13 @@
                                 {{ slot }}
                             </span>
 
-                            <!-- Activity Field -->
+                            <!-- Activity Field (Expanded to accommodate 50 characters visibly) -->
                             <input type="text" 
                                    name="slot_act_{{ slot_id }}" 
                                    value="{{ act_text }}" 
+                                   size="50"
                                    placeholder="Activity details (e.g. Deep Work, Team Meeting)..." 
-                                   class="flex-1 min-w-[150px] bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all">
+                                   class="flex-1 min-w-[340px] sm:min-w-[450px] bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all">
 
                             <!-- Mood Dropdown with Emoji (Just right to activity field, same row) -->
                             <select name="slot_mood_{{ slot_id }}" 

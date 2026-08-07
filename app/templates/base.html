@@ -79,27 +79,79 @@
                     {% endif %}
                 </div>
 
-                <!-- User Profile & Logout (Desktop) -->
-                <div class="hidden md:flex items-center space-x-4">
-                    <div class="flex items-center space-x-3 px-3 py-1.5 rounded-full bg-slate-700/40 border border-slate-700">
-                        <div class="w-7 h-7 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30 flex items-center justify-center font-bold text-xs">
+                <!-- User Profile & Dropdown Menu -->
+                <div class="relative">
+                    <button id="user-menu-btn" onclick="toggleUserDropdown(event)" class="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer shadow-sm">
+                        <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                             {{ current_user.username[0]|upper }}
                         </div>
-                        <span class="text-sm font-medium text-slate-200">{{ current_user.username }}</span>
-                    </div>
-                    <a href="{{ url_for('auth.logout') }}" class="text-slate-400 hover:text-rose-400 p-2 rounded-lg transition-colors" title="Logout">
-                        <i class="fa-solid fa-right-from-bracket text-lg"></i>
-                    </a>
-                </div>
+                        <span class="text-sm font-medium text-slate-200 max-w-[120px] truncate">{{ current_user.username }}</span>
+                        <i class="fa-solid fa-chevron-down text-slate-400 text-[11px] transition-transform duration-200" id="user-menu-chevron"></i>
+                    </button>
 
-                <!-- User Profile & Logout (Mobile) -->
-                <div class="flex md:hidden items-center space-x-2">
-                    <div class="w-7 h-7 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30 flex items-center justify-center font-bold text-xs" title="{{ current_user.username }}">
-                        {{ current_user.username[0]|upper }}
+                    <!-- Dropdown Menu -->
+                    <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-72 bg-slate-800/95 border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-xl z-50 py-2 divide-y divide-slate-700/60 transform origin-top-right transition-all">
+                        <!-- User Info Header -->
+                        <div class="px-4 py-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-md">
+                                    {{ current_user.username[0]|upper }}
+                                </div>
+                                <div class="truncate">
+                                    <p class="text-sm font-bold text-white truncate">{{ current_user.username }}</p>
+                                    <p class="text-xs text-slate-400 truncate">{{ current_user.email }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Google Drive Operations -->
+                        <div class="py-1.5 space-y-0.5">
+                            <div class="px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center">
+                                <i class="fa-brands fa-google-drive text-sky-400 mr-1.5 text-xs"></i>
+                                <span>Google Drive Cloud</span>
+                            </div>
+
+                            <button onclick="syncToGoogleDrive(); closeUserDropdown();" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors flex items-center space-x-3 group">
+                                <div class="w-6 h-6 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center group-hover:bg-sky-500/20">
+                                    <i class="fa-solid fa-cloud-arrow-up text-xs"></i>
+                                </div>
+                                <span>Sync to Google Drive</span>
+                            </button>
+
+                            <button onclick="restoreFromGoogleDrive(); closeUserDropdown();" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors flex items-center space-x-3 group">
+                                <div class="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:bg-emerald-500/20">
+                                    <i class="fa-solid fa-cloud-arrow-down text-xs"></i>
+                                </div>
+                                <span>Restore Drive Backup</span>
+                            </button>
+
+                            <button onclick="openDriveFolderModal(); closeUserDropdown();" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors flex items-center space-x-3 group" title="Select or Create Google Drive Backup Folder">
+                                <div class="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:bg-amber-500/20">
+                                    <i class="fa-solid fa-folder-gear text-xs"></i>
+                                </div>
+                                <span id="nav-active-drive-folder-text" class="truncate">Folder: {{ current_user.google_drive_folder_name or 'Root Folder' }}</span>
+                            </button>
+                        </div>
+
+                        <!-- System / Logout -->
+                        <div class="py-1.5">
+                            {% if (current_user.email or '').strip().lower() == 'niraj.choudhary1995@gmail.com' %}
+                            <a href="{{ url_for('admin.dashboard') }}" class="px-4 py-2 text-xs font-medium text-amber-300 hover:bg-amber-500/10 transition-colors flex items-center space-x-3 group">
+                                <div class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                                    <i class="fa-solid fa-shield-halved text-xs"></i>
+                                </div>
+                                <span>Admin Panel</span>
+                            </a>
+                            {% endif %}
+
+                            <a href="{{ url_for('auth.logout') }}" class="px-4 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors flex items-center space-x-3 group">
+                                <div class="w-6 h-6 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center group-hover:bg-rose-500/20">
+                                    <i class="fa-solid fa-right-from-bracket text-xs"></i>
+                                </div>
+                                <span>Sign Out</span>
+                            </a>
+                        </div>
                     </div>
-                    <a href="{{ url_for('auth.logout') }}" class="text-slate-400 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Logout">
-                        <i class="fa-solid fa-right-from-bracket text-base"></i>
-                    </a>
                 </div>
                 {% else %}
                 <div class="flex items-center space-x-3">
@@ -174,6 +226,74 @@
         {% block content %}{% endblock %}
     </main>
 
+    <!-- Google Drive Backup Folder Selection Modal (Global) -->
+    {% if current_user.is_authenticated %}
+    <dialog id="drive-folder-modal" class="bg-slate-900 border border-slate-700 text-slate-100 rounded-2xl p-6 shadow-2xl backdrop:bg-slate-950/80 max-w-xl w-full">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
+                    <i class="fa-solid fa-folder-tree text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Google Drive Backup Location</h3>
+                    <p class="text-xs text-slate-400">Navigate subfolders or create nested backup directories</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('drive-folder-modal').close()" class="text-slate-400 hover:text-white p-1">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="space-y-4 py-4">
+            <!-- Folder Breadcrumb Path Navigation Bar -->
+            <div class="bg-slate-800/80 border border-slate-700/70 rounded-xl p-3 flex items-center flex-wrap gap-1.5 text-xs">
+                <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] mr-1">Current Directory:</span>
+                <div id="drive-folder-breadcrumbs" class="flex items-center flex-wrap gap-1">
+                    <!-- Dynamically populated breadcrumbs -->
+                </div>
+            </div>
+
+            <!-- Directory Contents List -->
+            <div class="space-y-1.5">
+                <div class="flex items-center justify-between px-1">
+                    <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Subfolders in Current Directory</span>
+                    <button type="button" onclick="loadDriveSubfolders(currentBrowseParentId)" class="text-[11px] text-sky-400 hover:underline flex items-center space-x-1">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+
+                <div id="drive-folder-tree-list" class="bg-slate-950/60 border border-slate-800 rounded-xl p-2 max-h-52 overflow-y-auto space-y-1 min-h-[120px]">
+                    <!-- Dynamically populated subfolders list -->
+                </div>
+            </div>
+
+            <!-- Target Location Confirmation Bar -->
+            <div class="p-3 bg-brand-950/40 border border-brand-500/30 rounded-xl flex items-center justify-between">
+                <div class="truncate mr-2">
+                    <p class="text-[11px] text-slate-400 font-medium">Selected Backup Target:</p>
+                    <p id="drive-selected-target-path" class="text-xs font-bold text-brand-300 truncate">My Drive (Root Folder)</p>
+                </div>
+                <button type="button" onclick="setCurrentlyBrowsedAsBackupTarget()" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition-all whitespace-nowrap shadow-md flex items-center space-x-1">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Set Folder as Target</span>
+                </button>
+            </div>
+
+            <!-- Create New Subfolder in Current Directory -->
+            <div class="pt-2 border-t border-slate-800 space-y-2">
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">+ Create Subfolder in Current Directory</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="new-drive-folder-name" placeholder="e.g. chronos planner folder" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <button type="button" onclick="createNewDriveSubfolder()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all whitespace-nowrap shadow-md">
+                        + Create & Set Target
+                    </button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+    {% endif %}
+
     <!-- Footer -->
     <footer class="border-t border-slate-800 bg-slate-900/50 py-6 mt-12 text-center text-xs text-slate-500">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
@@ -189,7 +309,193 @@
     </footer>
 
     <!-- Main JavaScript -->
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=2"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=3"></script>
+    <script>
+    function toggleUserDropdown(event) {
+        if (event) event.stopPropagation();
+        const dropdown = document.getElementById('user-menu-dropdown');
+        const chevron = document.getElementById('user-menu-chevron');
+        if (!dropdown) return;
+        const isHidden = dropdown.classList.contains('hidden');
+        if (isHidden) {
+            dropdown.classList.remove('hidden');
+            if (chevron) chevron.classList.add('rotate-180');
+        } else {
+            dropdown.classList.add('hidden');
+            if (chevron) chevron.classList.remove('rotate-180');
+        }
+    }
+
+    function closeUserDropdown() {
+        const dropdown = document.getElementById('user-menu-dropdown');
+        const chevron = document.getElementById('user-menu-chevron');
+        if (dropdown && !dropdown.classList.contains('hidden')) {
+            dropdown.classList.add('hidden');
+            if (chevron) chevron.classList.remove('rotate-180');
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = document.getElementById('user-menu-btn');
+        const dropdown = document.getElementById('user-menu-dropdown');
+        if (btn && dropdown && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+            closeUserDropdown();
+        }
+    });
+
+    let driveFolderStack = [{ id: 'root', name: 'My Drive' }];
+    let currentBrowseParentId = 'root';
+
+    async function openDriveFolderModal() {
+        const modal = document.getElementById('drive-folder-modal');
+        if (modal) {
+            modal.showModal();
+            driveFolderStack = [{ id: 'root', name: 'My Drive' }];
+            await loadDriveSubfolders('root');
+        }
+    }
+
+    async function loadDriveSubfolders(parentId) {
+        currentBrowseParentId = parentId;
+        const treeList = document.getElementById('drive-folder-tree-list');
+        if (!treeList) return;
+        treeList.innerHTML = '<div class="text-xs text-slate-400 p-3 text-center">Loading subfolders...</div>';
+        
+        updateBreadcrumbsUI();
+        
+        try {
+            const response = await fetch(`/api/google/drive/folders?parent_id=${encodeURIComponent(parentId)}`);
+            const data = await response.json();
+            
+            treeList.innerHTML = '';
+            
+            if (data.success && data.folders && data.folders.length > 0) {
+                data.folders.forEach(f => {
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center justify-between p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-700/60 border border-slate-700/40 transition-colors cursor-pointer group';
+                    item.onclick = () => navigateIntoFolder(f.id, f.name);
+                    item.innerHTML = `
+                        <div class="flex items-center space-x-2.5 truncate">
+                            <i class="fa-solid fa-folder text-amber-400 text-sm group-hover:text-amber-300"></i>
+                            <span class="text-xs font-medium text-slate-200 group-hover:text-white truncate">${f.name}</span>
+                        </div>
+                        <span class="text-[10px] text-sky-400 font-semibold px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 group-hover:bg-sky-500/20">Open &rarr;</span>
+                    `;
+                    treeList.appendChild(item);
+                });
+            } else {
+                treeList.innerHTML = '<div class="text-xs text-slate-400 p-4 text-center">No subfolders found in this directory. You can create a new subfolder below!</div>';
+            }
+
+        } catch (e) {
+            treeList.innerHTML = '<div class="text-xs text-rose-400 p-3 text-center">Failed to fetch subfolders.</div>';
+        }
+    }
+
+    function navigateIntoFolder(id, name) {
+        driveFolderStack.push({ id: id, name: name });
+        loadDriveSubfolders(id);
+    }
+
+    function navigateToBreadcrumb(index) {
+        driveFolderStack = driveFolderStack.slice(0, index + 1);
+        const target = driveFolderStack[driveFolderStack.length - 1];
+        loadDriveSubfolders(target.id);
+    }
+
+    function updateBreadcrumbsUI() {
+        const bcContainer = document.getElementById('drive-folder-breadcrumbs');
+        if (!bcContainer) return;
+        bcContainer.innerHTML = '';
+        
+        driveFolderStack.forEach((crumb, idx) => {
+            if (idx > 0) {
+                const sep = document.createElement('span');
+                sep.className = 'text-slate-600 text-xs';
+                sep.innerText = '/';
+                bcContainer.appendChild(sep);
+            }
+            
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.onclick = () => navigateToBreadcrumb(idx);
+            btn.className = `px-2 py-0.5 rounded text-xs font-medium transition-colors ${idx === driveFolderStack.length - 1 ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'}`;
+            btn.innerText = crumb.name;
+            bcContainer.appendChild(btn);
+        });
+
+        const fullPathStr = driveFolderStack.map(c => c.name).join(' / ');
+        const pathEl = document.getElementById('drive-selected-target-path');
+        if (pathEl) pathEl.innerText = fullPathStr;
+    }
+
+    async function setCurrentlyBrowsedAsBackupTarget() {
+        const currentCrumb = driveFolderStack[driveFolderStack.length - 1];
+        const fullPathStr = driveFolderStack.map(c => c.name).join(' / ');
+
+        try {
+            const res = await fetch('/api/google/drive/folder_settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'select',
+                    folder_id: currentCrumb.id,
+                    folder_name: currentCrumb.name,
+                    folder_path: fullPathStr
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                const text = `Folder: ${data.folder_name}`;
+                const navTextEl = document.getElementById('nav-active-drive-folder-text');
+                if (navTextEl) navTextEl.innerText = text;
+                const btnTextEl = document.getElementById('active-drive-folder-btn-text');
+                if (btnTextEl) btnTextEl.innerText = text;
+                const modal = document.getElementById('drive-folder-modal');
+                if (modal) modal.close();
+                if (window.showToast) window.showToast(`Backup location updated to "${fullPathStr}"`, 'success');
+            }
+        } catch (e) {
+            alert('Failed to set backup target.');
+        }
+    }
+
+    async function createNewDriveSubfolder() {
+        const input = document.getElementById('new-drive-folder-name');
+        if (!input) return;
+        const folderName = input.value.trim() || 'chronos planner folder';
+        const parentCrumb = driveFolderStack[driveFolderStack.length - 1];
+        const fullPathStr = driveFolderStack.map(c => c.name).concat([folderName]).join(' / ');
+
+        try {
+            const res = await fetch('/api/google/drive/folder_settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'create',
+                    folder_name: folderName,
+                    parent_id: parentCrumb.id,
+                    folder_path: fullPathStr
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                const text = `Folder: ${data.folder_name}`;
+                const navTextEl = document.getElementById('nav-active-drive-folder-text');
+                if (navTextEl) navTextEl.innerText = text;
+                const btnTextEl = document.getElementById('active-drive-folder-btn-text');
+                if (btnTextEl) btnTextEl.innerText = text;
+                input.value = '';
+                const modal = document.getElementById('drive-folder-modal');
+                if (modal) modal.close();
+                if (window.showToast) window.showToast(`Created & set target folder: "${fullPathStr}"`, 'success');
+            }
+        } catch (e) {
+            alert('Failed to create folder.');
+        }
+    }
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+
