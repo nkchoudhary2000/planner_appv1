@@ -50,7 +50,7 @@
 
                 <!-- Navigation Links (Logged In) -->
                 {% if current_user.is_authenticated %}
-                <div class="hidden md:flex items-center space-x-1 lg:space-x-2">
+                <div class="hidden lg:flex items-center space-x-1 lg:space-x-2">
                     <a href="{{ url_for('planner.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner.dashboard' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
                         <i class="fa-solid fa-chart-pie"></i>
                         <span>Dashboard</span>
@@ -166,9 +166,9 @@
             </div>
         </div>
 
-        <!-- Mobile Navigation Subbar (All 5 Tabs) -->
+        <!-- Mobile & Tablet Navigation Subbar (All 5 Tabs) -->
         {% if current_user.is_authenticated %}
-        <div class="md:hidden border-t border-slate-700/50 px-2 py-2 flex items-center justify-between bg-slate-800/95 overflow-x-auto gap-1">
+        <div class="lg:hidden border-t border-slate-700/50 px-2 py-2 flex items-center justify-between bg-slate-800/95 overflow-x-auto gap-1">
             <a href="{{ url_for('planner.dashboard') }}" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.dashboard' else 'text-slate-300 hover:bg-slate-700/60' }}">
                 <i class="fa-solid fa-chart-pie text-[11px]"></i>
                 <span>Dashboard</span>

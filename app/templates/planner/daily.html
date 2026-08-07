@@ -54,23 +54,25 @@
                 </div>
 
                 <!-- Add Task Form -->
-                <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+                <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="space-y-3">
                     <input type="hidden" name="action" value="add_task">
-                    <input type="text" name="task_text" required placeholder="Add a new task..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <select name="priority" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Low">Low</option>
-                        </select>
-                        <label class="flex items-center space-x-1.5 text-xs text-amber-300 font-medium cursor-pointer bg-amber-500/10 px-2.5 py-2 rounded-xl border border-amber-500/20 hover:bg-amber-500/20 transition-all flex-shrink-0" title="Auto-populate this daily routine task every single day">
-                            <input type="checkbox" name="is_default" value="1" class="rounded border-amber-500/50 text-amber-500 focus:ring-amber-500 bg-slate-900">
-                            <i class="fa-solid fa-rotate text-amber-400 text-[11px]"></i>
-                            <span>Everyday Default</span>
-                        </label>
-                        <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1.5 whitespace-nowrap">
+                    <input type="text" name="task_text" required placeholder="Add a new task..." class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <select name="priority" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Low">Low</option>
+                            </select>
+                            <label class="flex items-center space-x-1.5 text-xs text-amber-300 font-medium cursor-pointer bg-amber-500/10 px-2.5 py-1.5 rounded-xl border border-amber-500/20 hover:bg-amber-500/20 transition-all select-none flex-shrink-0" title="Auto-populate this daily routine task every single day">
+                                <input type="checkbox" name="is_default" value="1" class="rounded border-amber-500/50 text-amber-500 focus:ring-amber-500 bg-slate-900">
+                                <i class="fa-solid fa-rotate text-amber-400 text-[11px]"></i>
+                                <span>Everyday Default</span>
+                            </label>
+                        </div>
+                        <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1.5 whitespace-nowrap ml-auto">
                             <i class="fa-solid fa-plus text-xs"></i>
-                            <span>Add</span>
+                            <span>Add Task</span>
                         </button>
                     </div>
                 </form>
