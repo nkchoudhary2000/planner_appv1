@@ -18,7 +18,7 @@ def index():
 
 def process_task_spillovers(user_id, target_date):
     """
-    Automatically rolls over uncompleted tasks from past dates up to target_date.
+    Automatically rolls over uncompleted non-default tasks from past dates up to target_date.
     Increments spillover_count (pending days) and escalates priority up to 'High' (max severity).
     """
     past_plans = DailyPlan.query.filter(
@@ -38,7 +38,8 @@ def process_task_spillovers(user_id, target_date):
         curr_plan = plan_map.get(curr_date)
 
         if curr_plan and curr_plan.tasks:
-            uncompleted = [t for t in curr_plan.tasks if isinstance(t, dict) and not t.get('completed')]
+            # Only non-default uncompleted tasks spill over
+            uncompleted = [t for t in curr_plan.tasks if isinstance(t, dict) and not t.get('completed') and not t.get('is_default')]
             if uncompleted:
                 next_plan = plan_map.get(next_date)
                 if not next_plan:
@@ -92,6 +93,103 @@ def process_task_spillovers(user_id, target_date):
     db.session.commit()
 
 
+def populate_daily_defaults(user_id, target_date):
+    """
+    Populates default daily routine tasks and default activity schedule slots
+    for target_date if they are not already set.
+    """
+    past_plans = DailyPlan.query.filter(
+        DailyPlan.user_id == user_id
+    ).order_by(DailyPlan.date.desc()).all()
+
+    if not past_plans:
+        return
+
+    default_tasks_master = {}
+    default_schedule_master = {}
+
+    for p in past_plans:
+        if p.tasks:
+            for t in p.tasks:
+                if isinstance(t, dict) and t.get('is_default'):
+                    t_text = t.get('text', '').strip()
+                    if t_text and t_text.lower() not in default_tasks_master:
+                        default_tasks_master[t_text.lower()] = {
+                            'text': t_text,
+                            'priority': t.get('priority', 'Medium'),
+                            'is_default': True
+                        }
+        if p.schedule:
+            for slot, sdata in p.schedule.items():
+                if slot.startswith('_'):
+                    continue
+                if isinstance(sdata, dict) and sdata.get('is_default') and sdata.get('activity'):
+                    if slot not in default_schedule_master:
+                        default_schedule_master[slot] = {
+                            'activity': sdata.get('activity', ''),
+                            'mood': sdata.get('mood', ''),
+                            'is_default': True
+                        }
+
+    if not default_tasks_master and not default_schedule_master:
+        return
+
+    plan = DailyPlan.query.filter_by(user_id=user_id, date=target_date).first()
+    if not plan:
+        plan = DailyPlan(user_id=user_id, date=target_date, schedule={}, tasks=[], notes='')
+        db.session.add(plan)
+
+    tasks = list(plan.tasks or [])
+    schedule = dict(plan.schedule or {})
+    modified = False
+
+    dismissed_ids = set()
+    if isinstance(schedule, dict):
+        dismissed_ids = set(schedule.get('_dismissed_tasks', []))
+
+    # Populate default tasks
+    existing_texts = {t.get('text', '').strip().lower() for t in tasks if isinstance(t, dict) and t.get('text')}
+    for key_lower, dtask in default_tasks_master.items():
+        if key_lower not in existing_texts:
+            new_id = f"def_{int(datetime.utcnow().timestamp() * 1000)}_{len(tasks)}"
+            if new_id not in dismissed_ids:
+                tasks.append({
+                    'id': new_id,
+                    'text': dtask['text'],
+                    'priority': dtask['priority'],
+                    'completed': False,
+                    'is_default': True,
+                    'is_spillover': False,
+                    'spillover_count': 0,
+                    'original_date': target_date.strftime('%Y-%m-%d')
+                })
+                modified = True
+
+    # Populate default schedule slots
+    for slot, dslot in default_schedule_master.items():
+        curr_val = schedule.get(slot)
+        is_empty = False
+        if not curr_val:
+            is_empty = True
+        elif isinstance(curr_val, dict) and not curr_val.get('activity'):
+            is_empty = True
+
+        if is_empty:
+            schedule[slot] = {
+                'activity': dslot['activity'],
+                'mood': dslot['mood'],
+                'is_default': True
+            }
+            modified = True
+
+    if modified:
+        plan.tasks = tasks
+        plan.schedule = schedule
+        flag_modified(plan, 'tasks')
+        flag_modified(plan, 'schedule')
+        db.session.commit()
+
+
 @planner.route('/dashboard')
 @login_required
 def dashboard():
@@ -99,8 +197,9 @@ def dashboard():
     current_year = today.year
     current_month = today.month
 
-    # Process automatic task spillovers up to today
+    # Process automatic task spillovers and daily routine defaults up to today
     process_task_spillovers(current_user.id, today)
+    populate_daily_defaults(current_user.id, today)
 
     # Get or create today's daily plan
     daily_plan = DailyPlan.query.filter_by(user_id=current_user.id, date=today).first()
@@ -458,8 +557,9 @@ def daily():
     else:
         selected_date = date.today()
 
-    # Automatically process spillover tasks up to selected_date
+    # Automatically process spillover tasks and daily routine defaults up to selected_date
     process_task_spillovers(current_user.id, selected_date)
+    populate_daily_defaults(current_user.id, selected_date)
 
     plan = DailyPlan.query.filter_by(user_id=current_user.id, date=selected_date).first()
 
@@ -476,12 +576,14 @@ def daily():
         if action == 'add_task':
             task_text = request.form.get('task_text', '').strip()
             priority = request.form.get('priority', 'Medium')
+            is_default = bool(request.form.get('is_default'))
             if task_text:
                 new_task = {
                     'id': str(int(datetime.utcnow().timestamp() * 1000)),
                     'text': task_text,
                     'priority': priority,
                     'completed': False,
+                    'is_default': is_default,
                     'is_spillover': False,
                     'spillover_count': 0,
                     'original_date': selected_date.strftime('%Y-%m-%d')
@@ -518,12 +620,17 @@ def daily():
                 "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM", "08:00 - 09:00 PM",
                 "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
             ]
+            raw_sched = plan.schedule or {}
+            if isinstance(raw_sched, dict) and '_dismissed_tasks' in raw_sched:
+                new_schedule['_dismissed_tasks'] = raw_sched['_dismissed_tasks']
+
             for time_slot in default_slots:
                 slot_id = time_slot.replace(':', '_').replace(' ', '_').replace('-', '_')
                 act = request.form.get(f'slot_act_{slot_id}', request.form.get(f'slot_{time_slot}', '')).strip()
                 mood = request.form.get(f'slot_mood_{slot_id}', '').strip()
-                if act or mood:
-                    new_schedule[time_slot] = {'activity': act, 'mood': mood}
+                is_def = bool(request.form.get(f'slot_def_{slot_id}'))
+                if act or mood or is_def:
+                    new_schedule[time_slot] = {'activity': act, 'mood': mood, 'is_default': is_def}
 
             plan.schedule = new_schedule
             flag_modified(plan, 'schedule')
