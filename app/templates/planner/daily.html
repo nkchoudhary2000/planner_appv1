@@ -38,10 +38,10 @@
     </div>
 
     <!-- Dual Column Layout: Tasks Checklist & Hourly Schedule -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         <!-- Left Column: Task Checklist -->
-        <div class="space-y-6">
+        <div class="lg:col-span-5 space-y-6">
             <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
                     <div class="flex items-center space-x-2">
@@ -321,8 +321,8 @@
             </div>
         </div>
 
-        <!-- Right Column: Activity & Mood Tracker -->
-        <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+        <!-- Right Column: Activity & Mood Tracker (Expanded 7-column layout) -->
+        <div class="lg:col-span-7 glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-700/50 gap-2">
                 <div class="flex items-center space-x-2">
                     <i class="fa-solid fa-clock text-amber-400"></i>
@@ -345,9 +345,9 @@
                     <span>Swipe horizontally to view full activity &amp; mood fields</span>
                 </p>
 
-                <!-- Horizontal Scrollable Activity Tracker Container for Mobile & Desktop -->
+                <!-- Activity Tracker Container -->
                 <div class="overflow-x-auto pb-2 -mx-1 px-1">
-                    <div class="space-y-2.5 max-h-[640px] overflow-y-auto pr-1 min-w-[750px] sm:min-w-full">
+                    <div class="space-y-2.5 max-h-[640px] overflow-y-auto pr-1 min-w-[580px] sm:min-w-full">
                         {% for slot in default_slots %}
                         {% set slot_id = slot.replace(':', '_').replace(' ', '_').replace('-', '_') %}
                         {% set slot_data = schedule.get(slot, {}) %}
@@ -360,13 +360,13 @@
                                 {{ slot }}
                             </span>
 
-                            <!-- Activity Field (Expanded to accommodate 50 characters visibly) -->
+                            <!-- Activity Field (Set to 35 character visible width, smoothly fitting in layout) -->
                             <input type="text" 
                                    name="slot_act_{{ slot_id }}" 
                                    value="{{ act_text }}" 
-                                   size="50"
+                                   size="35"
                                    placeholder="Activity details (e.g. Deep Work, Team Meeting)..." 
-                                   class="flex-1 min-w-[340px] sm:min-w-[450px] bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all">
+                                   class="flex-1 min-w-[200px] bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all">
 
                             <!-- Mood Dropdown with Emoji (Just right to activity field, same row) -->
                             <select name="slot_mood_{{ slot_id }}" 
