@@ -738,39 +738,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-
-    // Touch Swipe Left Gesture
-    const cardWrappers = container.querySelectorAll('.task-card-wrapper');
-    cardWrappers.forEach(wrapper => {
-        const item = wrapper.querySelector('.task-item');
-        if (!item) return;
-
-        let startX = 0;
-        let currentX = 0;
-
-        item.addEventListener('touchstart', function(e) {
-            startX = e.touches[0].clientX;
-        }, { passive: true });
-
-        item.addEventListener('touchmove', function(e) {
-            currentX = e.touches[0].clientX;
-            const diffX = currentX - startX;
-            if (diffX < 0 && diffX > -120) {
-                item.style.transform = `translateX(${diffX}px)`;
-            }
-        }, { passive: true });
-
-        item.addEventListener('touchend', function(e) {
-            const diffX = currentX - startX;
-            item.style.transition = 'transform 0.2s ease';
-            if (diffX < -40) {
-                item.style.transform = 'translateX(-90px)';
-            } else {
-                item.style.transform = 'translateX(0)';
-            }
-            setTimeout(() => { item.style.transition = ''; }, 200);
-        });
-    });
 });
 </script>
 {% endblock %}
