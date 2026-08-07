@@ -417,12 +417,14 @@ def daily():
         elif action == 'save_schedule':
             new_schedule = {}
             default_slots = [
-                "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM",
-                "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
-                "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"
+                "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM", "08:00 - 09:00 AM",
+                "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM", "12:00 - 01:00 PM",
+                "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM", "04:00 - 05:00 PM",
+                "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM", "08:00 - 09:00 PM",
+                "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
             ]
             for time_slot in default_slots:
-                slot_id = time_slot.replace(':', '_').replace(' ', '_')
+                slot_id = time_slot.replace(':', '_').replace(' ', '_').replace('-', '_')
                 act = request.form.get(f'slot_act_{slot_id}', request.form.get(f'slot_{time_slot}', '')).strip()
                 mood = request.form.get(f'slot_mood_{slot_id}', '').strip()
                 if act or mood:
@@ -481,25 +483,31 @@ def daily():
 
         return redirect(url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')))
 
-    # 12-Hour AM/PM default schedule slots (06:00 AM to 11:00 PM)
+    # Hourly default schedule slots (05:00 - 06:00 AM to 11:00 - 12:00 AM)
     default_slots = [
-        "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM",
-        "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
-        "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"
+        "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM", "08:00 - 09:00 AM",
+        "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM", "12:00 - 01:00 PM",
+        "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM", "04:00 - 05:00 PM",
+        "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM", "08:00 - 09:00 PM",
+        "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
     ]
 
     # Normalize schedule dict for 12h format & mood tracking
     raw_schedule = plan.schedule if plan and plan.schedule else {}
     normalized_schedule = {}
-    legacy_map = {f'{h:02d}:00': f'{(h if (h % 12 != 0) else 12):02d}:00 {"AM" if h < 12 else "PM"}' for h in range(6, 24)}
+    legacy_map = {f'{h:02d}:00': f'{(h if (h % 12 != 0) else 12):02d}:00 {"AM" if h < 12 else "PM"}' for h in range(5, 24)}
 
     for slot in default_slots:
         val = raw_schedule.get(slot)
         if not val:
-            for k24, v12 in legacy_map.items():
-                if v12 == slot and k24 in raw_schedule:
-                    val = raw_schedule[k24]
-                    break
+            start_time = slot.split(' - ')[0] if ' - ' in slot else slot
+            if start_time in raw_schedule:
+                val = raw_schedule[start_time]
+            else:
+                for k24, v12 in legacy_map.items():
+                    if v12 == start_time and k24 in raw_schedule:
+                        val = raw_schedule[k24]
+                        break
 
         if isinstance(val, dict):
             normalized_schedule[slot] = val
@@ -1161,11 +1169,13 @@ def export_daily_excel():
                 "Completed" if t.get('completed') else "Pending"
             ])
 
-    # 12-Hour Schedule & Mood Sheet
+    # Hourly Schedule & Mood Sheet
     default_slots = [
-        "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM",
-        "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
-        "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"
+        "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM", "08:00 - 09:00 AM",
+        "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM", "12:00 - 01:00 PM",
+        "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM", "04:00 - 05:00 PM",
+        "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM", "08:00 - 09:00 PM",
+        "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
     ]
     schedule_rows = [["Time Slot", "Activity Details", "Hourly Mood Tag"]]
     raw_schedule = plan.schedule if plan and plan.schedule else {}
