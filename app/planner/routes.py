@@ -1232,6 +1232,85 @@ def api_toggle_task():
     return jsonify({'success': False, 'message': 'Task not found'}), 404
 
 
+# AJAX Endpoint for dynamic reordering of tasks
+@planner.route('/api/daily/task/reorder', methods=['POST'])
+@login_required
+def api_reorder_tasks():
+    data = request.get_json() or {}
+    date_str = data.get('date')
+    task_ids = data.get('task_ids', [])
+
+    if not date_str or not isinstance(task_ids, list):
+        return jsonify({'success': False, 'message': 'Missing or invalid arguments'}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+    if not plan:
+        return jsonify({'success': False, 'message': 'Plan not found'}), 404
+
+    tasks = plan.tasks or []
+    task_map = {t.get('id'): t for t in tasks if isinstance(t, dict) and t.get('id')}
+
+    reordered = []
+    for tid in task_ids:
+        if tid in task_map:
+            reordered.append(task_map.pop(tid))
+
+    # Append any remaining tasks that weren't specified
+    reordered.extend(task_map.values())
+
+    plan.tasks = reordered
+    flag_modified(plan, 'tasks')
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# AJAX Endpoint for dynamic task editing
+@planner.route('/api/daily/task/edit', methods=['POST'])
+@login_required
+def api_edit_task():
+    data = request.get_json() or {}
+    date_str = data.get('date')
+    task_id = data.get('task_id')
+    new_text = data.get('text', '').strip()
+    new_priority = data.get('priority', 'Medium')
+    is_default = bool(data.get('is_default'))
+
+    if not date_str or not task_id or not new_text:
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+    if not plan:
+        return jsonify({'success': False, 'message': 'Plan not found'}), 404
+
+    tasks = plan.tasks or []
+    updated = False
+
+    for t in tasks:
+        if isinstance(t, dict) and t.get('id') == task_id:
+            t['text'] = new_text
+            t['priority'] = new_priority
+            t['is_default'] = is_default
+            updated = True
+            break
+
+    if updated:
+        plan.tasks = tasks
+        flag_modified(plan, 'tasks')
+        db.session.commit()
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'message': 'Task not found'}), 404
+
+
 # AJAX Endpoint for habit tracker day toggle
 @planner.route('/api/monthly/habit/toggle', methods=['POST'])
 @login_required
