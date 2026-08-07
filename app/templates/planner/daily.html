@@ -99,34 +99,15 @@
                         {% set spill_count = task.spillover_count or 1 %}
                         {% set is_def = task.get('is_default') %}
 
-                        <div class="task-card-wrapper relative overflow-hidden rounded-xl group transition-all">
-                            <!-- Hidden Action Bar (Revealed on Swipe Left or Mobile) -->
-                            <div class="absolute inset-y-0 right-0 flex items-center bg-slate-900/90 border-l border-slate-700/80 px-2 space-x-1.5 z-0">
-                                <button type="button" 
-                                        onclick="openEditTaskModal('{{ task.id }}', '{{ task.text|replace("'", "\\'")|replace('"', '&quot;') }}', '{{ task.priority }}', {{ 'true' if is_def else 'false' }})" 
-                                        class="p-2 rounded-lg bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white text-xs transition-colors flex items-center space-x-1" 
-                                        title="Edit Task">
-                                    <i class="fa-solid fa-pen-to-square"></i>
-                                    <span class="text-[11px] font-medium hidden sm:inline">Edit</span>
-                                </button>
-                                <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="inline">
-                                    <input type="hidden" name="action" value="delete_task">
-                                    <input type="hidden" name="task_id" value="{{ task.id }}">
-                                    <button type="submit" class="p-2 rounded-lg bg-rose-600/30 text-rose-300 hover:bg-rose-600 hover:text-white text-xs transition-colors flex items-center space-x-1" title="Delete Task">
-                                        <i class="fa-solid fa-trash-can"></i>
-                                        <span class="text-[11px] font-medium hidden sm:inline">Delete</span>
-                                    </button>
-                                </form>
-                            </div>
-
-                            <!-- Main Task Card Content -->
-                            <div class="task-item relative z-10 flex items-center justify-between p-3.5 rounded-xl transition-all gap-2 cursor-grab active:cursor-grabbing {{ 'bg-indigo-950/30 border border-indigo-500/40 hover:border-indigo-400 text-indigo-100 shadow-sm shadow-indigo-500/10' if is_def else ('bg-rose-950/30 border border-rose-500/50 hover:border-rose-400 shadow-sm shadow-rose-500/10' if (is_spill and task.priority == 'High') else ('bg-amber-950/20 border border-amber-500/35 hover:border-amber-400' if is_spill else 'bg-slate-800/60 border border-slate-700/40 hover:border-slate-600')) }}"
+                        <div class="task-card-wrapper relative rounded-xl border {{ 'bg-indigo-950/30 border-indigo-500/40 hover:border-indigo-400 text-indigo-100 shadow-sm shadow-indigo-500/10' if is_def else ('bg-rose-950/30 border-rose-500/50 hover:border-rose-400 shadow-sm shadow-rose-500/10' if (is_spill and task.priority == 'High') else ('bg-amber-950/20 border-amber-500/35 hover:border-amber-400' if is_spill else 'bg-slate-800/60 border-slate-700/40 hover:border-slate-600')) }} transition-all">
+                            <!-- Main Task Card Header/Content -->
+                            <div class="task-item flex items-center justify-between p-3.5 gap-2 cursor-grab active:cursor-grabbing"
                                  draggable="true"
                                  data-task-id="{{ task.id }}">
                                 
                                 <div class="flex items-center space-x-2.5 flex-1 min-w-0 pr-1">
                                     <!-- Drag Handle -->
-                                    <i class="fa-solid fa-grip-vertical text-slate-500 group-hover:text-slate-300 cursor-grab px-0.5 text-xs flex-shrink-0 drag-handle" title="Drag to re-order"></i>
+                                    <i class="fa-solid fa-grip-vertical text-slate-500 hover:text-slate-300 cursor-grab px-0.5 text-xs flex-shrink-0 drag-handle" title="Drag to re-order"></i>
 
                                     <!-- Task Completion Checkbox -->
                                     <input type="checkbox" 
@@ -171,18 +152,36 @@
                                         </button>
                                     </div>
 
-                                    <!-- Desktop Action Buttons -->
+                                    <!-- Single Action Menu Toggle Button -->
+                                    <button type="button" 
+                                            onclick="toggleTaskActions('{{ task.id }}')" 
+                                            class="p-1.5 rounded-lg bg-slate-900/60 hover:bg-indigo-600/30 text-slate-400 hover:text-indigo-300 border border-slate-700/60 transition-all ml-1" 
+                                            title="Actions (Edit / Delete)">
+                                        <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Animated Smooth Sliding Action Drawer (Opens on click of ⋮ button or swipe) -->
+                            <div id="action-drawer-{{ task.id }}" 
+                                 class="task-action-drawer hidden overflow-hidden transition-all duration-300 bg-slate-900/90 border-t border-slate-700/60 rounded-b-xl px-4 py-2 flex items-center justify-between animate-fadeIn">
+                                <span class="text-xs text-slate-400 font-medium flex items-center space-x-1.5">
+                                    <i class="fa-solid fa-sliders text-indigo-400 text-[11px]"></i>
+                                    <span>Task Options</span>
+                                </span>
+                                <div class="flex items-center space-x-2">
                                     <button type="button" 
                                             onclick="openEditTaskModal('{{ task.id }}', '{{ task.text|replace("'", "\\'")|replace('"', '&quot;') }}', '{{ task.priority }}', {{ 'true' if is_def else 'false' }})" 
-                                            class="text-slate-400 hover:text-indigo-300 p-1 rounded-lg transition-colors hidden sm:inline-block" 
-                                            title="Edit Task">
-                                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                            class="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-xs font-semibold border border-indigo-500/30 transition-all flex items-center space-x-1.5 shadow-sm">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                        <span>Edit Task</span>
                                     </button>
                                     <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="inline">
                                         <input type="hidden" name="action" value="delete_task">
                                         <input type="hidden" name="task_id" value="{{ task.id }}">
-                                        <button type="submit" class="text-slate-400 hover:text-rose-400 p-1 rounded-lg transition-colors hidden sm:inline-block" title="Delete Task">
-                                            <i class="fa-solid fa-trash-can text-xs"></i>
+                                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white text-xs font-semibold border border-rose-500/30 transition-all flex items-center space-x-1.5 shadow-sm">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                            <span>Delete Task</span>
                                         </button>
                                     </form>
                                 </div>
@@ -564,8 +563,18 @@ function updateIntensityVal(val) {
         styleClass = 'bg-orange-500/20 text-orange-300 border-orange-500/30';
     }
 
-    badge.className = `px-2.5 py-0.5 rounded-lg text-xs font-bold border ${styleClass}`;
-    badge.innerText = `${val}/10 (${label})`;
+// Toggle Sliding Task Action Drawer
+function toggleTaskActions(taskId) {
+    const drawer = document.getElementById(`action-drawer-${taskId}`);
+    if (!drawer) return;
+    const isHidden = drawer.classList.contains('hidden');
+    
+    // Close all other task action drawers
+    document.querySelectorAll('.task-action-drawer').forEach(d => d.classList.add('hidden'));
+
+    if (isHidden) {
+        drawer.classList.remove('hidden');
+    }
 }
 
 // Edit Task Modal Functions
