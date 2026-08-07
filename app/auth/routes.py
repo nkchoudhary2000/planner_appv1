@@ -105,7 +105,8 @@ def google_login():
         flash('Logged in via Google Account! Google Drive sync is enabled.', 'success')
         return redirect(url_for('planner.dashboard'))
 
-    redirect_uri = url_for('auth.google_callback', _external=True)
+    scheme = 'https' if request.headers.get('X-Forwarded-Proto') == 'https' or not (request.host.startswith('127.0.0.1') or request.host.startswith('localhost')) else 'http'
+    redirect_uri = url_for('auth.google_callback', _external=True, _scheme=scheme)
     return oauth.google.authorize_redirect(redirect_uri, access_type='offline', prompt='select_account')
 
 
