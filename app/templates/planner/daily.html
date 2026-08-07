@@ -14,24 +14,24 @@
         </div>
 
         <!-- Date Controls -->
-        <div class="flex items-center space-x-3">
+        <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
             {% set prev_date = selected_date.fromordinal(selected_date.toordinal() - 1).strftime('%Y-%m-%d') %}
             {% set next_date = selected_date.fromordinal(selected_date.toordinal() + 1).strftime('%Y-%m-%d') %}
 
-            <a href="{{ url_for('planner.daily', date=prev_date) }}" class="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-all" title="Previous Day">
-                <i class="fa-solid fa-chevron-left"></i>
+            <a href="{{ url_for('planner.daily', date=prev_date) }}" class="p-2 sm:p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-all" title="Previous Day">
+                <i class="fa-solid fa-chevron-left text-xs sm:text-base"></i>
             </a>
 
             <form action="{{ url_for('planner.daily') }}" method="GET" class="flex items-center">
-                <input type="date" name="date" value="{{ selected_date.strftime('%Y-%m-%d') }}" onchange="this.form.submit()" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <input type="date" name="date" value="{{ selected_date.strftime('%Y-%m-%d') }}" onchange="this.form.submit()" class="bg-slate-800 border border-slate-700 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
             </form>
 
-            <a href="{{ url_for('planner.daily', date=next_date) }}" class="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-all" title="Next Day">
-                <i class="fa-solid fa-chevron-right"></i>
+            <a href="{{ url_for('planner.daily', date=next_date) }}" class="p-2 sm:p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-all" title="Next Day">
+                <i class="fa-solid fa-chevron-right text-xs sm:text-base"></i>
             </a>
 
-            <a href="{{ url_for('planner.export_daily_excel', date=selected_date.strftime('%Y-%m-%d')) }}" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5" title="Export Daily Plan to Excel">
-                <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
+            <a href="{{ url_for('planner.export_daily_excel', date=selected_date.strftime('%Y-%m-%d')) }}" class="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5" title="Export Daily Plan to Excel">
+                <i class="fa-solid fa-file-excel text-emerald-400 text-xs sm:text-sm"></i>
                 <span>Export Excel</span>
             </a>
         </div>
