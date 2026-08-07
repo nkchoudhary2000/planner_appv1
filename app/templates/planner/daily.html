@@ -105,119 +105,98 @@
                              data-task-priority="{{ task.priority }}"
                              data-task-default="{{ 'true' if is_def else 'false' }}">
                             <!-- Main Task Card Header/Content -->
-                            <div class="task-item flex items-center justify-between p-2.5 sm:p-3.5 gap-1.5 sm:gap-2">
+                            <div class="task-item flex items-center justify-between p-2.5 sm:p-3.5 gap-2">
                                 
                                 <div class="flex items-center space-x-2 sm:space-x-2.5 flex-1 min-w-0 pr-1">
-                                    <!-- Drag Handle (Desktop only) -->
-                                    <i class="hidden sm:inline-block fa-solid fa-grip-vertical text-slate-500 hover:text-slate-200 cursor-grab active:cursor-grabbing px-1 py-1 text-sm flex-shrink-0 drag-handle" 
-                                       draggable="true" 
-                                       title="Click and drag to re-order task"></i>
-
                                     <!-- Task Completion Checkbox -->
                                     <input type="checkbox" 
                                            {{ 'checked' if task.completed }} 
                                            onchange="toggleTask('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)"
                                            class="custom-checkbox flex-shrink-0">
 
-                                    <!-- Task Text (Priority #1 on Mobile: max width & full visibility) -->
-                                    <span class="task-text text-xs sm:text-sm font-medium break-words sm:truncate flex-1 {{ 'line-through-fade text-slate-400' if task.completed else ('text-indigo-200 font-medium' if is_def else 'text-slate-200') }}">
+                                    <!-- Task Text (Max Priority & Visibility on Laptop and Mobile) -->
+                                    <span class="task-text text-xs sm:text-sm font-medium break-words flex-1 {{ 'line-through-fade text-slate-400' if task.completed else ('text-indigo-200 font-medium' if is_def else 'text-slate-200') }}">
                                         {{ task.text }}
                                     </span>
                                 </div>
                                 
-                                <div class="flex items-center space-x-1 sm:space-x-1.5 flex-shrink-0">
-                                    <!-- Icon-Only Default Routine Indicator (Desktop) -->
-                                    {% if is_def %}
-                                    <span class="hidden sm:flex w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 items-center justify-center text-xs" title="Everyday Default Routine Task">
-                                        <i class="fa-solid fa-rotate text-indigo-400 text-[10px]"></i>
-                                    </span>
-                                    {% endif %}
-
-                                    <!-- Spillover Pending Badge (Desktop) -->
-                                    {% if is_spill %}
-                                    <span class="hidden sm:flex text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 items-center space-x-1" title="Carried forward from {{ task.original_date or 'previous day' }}">
-                                        <i class="fa-solid fa-fire text-amber-400 text-[9px]"></i>
-                                        <span>Pending {{ spill_count }}d</span>
-                                    </span>
-                                    {% endif %}
-
-                                    <!-- Priority Badge -->
-                                    <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider {{ 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' if task.priority == 'High' else ('bg-amber-500/20 text-amber-300 border border-amber-500/30' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300 border border-slate-600') }}">
+                                <div class="flex items-center space-x-1.5 flex-shrink-0">
+                                    <!-- Severity / Priority Badge -->
+                                    <span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider {{ 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' if task.priority == 'High' else ('bg-amber-500/20 text-amber-300 border border-amber-500/30' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300 border border-slate-600') }}">
                                         {{ task.priority }}
                                     </span>
 
-                                    <!-- Edit Button (Directly Visible on Row for Mobile & Desktop) -->
-                                    <button type="button" 
-                                            onclick="openEditTaskModal('{{ task.id }}')" 
-                                            class="p-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 transition-all flex-shrink-0" 
-                                            title="Edit Task">
-                                        <i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i>
-                                    </button>
-
-                                    <!-- Delete Button (Directly Visible on Row for Mobile & Desktop) -->
-                                    <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="inline flex-shrink-0">
-                                        <input type="hidden" name="action" value="delete_task">
-                                        <input type="hidden" name="task_id" value="{{ task.id }}">
-                                        <button type="submit" 
-                                                class="p-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all cursor-pointer" 
-                                                title="Delete Task">
-                                            <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
-                                        </button>
-                                    </form>
-
-                                    <!-- Up / Down Quick Reorder Buttons (Desktop) -->
-                                    <div class="hidden sm:flex items-center space-x-0.5 pl-1 border-l border-slate-700/60">
-                                        <button type="button" onclick="moveTask(this, 'up')" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded transition-colors" title="Move Up">
-                                            <i class="fa-solid fa-chevron-up text-[10px]"></i>
-                                        </button>
-                                        <button type="button" onclick="moveTask(this, 'down')" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded transition-colors" title="Move Down">
-                                            <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                                        </button>
-                                    </div>
-
-                                    <!-- Single Action Menu Toggle Button (Ellipsis for Extra Options & Reorder) -->
+                                    <!-- Single Action Menu Toggle Button (Ellipsis) -->
                                     <button type="button" 
                                             onclick="toggleTaskActions('{{ task.id }}')" 
                                             class="p-1.5 rounded-lg bg-slate-900/80 hover:bg-indigo-600/40 text-slate-300 hover:text-indigo-200 border border-slate-700/80 transition-all cursor-pointer flex-shrink-0" 
-                                            title="More Options (Reorder / Details)">
+                                            title="Task Actions & Options">
                                         <i class="fa-solid fa-ellipsis-vertical text-xs pointer-events-none"></i>
                                     </button>
                                 </div>
                             </div>
 
-                            <!-- Animated Smooth Sliding Action Drawer (Opens on click of ⋮ button) -->
+                            <!-- Animated Smooth Sliding Action Drawer (Opens on click of ⋮ button - Pure Icon Actions) -->
                             <div id="action-drawer-{{ task.id }}" 
-                                 class="task-action-drawer hidden bg-slate-900/95 border-t border-slate-700/60 rounded-b-xl p-3 space-y-2.5 transition-all duration-300">
-                                
-                                <!-- Badges & Details Summary -->
-                                <div class="flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-800 text-[11px]">
-                                    <span class="text-slate-400 font-medium">Task Details:</span>
-                                    {% if is_def %}
-                                    <span class="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-medium flex items-center space-x-1">
-                                        <i class="fa-solid fa-rotate text-indigo-400 text-[9px]"></i>
-                                        <span>Everyday Default</span>
-                                    </span>
-                                    {% endif %}
-                                    {% if is_spill %}
-                                    <span class="px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1">
-                                        <i class="fa-solid fa-fire text-amber-400 text-[9px]"></i>
-                                        <span>Pending {{ spill_count }}d</span>
-                                    </span>
-                                    {% endif %}
-                                </div>
-
-                                <!-- Action Buttons Row (Reorder Up/Down) -->
+                                 class="task-action-drawer hidden bg-slate-900/95 border-t border-slate-700/60 rounded-b-xl p-2.5 transition-all duration-300">
                                 <div class="flex items-center justify-between gap-2">
-                                    <div class="flex items-center space-x-1 bg-slate-800/90 p-1 rounded-lg border border-slate-700/60">
-                                        <span class="text-[10px] text-slate-400 px-1 font-medium">Reorder Position:</span>
-                                        <button type="button" onclick="moveTask(this, 'up')" class="px-2.5 py-1 text-slate-300 hover:text-white bg-slate-700/60 rounded text-xs transition-colors flex items-center space-x-1" title="Move Up">
-                                            <i class="fa-solid fa-chevron-up text-[10px]"></i>
-                                            <span>Move Up</span>
+                                    <!-- Icon Badges Summary -->
+                                    <div class="flex items-center space-x-1.5">
+                                        {% if is_def %}
+                                        <span class="px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-xs font-medium flex items-center space-x-1" title="Everyday Default Task">
+                                            <i class="fa-solid fa-rotate text-indigo-400 text-xs"></i>
+                                            <span class="text-[10px]">Default</span>
+                                        </span>
+                                        {% endif %}
+                                        {% if is_spill %}
+                                        <span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1" title="Carried forward from {{ task.original_date or 'previous day' }}">
+                                            <i class="fa-solid fa-fire text-amber-400 text-xs"></i>
+                                            <span class="text-[10px]">{{ spill_count }}d</span>
+                                        </span>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Action Icon Buttons (Move Up, Move Down, Edit, Delete) -->
+                                    <div class="flex items-center space-x-1.5 ml-auto">
+                                        <!-- Drag Handle Icon -->
+                                        <i class="fa-solid fa-grip-vertical text-slate-500 hover:text-slate-200 cursor-grab active:cursor-grabbing p-2 text-sm flex-shrink-0 drag-handle" 
+                                           draggable="true" 
+                                           title="Click and drag to re-order task"></i>
+
+                                        <!-- Move Up Icon Button -->
+                                        <button type="button" 
+                                                onclick="moveTask(this, 'up')" 
+                                                class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer" 
+                                                title="Move Up">
+                                            <i class="fa-solid fa-chevron-up text-xs pointer-events-none"></i>
                                         </button>
-                                        <button type="button" onclick="moveTask(this, 'down')" class="px-2.5 py-1 text-slate-300 hover:text-white bg-slate-700/60 rounded text-xs transition-colors flex items-center space-x-1" title="Move Down">
-                                            <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                                            <span>Move Down</span>
+
+                                        <!-- Move Down Icon Button -->
+                                        <button type="button" 
+                                                onclick="moveTask(this, 'down')" 
+                                                class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer" 
+                                                title="Move Down">
+                                            <i class="fa-solid fa-chevron-down text-xs pointer-events-none"></i>
                                         </button>
+
+                                        <!-- Edit Task Icon Button -->
+                                        <button type="button" 
+                                                onclick="openEditTaskModal('{{ task.id }}')" 
+                                                class="w-8 h-8 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" 
+                                                title="Edit Task">
+                                            <i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i>
+                                        </button>
+
+                                        <!-- Delete Task Icon Button -->
+                                        <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="inline flex-shrink-0">
+                                            <input type="hidden" name="action" value="delete_task">
+                                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                                            <button type="submit" 
+                                                    class="w-8 h-8 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" 
+                                                    title="Delete Task">
+                                                <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
+                                            </button>
+                                        </form>
                                     </div>
                                 </div>
                             </div>
