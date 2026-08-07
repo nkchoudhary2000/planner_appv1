@@ -16,12 +16,91 @@ def index():
     return redirect(url_for('auth.login'))
 
 
+def process_task_spillovers(user_id, target_date):
+    """
+    Automatically rolls over uncompleted tasks from past dates up to target_date.
+    Increments spillover_count (pending days) and escalates priority up to 'High' (max severity).
+    """
+    past_plans = DailyPlan.query.filter(
+        DailyPlan.user_id == user_id,
+        DailyPlan.date < target_date
+    ).order_by(DailyPlan.date.asc()).all()
+
+    if not past_plans:
+        return
+
+    plan_map = {p.date: p for p in past_plans}
+    earliest_date = past_plans[0].date
+
+    curr_date = earliest_date
+    while curr_date < target_date:
+        next_date = curr_date + timedelta(days=1)
+        curr_plan = plan_map.get(curr_date)
+
+        if curr_plan and curr_plan.tasks:
+            uncompleted = [t for t in curr_plan.tasks if isinstance(t, dict) and not t.get('completed')]
+            if uncompleted:
+                next_plan = plan_map.get(next_date)
+                if not next_plan:
+                    next_plan = DailyPlan.query.filter_by(user_id=user_id, date=next_date).first()
+                if not next_plan:
+                    next_plan = DailyPlan(user_id=user_id, date=next_date, schedule={}, tasks=[], notes='')
+                    db.session.add(next_plan)
+
+                next_tasks = list(next_plan.tasks or [])
+                existing_ids = {t.get('id') for t in next_tasks if isinstance(t, dict) and t.get('id')}
+
+                dismissed_ids = set()
+                raw_sched = next_plan.schedule or {}
+                if isinstance(raw_sched, dict):
+                    dismissed_ids = set(raw_sched.get('_dismissed_tasks', []))
+
+                modified_next = False
+
+                for t in uncompleted:
+                    t_id = t.get('id')
+                    if t_id and t_id not in existing_ids and t_id not in dismissed_ids:
+                        old_priority = t.get('priority', 'Medium')
+                        if old_priority == 'Low':
+                            new_priority = 'Medium'
+                        else:
+                            new_priority = 'High'  # Escalates to High (max severity)
+
+                        spill_count = t.get('spillover_count', 0) + 1
+                        orig_date = t.get('original_date', curr_date.strftime('%Y-%m-%d'))
+
+                        spill_task = {
+                            'id': t_id,
+                            'text': t.get('text', ''),
+                            'priority': new_priority,
+                            'completed': False,
+                            'is_spillover': True,
+                            'spillover_count': spill_count,
+                            'original_date': orig_date
+                        }
+                        next_tasks.append(spill_task)
+                        existing_ids.add(t_id)
+                        modified_next = True
+
+                if modified_next:
+                    next_plan.tasks = next_tasks
+                    flag_modified(next_plan, 'tasks')
+                    plan_map[next_date] = next_plan
+
+        curr_date = next_date
+
+    db.session.commit()
+
+
 @planner.route('/dashboard')
 @login_required
 def dashboard():
     today = date.today()
     current_year = today.year
     current_month = today.month
+
+    # Process automatic task spillovers up to today
+    process_task_spillovers(current_user.id, today)
 
     # Get or create today's daily plan
     daily_plan = DailyPlan.query.filter_by(user_id=current_user.id, date=today).first()
@@ -379,6 +458,9 @@ def daily():
     else:
         selected_date = date.today()
 
+    # Automatically process spillover tasks up to selected_date
+    process_task_spillovers(current_user.id, selected_date)
+
     plan = DailyPlan.query.filter_by(user_id=current_user.id, date=selected_date).first()
 
     if request.method == 'POST':
@@ -399,7 +481,10 @@ def daily():
                     'id': str(int(datetime.utcnow().timestamp() * 1000)),
                     'text': task_text,
                     'priority': priority,
-                    'completed': False
+                    'completed': False,
+                    'is_spillover': False,
+                    'spillover_count': 0,
+                    'original_date': selected_date.strftime('%Y-%m-%d')
                 }
                 tasks.append(new_task)
                 plan.tasks = tasks
@@ -410,6 +495,16 @@ def daily():
         elif action == 'delete_task':
             task_id = request.form.get('task_id')
             plan.tasks = [t for t in tasks if t.get('id') != task_id]
+            
+            raw_sched = plan.schedule or {}
+            if isinstance(raw_sched, dict):
+                dismissed = list(raw_sched.get('_dismissed_tasks', []))
+                if task_id not in dismissed:
+                    dismissed.append(task_id)
+                raw_sched['_dismissed_tasks'] = dismissed
+                plan.schedule = raw_sched
+                flag_modified(plan, 'schedule')
+
             flag_modified(plan, 'tasks')
             db.session.commit()
             flash('Task deleted.', 'info')

@@ -125,19 +125,32 @@
                 {% if today_tasks %}
                 <div class="space-y-3">
                     {% for task in today_tasks %}
-                    <div class="task-item flex items-center justify-between p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 hover:border-slate-600 transition-colors">
-                        <div class="flex items-center space-x-3">
+                    {% set is_spill = task.is_spillover or task.spillover_count %}
+                    {% set spill_count = task.spillover_count or 1 %}
+
+                    <div class="task-item flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl transition-all gap-2 {{ 'bg-rose-950/25 border border-rose-500/40 hover:border-rose-400 shadow-sm' if (is_spill and task.priority == 'High') else ('bg-amber-950/20 border border-amber-500/30' if is_spill else 'bg-slate-800/60 border border-slate-700/40 hover:border-slate-600') }}">
+                        <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                             <input type="checkbox" 
                                    {{ 'checked' if task.completed }} 
                                    onchange="toggleTask('{{ today.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)"
-                                   class="custom-checkbox">
-                            <span class="task-text text-sm font-medium text-slate-200 {{ 'line-through-fade' if task.completed }}">
+                                   class="custom-checkbox flex-shrink-0">
+                            <span class="task-text text-sm font-medium text-slate-200 truncate {{ 'line-through-fade' if task.completed }}">
                                 {{ task.text }}
                             </span>
                         </div>
-                        <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold {{ 'bg-rose-500/10 text-rose-400 border border-rose-500/20' if task.priority == 'High' else ('bg-amber-500/10 text-amber-400 border border-amber-500/20' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300') }}">
-                            {{ task.priority }}
-                        </span>
+
+                        <div class="flex items-center space-x-2 flex-shrink-0 self-end sm:self-auto">
+                            {% if is_spill %}
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1" title="Carried forward from {{ task.original_date or 'previous day' }}">
+                                <i class="fa-solid fa-fire text-amber-400 text-[9px]"></i>
+                                <span>Spillover (Pending {{ spill_count }}d)</span>
+                            </span>
+                            {% endif %}
+
+                            <span class="text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider {{ 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' if task.priority == 'High' else ('bg-amber-500/20 text-amber-300 border border-amber-500/30' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300 border border-slate-600') }}">
+                                {{ task.priority }}
+                            </span>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>

@@ -70,11 +70,30 @@
                     </div>
                 </form>
 
+                <!-- Spillover Tasks Alert Banner -->
+                {% set spillover_tasks = tasks|selectattr('is_spillover')|list %}
+                {% if spillover_tasks %}
+                <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0">
+                            <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                        </div>
+                        <div>
+                            <span class="font-bold text-amber-200">{{ spillover_tasks|length }} Spillover Task(s) Carried Forward</span>
+                            <p class="text-[11px] text-amber-300/80">Uncompleted tasks from previous days have automatically rolled over with escalated severity.</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Task List Items -->
                 <div class="space-y-3 pt-2">
                     {% if tasks %}
                         {% for task in tasks %}
-                        <div class="task-item flex items-center justify-between p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 hover:border-slate-600 transition-colors">
+                        {% set is_spill = task.is_spillover or task.spillover_count %}
+                        {% set spill_count = task.spillover_count or 1 %}
+
+                        <div class="task-item flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl transition-all gap-2 {{ 'bg-rose-950/25 border border-rose-500/40 hover:border-rose-400 shadow-sm shadow-rose-500/10' if (is_spill and task.priority == 'High') else ('bg-amber-950/20 border border-amber-500/30 hover:border-amber-400' if is_spill else 'bg-slate-800/60 border border-slate-700/40 hover:border-slate-600') }}">
                             <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <input type="checkbox" 
                                        {{ 'checked' if task.completed }} 
@@ -85,14 +104,22 @@
                                 </span>
                             </div>
                             
-                            <div class="flex items-center space-x-2 flex-shrink-0">
-                                <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold {{ 'bg-rose-500/10 text-rose-400 border border-rose-500/20' if task.priority == 'High' else ('bg-amber-500/10 text-amber-400 border border-amber-500/20' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300') }}">
+                            <div class="flex flex-wrap items-center gap-1.5 flex-shrink-0 self-end sm:self-auto">
+                                {% if is_spill %}
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1" title="Carried forward from {{ task.original_date or 'previous day' }}">
+                                    <i class="fa-solid fa-fire text-amber-400 text-[9px]"></i>
+                                    <span>Spillover (Pending {{ spill_count }}d)</span>
+                                </span>
+                                {% endif %}
+
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider {{ 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' if task.priority == 'High' else ('bg-amber-500/20 text-amber-300 border border-amber-500/30' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300 border border-slate-600') }}">
                                     {{ task.priority }}
                                 </span>
+
                                 <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="inline">
                                     <input type="hidden" name="action" value="delete_task">
                                     <input type="hidden" name="task_id" value="{{ task.id }}">
-                                    <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
+                                    <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Task">
                                         <i class="fa-solid fa-trash-can text-xs"></i>
                                     </button>
                                 </form>
