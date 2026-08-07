@@ -106,7 +106,7 @@ def google_login():
         return redirect(url_for('planner.dashboard'))
 
     redirect_uri = url_for('auth.google_callback', _external=True)
-    return oauth.google.authorize_redirect(redirect_uri, access_type='offline', prompt='consent')
+    return oauth.google.authorize_redirect(redirect_uri, access_type='offline', prompt='select_account')
 
 
 @auth.route('/google/callback')

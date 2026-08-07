@@ -21,7 +21,7 @@ def init_google_oauth(app):
         client_kwargs={
             'scope': 'openid email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly',
             'access_type': 'offline',
-            'prompt': 'consent'
+            'prompt': 'select_account'
         }
     )
 
