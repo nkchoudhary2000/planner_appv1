@@ -2,6 +2,7 @@ services:
   - type: web
     name: chronos-planner-app
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn run:app
     envVars:
