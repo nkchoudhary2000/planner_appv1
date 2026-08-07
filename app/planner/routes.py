@@ -96,35 +96,57 @@ def process_task_spillovers(user_id, target_date):
 def populate_daily_defaults(user_id, target_date):
     """
     Populates default daily routine tasks and default activity schedule slots
-    for target_date if they are not already set.
+    for target_date based on the latest saved default configurations.
     """
     past_plans = DailyPlan.query.filter(
-        DailyPlan.user_id == user_id
+        DailyPlan.user_id == user_id,
+        DailyPlan.date <= target_date
     ).order_by(DailyPlan.date.desc()).all()
 
     if not past_plans:
         return
 
-    default_tasks_master = {}
-    default_schedule_master = {}
+    # 1. Collect deleted default tasks across plans to prevent resurrection
+    deleted_task_keys = set()
+    for p in past_plans:
+        raw_sched = p.schedule or {}
+        if isinstance(raw_sched, dict):
+            for dkey in raw_sched.get('_deleted_defaults', []):
+                deleted_task_keys.add(str(dkey).lower())
 
+    # 2. Resolve active Default Tasks
+    default_tasks_master = {}
     for p in past_plans:
         if p.tasks:
             for t in p.tasks:
-                if isinstance(t, dict) and t.get('is_default'):
+                if isinstance(t, dict):
                     t_text = t.get('text', '').strip()
-                    if t_text and t_text.lower() not in default_tasks_master:
-                        default_tasks_master[t_text.lower()] = {
+                    t_id = t.get('id', '')
+                    t_key = t_text.lower()
+
+                    if t_key in deleted_task_keys or t_id.lower() in deleted_task_keys:
+                        continue
+
+                    if t.get('is_default') and t_key not in default_tasks_master:
+                        default_tasks_master[t_key] = {
                             'text': t_text,
                             'priority': t.get('priority', 'Medium'),
                             'is_default': True
                         }
+
+    # 3. Resolve Default Schedule Slots based on the MOST RECENT plan setting for each slot
+    default_schedule_master = {}
+    resolved_slots = set()
+
+    for p in past_plans:
         if p.schedule:
             for slot, sdata in p.schedule.items():
-                if slot.startswith('_'):
+                if slot.startswith('_') or slot in resolved_slots:
                     continue
-                if isinstance(sdata, dict) and sdata.get('is_default') and sdata.get('activity'):
-                    if slot not in default_schedule_master:
+
+                if isinstance(sdata, dict):
+                    resolved_slots.add(slot)
+                    if sdata.get('is_default') and sdata.get('activity'):
                         default_schedule_master[slot] = {
                             'activity': sdata.get('activity', ''),
                             'mood': sdata.get('mood', ''),
@@ -146,11 +168,12 @@ def populate_daily_defaults(user_id, target_date):
     dismissed_ids = set()
     if isinstance(schedule, dict):
         dismissed_ids = set(schedule.get('_dismissed_tasks', []))
+        dismissed_ids.update(schedule.get('_deleted_defaults', []))
 
-    # Populate default tasks
+    # Populate missing default tasks
     existing_texts = {t.get('text', '').strip().lower() for t in tasks if isinstance(t, dict) and t.get('text')}
     for key_lower, dtask in default_tasks_master.items():
-        if key_lower not in existing_texts:
+        if key_lower not in existing_texts and key_lower not in deleted_task_keys:
             new_id = f"def_{int(datetime.utcnow().timestamp() * 1000)}_{len(tasks)}"
             if new_id not in dismissed_ids:
                 tasks.append({
@@ -165,7 +188,7 @@ def populate_daily_defaults(user_id, target_date):
                 })
                 modified = True
 
-    # Populate default schedule slots
+    # Populate missing default schedule slots
     for slot, dslot in default_schedule_master.items():
         curr_val = schedule.get(slot)
         is_empty = False
@@ -596,16 +619,35 @@ def daily():
 
         elif action == 'delete_task':
             task_id = request.form.get('task_id')
-            plan.tasks = [t for t in tasks if t.get('id') != task_id]
+            deleted_task = None
+            for t in tasks:
+                if isinstance(t, dict) and t.get('id') == task_id:
+                    deleted_task = t
+                    break
+
+            plan.tasks = [t for t in tasks if isinstance(t, dict) and t.get('id') != task_id]
             
             raw_sched = plan.schedule or {}
-            if isinstance(raw_sched, dict):
-                dismissed = list(raw_sched.get('_dismissed_tasks', []))
-                if task_id not in dismissed:
-                    dismissed.append(task_id)
-                raw_sched['_dismissed_tasks'] = dismissed
-                plan.schedule = raw_sched
-                flag_modified(plan, 'schedule')
+            if not isinstance(raw_sched, dict):
+                raw_sched = {}
+
+            dismissed = list(raw_sched.get('_dismissed_tasks', []))
+            deleted_defs = list(raw_sched.get('_deleted_defaults', []))
+
+            if task_id not in dismissed:
+                dismissed.append(task_id)
+
+            if deleted_task:
+                t_text = deleted_task.get('text', '').strip().lower()
+                if t_text and t_text not in deleted_defs:
+                    deleted_defs.append(t_text)
+                if task_id not in deleted_defs:
+                    deleted_defs.append(task_id)
+
+            raw_sched['_dismissed_tasks'] = dismissed
+            raw_sched['_deleted_defaults'] = deleted_defs
+            plan.schedule = raw_sched
+            flag_modified(plan, 'schedule')
 
             flag_modified(plan, 'tasks')
             db.session.commit()
