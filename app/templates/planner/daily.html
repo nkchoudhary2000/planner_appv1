@@ -236,41 +236,50 @@
             <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="space-y-4">
                 <input type="hidden" name="action" value="save_schedule">
 
-                <div class="space-y-2.5 max-h-[640px] overflow-y-auto pr-1">
-                    {% for slot in default_slots %}
-                    {% set slot_id = slot.replace(':', '_').replace(' ', '_').replace('-', '_') %}
-                    {% set slot_data = schedule.get(slot, {}) %}
-                    {% set act_text = slot_data.get('activity', '') if slot_data is mapping else slot_data %}
-                    {% set current_mood = slot_data.get('mood', '') if slot_data is mapping else '' %}
+                <!-- Mobile Touch Scroll Hint -->
+                <p class="text-[11px] text-amber-300 sm:hidden flex items-center space-x-1 mb-1 font-medium">
+                    <i class="fa-solid fa-arrows-left-right text-[10px]"></i>
+                    <span>Swipe horizontally to view full activity &amp; mood fields</span>
+                </p>
 
-                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5 p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/40 hover:border-slate-600 transition-all">
-                        <!-- Hour Range Badge -->
-                        <span class="px-2.5 py-1 text-xs font-bold text-amber-400 bg-amber-500/10 rounded-lg border border-amber-500/20 flex-shrink-0 whitespace-nowrap">
-                            {{ slot }}
-                        </span>
+                <!-- Horizontal Scrollable Activity Tracker Container for Mobile -->
+                <div class="overflow-x-auto pb-2 -mx-1 px-1">
+                    <div class="space-y-2.5 max-h-[640px] overflow-y-auto pr-1 min-w-[520px] sm:min-w-full">
+                        {% for slot in default_slots %}
+                        {% set slot_id = slot.replace(':', '_').replace(' ', '_').replace('-', '_') %}
+                        {% set slot_data = schedule.get(slot, {}) %}
+                        {% set act_text = slot_data.get('activity', '') if slot_data is mapping else slot_data %}
+                        {% set current_mood = slot_data.get('mood', '') if slot_data is mapping else '' %}
 
-                        <!-- Activity Field -->
-                        <input type="text" 
-                               name="slot_act_{{ slot_id }}" 
-                               value="{{ act_text }}" 
-                               placeholder="Activity details (e.g. Deep Work, Team Meeting)..." 
-                               class="flex-1 min-w-[140px] bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all">
+                        <div class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/40 hover:border-slate-600 transition-all">
+                            <!-- Hour Range Badge -->
+                            <span class="px-2.5 py-1 text-xs font-bold text-amber-400 bg-amber-500/10 rounded-lg border border-amber-500/20 flex-shrink-0 whitespace-nowrap">
+                                {{ slot }}
+                            </span>
 
-                        <!-- Mood Dropdown with Emoji (Just right to activity field, same row) -->
-                        <select name="slot_mood_{{ slot_id }}" 
-                                class="bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all cursor-pointer flex-shrink-0">
-                            <option value="" class="bg-slate-900 text-slate-400">Mood 😶</option>
-                            <option value="😄" {{ 'selected' if current_mood == '😄' }}>😄 Energetic</option>
-                            <option value="😊" {{ 'selected' if current_mood == '😊' }}>😊 Calm</option>
-                            <option value="😐" {{ 'selected' if current_mood == '😐' }}>😐 Neutral</option>
-                            <option value="🤩" {{ 'selected' if current_mood == '🤩' }}>🤩 Motivated</option>
-                            <option value="😓" {{ 'selected' if current_mood == '😓' }}>😓 Stressed</option>
-                            <option value="😤" {{ 'selected' if current_mood == '😤' }}>😤 Frustrated</option>
-                            <option value="😴" {{ 'selected' if current_mood == '😴' }}>😴 Sleepy</option>
-                            <option value="🌧️" {{ 'selected' if current_mood == '🌧️' }}>🌧️ Down</option>
-                        </select>
+                            <!-- Activity Field -->
+                            <input type="text" 
+                                   name="slot_act_{{ slot_id }}" 
+                                   value="{{ act_text }}" 
+                                   placeholder="Activity details (e.g. Deep Work, Team Meeting)..." 
+                                   class="flex-1 min-w-[200px] bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all">
+
+                            <!-- Mood Dropdown with Emoji (Just right to activity field, same row) -->
+                            <select name="slot_mood_{{ slot_id }}" 
+                                    class="bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all cursor-pointer flex-shrink-0">
+                                <option value="" class="bg-slate-900 text-slate-400">Mood 😶</option>
+                                <option value="😄" {{ 'selected' if current_mood == '😄' }}>😄 Energetic</option>
+                                <option value="😊" {{ 'selected' if current_mood == '😊' }}>😊 Calm</option>
+                                <option value="😐" {{ 'selected' if current_mood == '😐' }}>😐 Neutral</option>
+                                <option value="🤩" {{ 'selected' if current_mood == '🤩' }}>🤩 Motivated</option>
+                                <option value="😓" {{ 'selected' if current_mood == '😓' }}>😓 Stressed</option>
+                                <option value="😤" {{ 'selected' if current_mood == '😤' }}>😤 Frustrated</option>
+                                <option value="😴" {{ 'selected' if current_mood == '😴' }}>😴 Sleepy</option>
+                                <option value="🌧️" {{ 'selected' if current_mood == '🌧️' }}>🌧️ Down</option>
+                            </select>
+                        </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
                 </div>
 
                 <div class="pt-2 flex justify-end">
