@@ -134,6 +134,7 @@ def google_callback():
         return redirect(url_for('planner.dashboard'))
 
     except Exception as e:
+        db.session.rollback()
         flash(f'Google authentication failed: {str(e)}', 'danger')
         return redirect(url_for('auth.login'))
 

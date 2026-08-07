@@ -100,7 +100,10 @@
                         {% set is_def = task.get('is_default') %}
 
                         <div class="task-card-wrapper relative rounded-xl border {{ 'bg-indigo-950/30 border-indigo-500/40 hover:border-indigo-400 text-indigo-100 shadow-sm shadow-indigo-500/10' if is_def else ('bg-rose-950/30 border-rose-500/50 hover:border-rose-400 shadow-sm shadow-rose-500/10' if (is_spill and task.priority == 'High') else ('bg-amber-950/20 border-amber-500/35 hover:border-amber-400' if is_spill else 'bg-slate-800/60 border-slate-700/40 hover:border-slate-600')) }} transition-all"
-                             data-task-id="{{ task.id }}">
+                             data-task-id="{{ task.id }}"
+                             data-task-text="{{ task.text }}"
+                             data-task-priority="{{ task.priority }}"
+                             data-task-default="{{ 'true' if is_def else 'false' }}">
                             <!-- Main Task Card Header/Content -->
                             <div class="task-item flex items-center justify-between p-3.5 gap-2">
                                 
@@ -172,7 +175,7 @@
                                 </span>
                                 <div class="flex items-center space-x-2">
                                     <button type="button" 
-                                            onclick="openEditTaskModal('{{ task.id }}', '{{ task.text|replace("'", "\\'")|replace('"', '&quot;') }}', '{{ task.priority }}', {{ 'true' if is_def else 'false' }})" 
+                                            onclick="openEditTaskModal('{{ task.id }}')" 
                                             class="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white text-xs font-semibold border border-indigo-500/40 transition-all flex items-center space-x-1.5 shadow-sm">
                                         <i class="fa-solid fa-pen-to-square"></i>
                                         <span>Edit Task</span>
@@ -603,28 +606,42 @@ async function moveTask(btn, direction) {
 function toggleTaskActions(taskId) {
     const drawer = document.getElementById(`action-drawer-${taskId}`);
     if (!drawer) return;
-    const isHidden = drawer.classList.contains('hidden');
+    const isOpening = drawer.classList.contains('hidden') || !drawer.classList.contains('is-open');
     
     // Close all other task action drawers
     document.querySelectorAll('.task-action-drawer').forEach(d => {
         if (d.id !== `action-drawer-${taskId}`) {
+            d.classList.remove('is-open');
             d.classList.add('hidden');
         }
     });
 
-    if (isHidden) {
+    if (isOpening) {
         drawer.classList.remove('hidden');
+        void drawer.offsetWidth; // trigger reflow for smooth animation
+        drawer.classList.add('is-open');
     } else {
-        drawer.classList.add('hidden');
+        drawer.classList.remove('is-open');
+        setTimeout(() => {
+            if (!drawer.classList.contains('is-open')) {
+                drawer.classList.add('hidden');
+            }
+        }, 300);
     }
 }
 
 // Edit Task Modal Functions
-function openEditTaskModal(taskId, text, priority, isDefault) {
+function openEditTaskModal(taskId) {
+    const card = document.querySelector(`.task-card-wrapper[data-task-id="${taskId}"]`);
+    if (!card) return;
+    const text = card.getAttribute('data-task-text') || '';
+    const priority = card.getAttribute('data-task-priority') || 'Medium';
+    const isDefault = card.getAttribute('data-task-default') === 'true';
+
     document.getElementById('edit-task-id').value = taskId;
     document.getElementById('edit-task-text').value = text;
     document.getElementById('edit-task-priority').value = priority;
-    document.getElementById('edit-task-default').checked = !!isDefault;
+    document.getElementById('edit-task-default').checked = isDefault;
     document.getElementById('edit-task-modal').classList.remove('hidden');
 }
 

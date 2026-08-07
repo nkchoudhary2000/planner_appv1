@@ -64,6 +64,8 @@ db.sqlite3-journal
 
 # Flask / Database stuff:
 *.db
+*.db-shm
+*.db-wal
 planner.db
 instance/
 .webassets-cache

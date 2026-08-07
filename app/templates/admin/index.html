@@ -1,0 +1,405 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard | Chronos Planner{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    
+    <!-- Admin Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-800/80 backdrop-blur-md p-6 rounded-2xl border border-slate-700/60 shadow-xl">
+        <div class="flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-slate-950 font-bold text-xl shadow-lg shadow-amber-500/20">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+                    Admin Control Center
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">SuperAdmin</span>
+                </h1>
+                <p class="text-sm text-slate-400">Authenticated as <span class="text-slate-200 font-mono font-medium">{{ current_user.email }}</span></p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-2"></span>
+                System Operational
+            </span>
+        </div>
+    </div>
+
+    <!-- Statistics Overview Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <!-- Total Users -->
+        <div class="bg-slate-800/60 backdrop-blur-md p-5 rounded-2xl border border-slate-700/50 shadow-lg relative overflow-hidden group hover:border-slate-600/80 transition-all">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Users</span>
+                <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                    <i class="fa-solid fa-users text-sm"></i>
+                </div>
+            </div>
+            <p class="text-3xl font-extrabold text-white mt-3">{{ total_users }}</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Registered Accounts</span>
+        </div>
+
+        <!-- Daily Plans -->
+        <div class="bg-slate-800/60 backdrop-blur-md p-5 rounded-2xl border border-slate-700/50 shadow-lg relative overflow-hidden group hover:border-slate-600/80 transition-all">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Daily Plans</span>
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <i class="fa-solid fa-sun text-sm"></i>
+                </div>
+            </div>
+            <p class="text-3xl font-extrabold text-white mt-3">{{ total_daily_plans }}</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Total Daily Records</span>
+        </div>
+
+        <!-- Weekly Plans -->
+        <div class="bg-slate-800/60 backdrop-blur-md p-5 rounded-2xl border border-slate-700/50 shadow-lg relative overflow-hidden group hover:border-slate-600/80 transition-all">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Weekly Plans</span>
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <i class="fa-solid fa-calendar-week text-sm"></i>
+                </div>
+            </div>
+            <p class="text-3xl font-extrabold text-white mt-3">{{ total_weekly_plans }}</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Weekly Schedules</span>
+        </div>
+
+        <!-- Monthly Plans -->
+        <div class="bg-slate-800/60 backdrop-blur-md p-5 rounded-2xl border border-slate-700/50 shadow-lg relative overflow-hidden group hover:border-slate-600/80 transition-all">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Monthly Plans</span>
+                <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                    <i class="fa-solid fa-calendar-days text-sm"></i>
+                </div>
+            </div>
+            <p class="text-3xl font-extrabold text-white mt-3">{{ total_monthly_plans }}</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Monthly Overviews</span>
+        </div>
+
+        <!-- Yearly Plans -->
+        <div class="bg-slate-800/60 backdrop-blur-md p-5 rounded-2xl border border-slate-700/50 shadow-lg relative overflow-hidden group hover:border-slate-600/80 transition-all col-span-2 sm:col-span-1">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Yearly Plans</span>
+                <div class="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center">
+                    <i class="fa-solid fa-bullseye text-sm"></i>
+                </div>
+            </div>
+            <p class="text-3xl font-extrabold text-white mt-3">{{ total_yearly_plans }}</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Yearly Resolutions</span>
+        </div>
+    </div>
+
+    <!-- Main Content Area: User Management + Database Maintenance -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- User Management Table (2 Columns) -->
+        <div class="lg:col-span-2 bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-700/60 shadow-xl overflow-hidden flex flex-col">
+            <div class="p-6 border-b border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-users-gear text-indigo-400"></i>
+                        User Management
+                    </h2>
+                    <p class="text-xs text-slate-400">View registered user accounts and activity</p>
+                </div>
+                <!-- User Search Filter -->
+                <div class="relative w-full sm:w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="userSearchInput" onkeyup="filterUsers()" placeholder="Search user or email..." class="w-full pl-9 pr-4 py-1.5 bg-slate-900/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto flex-1">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-900/50 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700/60">
+                        <tr>
+                            <th class="py-3.5 px-4 font-semibold">User</th>
+                            <th class="py-3.5 px-4 font-semibold">Joined</th>
+                            <th class="py-3.5 px-4 font-semibold text-center">Google Auth</th>
+                            <th class="py-3.5 px-4 font-semibold text-center">Total Plans</th>
+                            <th class="py-3.5 px-4 font-semibold text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/40" id="userTableBody">
+                        {% for u in users %}
+                        <tr class="user-row hover:bg-slate-700/30 transition-colors">
+                            <!-- User Info -->
+                            <td class="py-3.5 px-4">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-9 h-9 rounded-full bg-slate-700 text-indigo-300 font-bold flex items-center justify-center border border-slate-600 text-xs">
+                                        {{ u.username[0]|upper }}
+                                    </div>
+                                    <div>
+                                        <div class="font-medium text-white flex items-center gap-1.5">
+                                            <span class="user-name">{{ u.username }}</span>
+                                            {% if u.is_admin %}
+                                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ADMIN</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-xs text-slate-400 font-mono user-email">{{ u.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Joined Date -->
+                            <td class="py-3.5 px-4 text-xs text-slate-400 whitespace-nowrap">
+                                {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else 'N/A' }}
+                            </td>
+
+                            <!-- Google Status -->
+                            <td class="py-3.5 px-4 text-center">
+                                {% if u.google_connected %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        <i class="fa-brands fa-google text-[10px] mr-1"></i> Connected
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-700/50 text-slate-400 border border-slate-600/50">
+                                        Local Only
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Plan Breakdown -->
+                            <td class="py-3.5 px-4 text-center">
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 border border-slate-700 text-indigo-300">
+                                    {{ u.total_plans }}
+                                </span>
+                                <div class="text-[10px] text-slate-500 mt-1">
+                                    D:{{ u.daily_count }} | W:{{ u.weekly_count }} | M:{{ u.monthly_count }} | Y:{{ u.yearly_count }}
+                                </div>
+                            </td>
+
+                            <!-- Action Buttons -->
+                            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                                <div class="flex items-center justify-end space-x-2">
+                                    <button type="button" onclick="confirmClearUserPlans({{ u.id }}, '{{ u.username }}')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-400 hover:text-white bg-amber-500/10 hover:bg-amber-500/80 border border-amber-500/20 transition-all flex items-center space-x-1" title="Purge plans for this user">
+                                        <i class="fa-solid fa-broom text-[11px]"></i>
+                                        <span>Purge Plans</span>
+                                    </button>
+                                    {% if not u.is_admin %}
+                                        <button type="button" onclick="confirmDeleteUser({{ u.id }}, '{{ u.username }}')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-500/80 border border-rose-500/20 transition-all flex items-center space-x-1" title="Delete account">
+                                            <i class="fa-solid fa-trash-can text-[11px]"></i>
+                                            <span>Delete</span>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Database Maintenance & Actions (1 Column) -->
+        <div class="space-y-6">
+            <!-- Database Controls Card -->
+            <div class="bg-slate-800/80 backdrop-blur-md p-6 rounded-2xl border border-slate-700/60 shadow-xl space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-database text-amber-400"></i>
+                        Database Maintenance
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Manage system data and database cleanup actions</p>
+                </div>
+
+                <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-700/60 space-y-3">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">Storage Engine:</span>
+                        <span class="font-mono font-semibold text-slate-200">SQLite 3 (WAL Mode)</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">Connection Timeout:</span>
+                        <span class="font-mono font-semibold text-emerald-400">30 seconds</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">Active DB URI:</span>
+                        <span class="font-mono font-semibold text-slate-300">planner.db</span>
+                    </div>
+                </div>
+
+                <!-- Clean All Plans Action -->
+                <div class="p-4 rounded-xl bg-rose-500/5 border border-rose-500/20 space-y-3">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-broom text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-rose-300">Purge All Plan Records</h3>
+                            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+                                Wipe all daily, weekly, monthly, and yearly planner records. Registered user accounts will remain untouched.
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="confirmClearPlans()" class="w-full mt-2 py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-xs shadow-lg shadow-rose-600/20 transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-trash-arrow-up"></i>
+                        <span>Clear All Plan Records</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- System Information -->
+            <div class="bg-slate-800/80 backdrop-blur-md p-6 rounded-2xl border border-slate-700/60 shadow-xl space-y-4">
+                <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-sky-400"></i>
+                    System Information
+                </h3>
+                <ul class="text-xs space-y-2.5 text-slate-400">
+                    <li class="flex justify-between border-b border-slate-700/40 pb-2">
+                        <span>Application:</span>
+                        <span class="font-semibold text-slate-200">Chronos Planner v1.0</span>
+                    </li>
+                    <li class="flex justify-between border-b border-slate-700/40 pb-2">
+                        <span>Environment:</span>
+                        <span class="font-semibold text-slate-200">Production / Dev</span>
+                    </li>
+                    <li class="flex justify-between border-b border-slate-700/40 pb-2">
+                        <span>Admin Email:</span>
+                        <span class="font-mono text-amber-300 font-medium">{{ admin_email }}</span>
+                    </li>
+                    <li class="flex justify-between">
+                        <span>Google OAuth:</span>
+                        <span class="font-semibold text-emerald-400">Configured & Active</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Delete User Confirmation -->
+<div id="deleteUserModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold">
+                <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-white">Delete User Account</h3>
+                <p class="text-xs text-slate-400">This action cannot be undone.</p>
+            </div>
+        </div>
+        
+        <p class="text-sm text-slate-300">
+            Are you sure you want to permanently delete user <strong id="deleteTargetUsername" class="text-white"></strong>? All their daily, weekly, monthly, and yearly plans will be deleted immediately.
+        </p>
+
+        <form id="deleteUserForm" method="POST" action="">
+            <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="closeDeleteUserModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-700/60 transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/20 transition-all">
+                    Yes, Delete User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Clear All Plans Confirmation -->
+<div id="clearPlansModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold">
+                <i class="fa-solid fa-broom text-lg"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-white">Purge All Plan Records</h3>
+                <p class="text-xs text-slate-400">Confirm database plan cleanup</p>
+            </div>
+        </div>
+
+        <p class="text-sm text-slate-300">
+            Are you sure you want to clear **ALL** daily, weekly, monthly, and yearly plan records across all users? User accounts will remain registered.
+        </p>
+
+        <form method="POST" action="{{ url_for('admin.clear_plans') }}">
+            <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="closeClearPlansModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-700/60 transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/20 transition-all">
+                    Yes, Clear All Plans
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Clear Specific User Plans Confirmation -->
+<div id="clearUserPlansModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                <i class="fa-solid fa-broom text-lg"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-white">Purge User Plans</h3>
+                <p class="text-xs text-slate-400">Clear plans for a single user account</p>
+            </div>
+        </div>
+
+        <p class="text-sm text-slate-300">
+            Are you sure you want to clear all daily, weekly, monthly, and yearly plan records for user <strong id="clearUserTargetUsername" class="text-white"></strong>? The user account itself will remain active.
+        </p>
+
+        <form id="clearUserPlansForm" method="POST" action="">
+            <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="closeClearUserPlansModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-700/60 transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all">
+                    Yes, Purge User Plans
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function filterUsers() {
+    const query = document.getElementById('userSearchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('.user-row');
+    rows.forEach(row => {
+        const username = row.querySelector('.user-name').innerText.toLowerCase();
+        const email = row.querySelector('.user-email').innerText.toLowerCase();
+        if (username.includes(query) || email.includes(query)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function confirmDeleteUser(userId, username) {
+    document.getElementById('deleteTargetUsername').innerText = username;
+    document.getElementById('deleteUserForm').action = '/admin/user/delete/' + userId;
+    document.getElementById('deleteUserModal').classList.remove('hidden');
+}
+
+function closeDeleteUserModal() {
+    document.getElementById('deleteUserModal').classList.add('hidden');
+}
+
+function confirmClearUserPlans(userId, username) {
+    document.getElementById('clearUserTargetUsername').innerText = username;
+    document.getElementById('clearUserPlansForm').action = '/admin/user/clear-plans/' + userId;
+    document.getElementById('clearUserPlansModal').classList.remove('hidden');
+}
+
+function closeClearUserPlansModal() {
+    document.getElementById('clearUserPlansModal').classList.add('hidden');
+}
+
+function confirmClearPlans() {
+    document.getElementById('clearPlansModal').classList.remove('hidden');
+}
+
+function closeClearPlansModal() {
+    document.getElementById('clearPlansModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

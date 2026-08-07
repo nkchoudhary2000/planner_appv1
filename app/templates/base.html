@@ -71,6 +71,12 @@
                         <i class="fa-solid fa-bullseye"></i>
                         <span>Yearly</span>
                     </a>
+                    {% if (current_user.email or '').strip().lower() == 'niraj.choudhary1995@gmail.com' %}
+                    <a href="{{ url_for('admin.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20' if request.endpoint == 'admin.dashboard' else 'text-amber-400 hover:bg-amber-500/10 hover:text-amber-300' }}">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>Admin</span>
+                    </a>
+                    {% endif %}
                 </div>
 
                 <!-- User Profile & Logout (Desktop) -->
@@ -131,6 +137,12 @@
                 <i class="fa-solid fa-bullseye text-[11px]"></i>
                 <span>Yearly</span>
             </a>
+            {% if (current_user.email or '').strip().lower() == 'niraj.choudhary1995@gmail.com' %}
+            <a href="{{ url_for('admin.dashboard') }}" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-amber-500 text-slate-950 shadow-sm font-bold' if request.endpoint == 'admin.dashboard' else 'text-amber-400 hover:bg-amber-500/10' }}">
+                <i class="fa-solid fa-shield-halved text-[11px]"></i>
+                <span>Admin</span>
+            </a>
+            {% endif %}
         </div>
         {% endif %}
     </nav>
