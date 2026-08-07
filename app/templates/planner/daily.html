@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Planner - {{ selected_date.strftime('%B %d, %Y') }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Date Navigation Header -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+            <span class="text-xs font-semibold text-brand-400 uppercase tracking-wider">Daily Overview</span>
+            <h1 class="text-2xl font-bold text-white mt-0.5">
+                {{ selected_date.strftime('%A, %B %d, %Y') }}
+            </h1>
+        </div>
+
+        <!-- Date Controls -->
+        <div class="flex items-center space-x-3">
+            {% set prev_date = selected_date.fromordinal(selected_date.toordinal() - 1).strftime('%Y-%m-%d') %}
+            {% set next_date = selected_date.fromordinal(selected_date.toordinal() + 1).strftime('%Y-%m-%d') %}
+
+            <a href="{{ url_for('planner.daily', date=prev_date) }}" class="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-all" title="Previous Day">
+                <i class="fa-solid fa-chevron-left"></i>
+            </a>
+
+            <form action="{{ url_for('planner.daily') }}" method="GET" class="flex items-center">
+                <input type="date" name="date" value="{{ selected_date.strftime('%Y-%m-%d') }}" onchange="this.form.submit()" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            </form>
+
+            <a href="{{ url_for('planner.daily', date=next_date) }}" class="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-all" title="Next Day">
+                <i class="fa-solid fa-chevron-right"></i>
+            </a>
+
+            <a href="{{ url_for('planner.export_daily_excel', date=selected_date.strftime('%Y-%m-%d')) }}" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5" title="Export Daily Plan to Excel">
+                <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
+                <span>Export Excel</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Dual Column Layout: Tasks Checklist & Hourly Schedule -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Left Column: Task Checklist -->
+        <div class="space-y-6">
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-list-check text-brand-400"></i>
+                        <h2 class="text-lg font-bold text-white">Daily Tasks Checklist</h2>
+                    </div>
+                    <span class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full font-medium border border-slate-700">
+                        {{ tasks|selectattr('completed')|list|length }}/{{ tasks|length }} Done
+                    </span>
+                </div>
+
+                <!-- Add Task Form -->
+                <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+                    <input type="hidden" name="action" value="add_task">
+                    <input type="text" name="task_text" required placeholder="Add a new task..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <div class="flex items-center space-x-2">
+                        <select name="priority" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Low">Low</option>
+                        </select>
+                        <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1.5 whitespace-nowrap">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                            <span>Add</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Task List Items -->
+                <div class="space-y-3 pt-2">
+                    {% if tasks %}
+                        {% for task in tasks %}
+                        <div class="task-item flex items-center justify-between p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 hover:border-slate-600 transition-colors">
+                            <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
+                                <input type="checkbox" 
+                                       {{ 'checked' if task.completed }} 
+                                       onchange="toggleTask('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)"
+                                       class="custom-checkbox flex-shrink-0">
+                                <span class="task-text text-sm font-medium text-slate-200 truncate {{ 'line-through-fade' if task.completed }}">
+                                    {{ task.text }}
+                                </span>
+                            </div>
+                            
+                            <div class="flex items-center space-x-2 flex-shrink-0">
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold {{ 'bg-rose-500/10 text-rose-400 border border-rose-500/20' if task.priority == 'High' else ('bg-amber-500/10 text-amber-400 border border-amber-500/20' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300') }}">
+                                    {{ task.priority }}
+                                </span>
+                                <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="inline">
+                                    <input type="hidden" name="action" value="delete_task">
+                                    <input type="hidden" name="task_id" value="{{ task.id }}">
+                                    <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-10 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
+                            <p class="text-slate-400 text-sm">No tasks added for this day yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Depression Episode & Symptom Tracker Section -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-5">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                            <i class="fa-solid fa-heart-pulse text-sm"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-white">Depression Episode Tracker</h2>
+                            <p class="text-xs text-slate-400">Log &amp; monitor episode intensity, coping mechanisms &amp; duration</p>
+                        </div>
+                    </div>
+                    
+                    <button type="button" onclick="openDepressionModal()" class="bg-purple-600 hover:bg-purple-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold shadow-md shadow-purple-500/20 transition-all flex items-center space-x-1.5 whitespace-nowrap">
+                        <i class="fa-solid fa-plus text-[10px]"></i>
+                        <span>Log Episode</span>
+                    </button>
+                </div>
+
+                <!-- Episode List -->
+                <div class="space-y-3">
+                    {% if depression_episodes %}
+                        {% for ep in depression_episodes %}
+                        {% set intensity = ep.intensity|int %}
+                        {% set severity_bg = 'bg-amber-500/15 border-amber-500/30 text-amber-300' if intensity <= 3 else ('bg-orange-500/15 border-orange-500/30 text-orange-300' if intensity <= 6 else ('bg-rose-500/15 border-rose-500/30 text-rose-300' if intensity <= 8 else 'bg-purple-500/20 border-purple-500/40 text-purple-300')) %}
+                        {% set severity_label = 'Mild' if intensity <= 3 else ('Moderate' if intensity <= 6 else ('Severe' if intensity <= 8 else 'Extreme')) %}
+                        
+                        <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 space-y-2.5 hover:border-slate-600 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold border {{ severity_bg }}">
+                                        Intensity {{ ep.intensity }}/10 ({{ severity_label }})
+                                    </span>
+                                    <span class="text-xs text-slate-400 font-medium">
+                                        <i class="fa-regular fa-clock text-slate-500 mr-1"></i>Started {{ ep.start_time }}
+                                    </span>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-700/60 text-slate-300 border border-slate-700">
+                                        ⏱️ {{ ep.duration }}
+                                    </span>
+                                    <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="inline">
+                                        <input type="hidden" name="action" value="delete_depression_episode">
+                                        <input type="hidden" name="episode_id" value="{{ ep.id }}">
+                                        <button type="submit" class="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors" title="Delete Episode Record">
+                                            <i class="fa-solid fa-trash-can text-xs"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            {% if ep.triggers %}
+                            <div class="text-xs text-slate-300">
+                                <span class="font-semibold text-slate-400">Triggers/Symptoms:</span> {{ ep.triggers }}
+                            </div>
+                            {% endif %}
+
+                            {% if ep.coping_mechanism %}
+                            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                                <span class="font-semibold text-slate-400">Coping Strategy:</span>
+                                <span class="px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-medium">
+                                    🛡️ {{ ep.coping_mechanism }}
+                                </span>
+                                {% if ep.coping_effectiveness %}
+                                <span class="text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                                    Effectiveness: {{ ep.coping_effectiveness }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
+                            {% if ep.notes %}
+                            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-700/40 text-xs text-slate-300 italic leading-relaxed">
+                                "{{ ep.notes }}"
+                            </div>
+                            {% endif %}
+                            
+                            <div class="text-[10px] text-slate-500 text-right">
+                                Logged at {{ ep.entry_time }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-6 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
+                            <p class="text-slate-400 text-xs">No depression episodes logged for today.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- End of Day Reflections & Notes -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/60">
+                <div class="flex items-center space-x-2 pb-3 border-b border-slate-700/50 mb-4">
+                    <i class="fa-solid fa-pen-to-square text-emerald-400"></i>
+                    <h2 class="text-lg font-bold text-white">End of Day Reflection &amp; Notes</h2>
+                </div>
+
+                <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="space-y-3">
+                    <input type="hidden" name="action" value="save_notes">
+                    <textarea name="notes" rows="4" placeholder="What went well today? What could be improved tomorrow?" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl p-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">{{ notes }}</textarea>
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1.5">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>Save Reflection</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Column: 12-Hour Activity & Mood Tracker -->
+        <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-700/50 gap-2">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-clock text-amber-400"></i>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Activity &amp; Hourly Mood Tracker</h2>
+                        <p class="text-xs text-slate-400">Track hourly activities and your mood throughout the day</p>
+                    </div>
+                </div>
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 whitespace-nowrap self-start sm:self-auto">
+                    12-Hour AM/PM
+                </span>
+            </div>
+
+            <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="space-y-4">
+                <input type="hidden" name="action" value="save_schedule">
+
+                <div class="space-y-3 max-h-[640px] overflow-y-auto pr-1">
+                    {% for slot in default_slots %}
+                    {% set slot_id = slot.replace(':', '_').replace(' ', '_') %}
+                    {% set slot_data = schedule.get(slot, {}) %}
+                    {% set act_text = slot_data.get('activity', '') if slot_data is mapping else slot_data %}
+                    {% set current_mood = slot_data.get('mood', '') if slot_data is mapping else '' %}
+
+                    <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40 space-y-2 hover:border-slate-600 transition-all">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <!-- 12-Hour AM/PM Time Badge -->
+                            <span class="w-24 text-center text-xs font-bold text-amber-400 py-1.5 px-2 bg-amber-500/10 rounded-xl border border-amber-500/20 flex-shrink-0">
+                                {{ slot }}
+                            </span>
+
+                            <!-- Activity Description Input -->
+                            <input type="text" 
+                                   name="slot_act_{{ slot_id }}" 
+                                   value="{{ act_text }}" 
+                                   placeholder="Activity details (e.g. Deep Work, Team Meeting, Workout)..." 
+                                   class="flex-1 bg-slate-900/70 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+
+                        <!-- Hourly Mood Selector Buttons -->
+                        <div class="flex items-center justify-between pt-1 border-t border-slate-700/30">
+                            <span class="text-[11px] font-semibold text-slate-400">Hourly Mood:</span>
+                            
+                            <input type="hidden" name="slot_mood_{{ slot_id }}" id="mood_input_{{ slot_id }}" value="{{ current_mood }}">
+
+                            <div class="flex items-center space-x-1.5" id="mood_btn_group_{{ slot_id }}">
+                                {% for emoji, label in [('😄', 'Energetic'), ('😊', 'Calm'), ('😐', 'Neutral'), ('😓', 'Stressed'), ('😤', 'Frustrated'), ('😴', 'Sleepy')] %}
+                                {% set is_active = (current_mood == emoji) %}
+                                <button type="button" 
+                                        onclick="selectHourlyMood('{{ slot_id }}', '{{ emoji }}', this)" 
+                                        title="{{ label }}" 
+                                        class="w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-all border {{ 'bg-brand-600/40 border-brand-400 scale-110 shadow-sm' if is_active else 'bg-slate-900/40 border-slate-700/50 hover:bg-slate-700/50' }}">
+                                    {{ emoji }}
+                                </button>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="pt-2 flex justify-end">
+                    <button type="submit" class="w-full sm:w-auto bg-brand-600 hover:bg-brand-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Save Tracker &amp; Moods</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Depression Episode Log Modal -->
+<div id="depression-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+    <div class="glass-panel max-w-lg w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-5 animate-floatToastIn">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                    <i class="fa-solid fa-heart-pulse text-base"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Log Depression Episode</h3>
+                    <p class="text-xs text-slate-400">Capture start time, intensity, coping mechanisms &amp; notes</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeDepressionModal()" class="text-slate-400 hover:text-white transition-colors p-1">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="space-y-4">
+            <input type="hidden" name="action" value="add_depression_episode">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Start Time -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Start Time</label>
+                    <input type="text" name="start_time" placeholder="e.g. 08:30 AM" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <!-- Duration -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Duration</label>
+                    <input type="text" name="duration" placeholder="e.g. 45 mins, 2 hours, Ongoing" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+
+            <!-- Intensity Rating (1-10 Scale) -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Episode Intensity (1 to 10)</label>
+                    <span id="intensity-val-badge" class="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        5/10 (Moderate)
+                    </span>
+                </div>
+                <input type="range" name="intensity" id="intensity-range" min="1" max="10" value="5" oninput="updateIntensityVal(this.value)" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500">
+                <div class="flex justify-between text-[10px] font-semibold text-slate-500">
+                    <span>1 (Mild)</span>
+                    <span>4 (Moderate)</span>
+                    <span>7 (Severe)</span>
+                    <span>10 (Extreme)</span>
+                </div>
+            </div>
+
+            <!-- Triggers / Symptoms -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Triggers / Primary Symptoms</label>
+                <input type="text" name="triggers" placeholder="e.g. Overwhelm, Fatigue, Work Stress, Negative thoughts..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Coping Mechanism -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Coping Strategy Used</label>
+                    <input type="text" name="coping_mechanism" placeholder="e.g. Deep breathing, Walk outdoors, Rest..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <!-- Coping Effectiveness -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Effectiveness</label>
+                    <select name="coping_effectiveness" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="Very Helpful">Very Helpful</option>
+                        <option value="Somewhat Helpful" selected>Somewhat Helpful</option>
+                        <option value="Not Helpful">Not Helpful</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Personal Notes & Context -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Personal Reflection / Notes</label>
+                <textarea name="notes" rows="3" placeholder="Describe feelings, symptoms, or what helped you cope..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-700/60">
+                <button type="button" onclick="closeDepressionModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-purple-500/20 transition-all flex items-center space-x-1.5">
+                    <i class="fa-solid fa-heart-pulse text-xs"></i>
+                    <span>Log Episode Record</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openDepressionModal() {
+    document.getElementById('depression-modal').classList.remove('hidden');
+}
+
+function closeDepressionModal() {
+    document.getElementById('depression-modal').classList.add('hidden');
+}
+
+function updateIntensityVal(val) {
+    const badge = document.getElementById('intensity-val-badge');
+    val = parseInt(val);
+    let label = 'Mild';
+    let styleClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+
+    if (val > 8) {
+        label = 'Extreme';
+        styleClass = 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+    } else if (val > 6) {
+        label = 'Severe';
+        styleClass = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+    } else if (val > 3) {
+        label = 'Moderate';
+        styleClass = 'bg-orange-500/20 text-orange-300 border-orange-500/30';
+    }
+
+    badge.className = `px-2.5 py-0.5 rounded-lg text-xs font-bold border ${styleClass}`;
+    badge.innerText = `${val}/10 (${label})`;
+}
+
+function selectHourlyMood(slotId, emoji, btnElement) {
+    const hiddenInput = document.getElementById('mood_input_' + slotId);
+    const container = document.getElementById('mood_btn_group_' + slotId);
+
+    if (hiddenInput.value === emoji) {
+        hiddenInput.value = '';
+        btnElement.classList.remove('bg-brand-600/40', 'border-brand-400', 'scale-110', 'shadow-sm');
+        btnElement.classList.add('bg-slate-900/40', 'border-slate-700/50');
+    } else {
+        hiddenInput.value = emoji;
+        const buttons = container.querySelectorAll('button');
+        buttons.forEach(btn => {
+            btn.classList.remove('bg-brand-600/40', 'border-brand-400', 'scale-110', 'shadow-sm');
+            btn.classList.add('bg-slate-900/40', 'border-slate-700/50');
+        });
+        btnElement.classList.remove('bg-slate-900/40', 'border-slate-700/50');
+        btnElement.classList.add('bg-brand-600/40', 'border-brand-400', 'scale-110', 'shadow-sm');
+    }
+}
+</script>
+{% endblock %}

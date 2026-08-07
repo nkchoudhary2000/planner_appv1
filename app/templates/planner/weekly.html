@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+
+{% block title %}Weekly Planner - Week {{ selected_week }}, {{ selected_year }}{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header & Week Selector -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+            <span class="text-xs font-semibold text-brand-400 uppercase tracking-wider">Weekly Overview</span>
+            <h1 class="text-2xl font-extrabold text-white mt-0.5">
+                Week {{ selected_week }}, {{ selected_year }}
+                <span class="text-sm font-medium text-slate-400 ml-2">({{ start_of_week.strftime('%B %d') }} - {{ end_of_week.strftime('%B %d, %Y') }})</span>
+            </h1>
+        </div>
+
+        <!-- Week Navigation Controls -->
+        <div class="flex items-center space-x-3">
+            <a href="{{ url_for('planner.weekly', year=prev_year, week=prev_week) }}" class="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-all" title="Previous Week">
+                <i class="fa-solid fa-chevron-left"></i>
+            </a>
+
+            <a href="{{ url_for('planner.weekly') }}" class="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-all">
+                Current Week
+            </a>
+
+            <a href="{{ url_for('planner.weekly', year=next_year, week=next_week) }}" class="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-all" title="Next Week">
+                <i class="fa-solid fa-chevron-right"></i>
+            </a>
+
+            <a href="{{ url_for('planner.export_weekly_excel', year=selected_year, week=selected_week) }}" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5" title="Export Weekly Plan to Excel">
+                <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
+                <span>Export Excel</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Week Entire Report Banner -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800/80 to-slate-900 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-700/50 gap-2">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-xl bg-brand-600/20 border border-brand-500/30 flex items-center justify-center text-brand-400">
+                    <i class="fa-solid fa-chart-line text-base"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-white">Week Entire Report</h2>
+                    <p class="text-xs text-slate-400">Synthesized productivity, meals, shopping &amp; wellness metrics</p>
+                </div>
+            </div>
+            
+            <span class="px-3.5 py-1.5 rounded-full text-xs font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30 self-start sm:self-auto">
+                Productivity Score: {{ weekly_score }}/100
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- 7-Day To-Dos Completion -->
+            <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">7-Day To-Dos</span>
+                <div class="flex items-baseline space-x-2 mt-1">
+                    <span class="text-xl font-bold text-white">{{ completed_todos }}/{{ total_todos }}</span>
+                    <span class="text-xs text-brand-400 font-medium">({{ todo_completion_pct }}%)</span>
+                </div>
+                <div class="w-full bg-slate-700 h-1.5 rounded-full mt-2.5 overflow-hidden">
+                    <div class="bg-brand-500 h-full rounded-full transition-all" style="width: {{ todo_completion_pct }}%"></div>
+                </div>
+            </div>
+
+            <!-- Weekly Goals -->
+            <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Weekly Goals</span>
+                <div class="flex items-baseline space-x-2 mt-1">
+                    <span class="text-xl font-bold text-white">{{ completed_goals }}/{{ total_goals }}</span>
+                    <span class="text-xs text-emerald-400 font-medium">Achieved</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2">{{ total_goals - completed_goals }} goals remaining</p>
+            </div>
+
+            <!-- Meal Plan Coverage -->
+            <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Meals Menu</span>
+                <div class="flex items-baseline space-x-2 mt-1">
+                    <span class="text-xl font-bold text-white">{{ meals_planned }}/21</span>
+                    <span class="text-xs text-amber-400 font-medium">({{ meal_planning_pct }}%)</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2">Planned meals across week</p>
+            </div>
+
+            <!-- Depression & Mood Summary for the Week -->
+            <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Depression Episodes</span>
+                <div class="flex items-baseline space-x-2 mt-1">
+                    <span class="text-xl font-bold text-white">{{ week_episodes|length }}</span>
+                    <span class="text-xs text-purple-400 font-medium">Logged This Week</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2">
+                    {% if week_episodes %}
+                    Peak intensity: {{ week_episodes|map(attribute='intensity')|map('int')|max }}/10
+                    {% else %}
+                    No episodes logged this week
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <!-- Daily Planner -> Weekly Cascade Summary -->
+        <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-700/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-sun text-amber-400"></i>
+                <span class="font-bold text-slate-200">Daily Plans Summary Cascade:</span>
+                <span class="text-slate-400">{{ daily_planned_days }}/7 Days Planned</span>
+                <span class="text-slate-500">•</span>
+                <span class="text-amber-300 font-semibold">{{ daily_tasks_done }}/{{ daily_tasks_total }} Daily Tasks Completed</span>
+            </div>
+
+            {% if daily_mood_tally %}
+            <div class="flex items-center space-x-2">
+                <span class="text-slate-400">Hourly Moods:</span>
+                <div class="flex items-center space-x-1.5">
+                    {% for emoji, count in daily_mood_tally.items() %}
+                    <span class="px-2 py-0.5 rounded-lg bg-slate-900/60 border border-slate-700 text-slate-200 font-medium">
+                        {{ emoji }} {{ count }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Dual Column: Weekly Goals & Shopping Checklist -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Left: Weekly Goals & Priorities -->
+        <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-bullseye text-brand-400"></i>
+                    <h2 class="text-lg font-bold text-white">Weekly Goals &amp; Priorities</h2>
+                </div>
+                <span class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                    {{ completed_goals }}/{{ total_goals }} Done
+                </span>
+            </div>
+
+            <!-- Add Goal Form -->
+            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="flex gap-3">
+                <input type="hidden" name="action" value="add_weekly_goal">
+                <input type="text" name="goal_title" required placeholder="Add a key goal for this week..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Add</span>
+                </button>
+            </form>
+
+            <!-- Goals List -->
+            <div class="space-y-3">
+                {% if goals %}
+                    {% for g in goals %}
+                    <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
+                                <input type="hidden" name="action" value="toggle_weekly_goal">
+                                <input type="hidden" name="goal_id" value="{{ g.id }}">
+                                <button type="submit" class="text-sm">
+                                    <i class="fa-regular {{ 'fa-square-check text-brand-400' if g.completed else 'fa-square text-slate-500' }} text-lg"></i>
+                                </button>
+                            </form>
+                            <span class="text-sm font-medium text-slate-200 {{ 'line-through-fade' if g.completed }}">
+                                {{ g.title }}
+                            </span>
+                        </div>
+
+                        <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
+                            <input type="hidden" name="action" value="delete_weekly_goal">
+                            <input type="hidden" name="goal_id" value="{{ g.id }}">
+                            <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-6">No goals added for this week yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right: Shopping & Supplies List -->
+        <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-cart-shopping text-emerald-400"></i>
+                    <h2 class="text-lg font-bold text-white">Weekly Shopping List</h2>
+                </div>
+                <span class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                    {{ bought_shopping }}/{{ total_shopping }} Bought
+                </span>
+            </div>
+
+            <!-- Add Shopping Item Form -->
+            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+                <input type="hidden" name="action" value="add_shopping_item">
+                <input type="text" name="item_name" required placeholder="Add item (e.g. Milk, Eggs, Notebook)..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <div class="flex items-center space-x-2">
+                    <select name="category" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="Groceries">Groceries</option>
+                        <option value="Household">Household</option>
+                        <option value="Personal">Personal</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span>Add</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Shopping List Items -->
+            <div class="space-y-3">
+                {% if shopping_list %}
+                    {% for item in shopping_list %}
+                    <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
+                                <input type="hidden" name="action" value="toggle_shopping_item">
+                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                <button type="submit" class="text-sm">
+                                    <i class="fa-regular {{ 'fa-square-check text-emerald-400' if item.bought else 'fa-square text-slate-500' }} text-lg"></i>
+                                </button>
+                            </form>
+                            <span class="text-sm font-medium text-slate-200 {{ 'line-through-fade' if item.bought }}">
+                                {{ item.item }}
+                            </span>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-700 text-slate-300">
+                                {{ item.category }}
+                            </span>
+                            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
+                                <input type="hidden" name="action" value="delete_shopping_item">
+                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-6">Shopping list is empty.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 7-Day To-Dos Grid (Mon to Sun) -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-list-check text-amber-400"></i>
+                <h2 class="text-lg font-bold text-white">7-Day Daily To-Dos Grid</h2>
+            </div>
+            <span class="text-xs text-slate-400">Monday through Sunday</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+            {% for day in days_of_week %}
+            {% set day_todos = daily_todos.get(day.abbr, []) %}
+            <div class="p-3.5 rounded-xl bg-slate-800/50 border border-slate-700/50 flex flex-col justify-between space-y-3">
+                <div>
+                    <!-- Day Header -->
+                    <div class="pb-2 border-b border-slate-700/40 text-center">
+                        <span class="text-xs font-bold text-brand-400 uppercase tracking-wider block">{{ day.abbr }}</span>
+                        <span class="text-xs text-slate-300 font-medium">{{ day.date_str }}</span>
+                    </div>
+
+                    <!-- Add Day Todo Form -->
+                    <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="mt-2.5">
+                        <input type="hidden" name="action" value="add_daily_todo">
+                        <input type="hidden" name="day_abbr" value="{{ day.abbr }}">
+                        <div class="flex items-center space-x-1">
+                            <input type="text" name="todo_text" required placeholder="+ Add..." class="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                        </div>
+                    </form>
+
+                    <!-- Day Todos Checklist -->
+                    <div class="space-y-2 mt-2.5 max-h-48 overflow-y-auto pr-0.5">
+                        {% if day_todos %}
+                            {% for t in day_todos %}
+                            <div class="p-1.5 rounded-lg bg-slate-900/40 border border-slate-700/30 flex items-center justify-between text-xs group">
+                                <div class="flex items-center space-x-1.5 min-w-0 pr-1">
+                                    <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
+                                        <input type="hidden" name="action" value="toggle_daily_todo">
+                                        <input type="hidden" name="day_abbr" value="{{ day.abbr }}">
+                                        <input type="hidden" name="todo_id" value="{{ t.id }}">
+                                        <button type="submit" class="text-slate-400 hover:text-white">
+                                            <i class="fa-regular {{ 'fa-square-check text-brand-400' if t.completed else 'fa-square' }} text-xs"></i>
+                                        </button>
+                                    </form>
+                                    <span class="truncate text-[11px] font-medium text-slate-200 {{ 'line-through-fade' if t.completed }}" title="{{ t.text }}">
+                                        {{ t.text }}
+                                    </span>
+                                </div>
+
+                                <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <input type="hidden" name="action" value="delete_daily_todo">
+                                    <input type="hidden" name="day_abbr" value="{{ day.abbr }}">
+                                    <input type="hidden" name="todo_id" value="{{ t.id }}">
+                                    <button type="submit" class="text-slate-500 hover:text-rose-400 p-0.5">
+                                        <i class="fa-solid fa-xmark text-[10px]"></i>
+                                    </button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-[10px] text-slate-500 text-center py-3">No tasks</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Weekly Meals Menu Grid -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-utensils text-rose-400"></i>
+                <h2 class="text-lg font-bold text-white">Weekly Meals Menu</h2>
+            </div>
+            <span class="text-xs text-slate-400">Breakfast, Lunch &amp; Dinner Planner</span>
+        </div>
+
+        <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="space-y-4">
+            <input type="hidden" name="action" value="save_meals_menu">
+
+            <div class="overflow-x-auto pb-2">
+                <table class="w-full text-left text-xs min-w-[700px]">
+                    <thead>
+                        <tr class="border-b border-slate-700/60 text-slate-400">
+                            <th class="py-2 px-3 w-28">Day</th>
+                            <th class="py-2 px-3">🥣 Breakfast</th>
+                            <th class="py-2 px-3">🥗 Lunch</th>
+                            <th class="py-2 px-3">🍲 Dinner</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {% for day in days_of_week %}
+                        {% set day_meals = meals_menu.get(day.abbr, {}) %}
+                        <tr>
+                            <td class="py-2.5 px-3 font-bold text-brand-400">
+                                {{ day.abbr }} <span class="text-slate-400 font-normal text-[11px]">({{ day.date_str }})</span>
+                            </td>
+                            <td class="py-1.5 px-2">
+                                <input type="text" name="meal_bf_{{ day.abbr }}" value="{{ day_meals.get('breakfast', '') }}" placeholder="Breakfast..." class="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                            </td>
+                            <td class="py-1.5 px-2">
+                                <input type="text" name="meal_lu_{{ day.abbr }}" value="{{ day_meals.get('lunch', '') }}" placeholder="Lunch..." class="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                            </td>
+                            <td class="py-1.5 px-2">
+                                <input type="text" name="meal_dn_{{ day.abbr }}" value="{{ day_meals.get('dinner', '') }}" placeholder="Dinner..." class="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pt-2 flex justify-end">
+                <button type="submit" class="bg-rose-600 hover:bg-rose-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-rose-500/20 transition-all flex items-center space-x-2">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Save Meals Menu</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Weekly Reflection & Notes -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60">
+        <div class="flex items-center space-x-2 pb-3 border-b border-slate-700/50 mb-4">
+            <i class="fa-solid fa-pen-to-square text-emerald-400"></i>
+            <h2 class="text-lg font-bold text-white">Weekly Reflection &amp; Notes</h2>
+        </div>
+
+        <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="space-y-3">
+            <input type="hidden" name="action" value="save_weekly_notes">
+            <textarea name="notes" rows="4" placeholder="Weekly highlights, achievements, lessons learned, and next week's focus areas..." class="w-full bg-slate-800/80 border border-slate-700 rounded-xl p-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">{{ notes }}</textarea>
+            <div class="flex justify-end">
+                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Save Weekly Reflection</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

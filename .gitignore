@@ -19,6 +19,7 @@ lib64/
 parts/
 sdist/
 var/
+.venv
 wheels/
 share/python-wheels/
 *.egg-info/
@@ -61,7 +62,9 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# Flask stuff:
+# Flask / Database stuff:
+*.db
+planner.db
 instance/
 .webassets-cache
 

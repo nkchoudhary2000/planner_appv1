@@ -1,0 +1,149 @@
+/* Custom Styling and UI Polish */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #0f172a;
+    color: #f8fafc;
+}
+
+/* Glassmorphism Cards */
+.glass-panel {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-hover {
+    transition: all 0.25s ease-in-out;
+}
+
+.glass-panel-hover:hover {
+    background: rgba(30, 41, 59, 0.85);
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* Animated Checkbox */
+.custom-checkbox {
+    accent-color: #6366f1;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+}
+
+/* Task Completed Strikethrough */
+.line-through-fade {
+    text-decoration: line-through;
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+/* Habit grid table styles */
+.habit-table {
+    border-collapse: separate;
+    border-spacing: 2px;
+}
+
+.habit-cell {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.habit-cell:hover {
+    transform: scale(1.15);
+}
+
+.habit-cell-active {
+    background-color: #6366f1;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.habit-cell-inactive {
+    background-color: #1e293b;
+    color: #64748b;
+}
+
+.habit-cell-inactive:hover {
+    background-color: #334155;
+    color: #cbd5e1;
+}
+
+/* Pulse badge */
+.pulse-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: pulse 1.6s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+/* Floating Toast Animations */
+@keyframes floatToastIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.float-toast-anim {
+    animation: floatToastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-dismissing {
+    opacity: 0 !important;
+    transform: translateY(-15px) scale(0.95) !important;
+    transition: opacity 0.3s ease, transform 0.3s ease !important;
+}
+

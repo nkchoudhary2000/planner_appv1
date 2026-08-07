@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Yearly Planner - {{ selected_year }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Year Navigation Header -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+            <span class="text-xs font-semibold text-purple-400 uppercase tracking-wider">Annual Resolutions &amp; High-Level Objectives</span>
+            <h1 class="text-2xl font-bold text-white mt-0.5">
+                Year {{ selected_year }}
+            </h1>
+        </div>
+
+        <!-- Year Selector -->
+        <form action="{{ url_for('planner.yearly') }}" method="GET" class="flex items-center space-x-3">
+            <select name="year" onchange="this.form.submit()" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                {% for y in range(selected_year - 3, selected_year + 5) %}
+                    <option value="{{ y }}" {{ 'selected' if y == selected_year }}>
+                        Year {{ y }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <a href="{{ url_for('planner.export_yearly_excel', year=selected_year) }}" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5" title="Export Yearly Plan to Excel">
+                <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
+                <span>Export Excel</span>
+            </a>
+        </form>
+    </div>
+
+    <!-- 12-Month Achievement Grid (Monthly -> Yearly Cascade) -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-5">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-calendar-days text-purple-400"></i>
+                <h2 class="text-lg font-bold text-white">12-Month Achievement Overview ({{ selected_year }})</h2>
+            </div>
+            <span class="text-xs text-slate-400">Monthly Planner Summaries Grid</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {% for mg in months_achievement_grid %}
+            <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-purple-500/50 transition-all flex flex-col justify-between space-y-3 group">
+                <div>
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-700/40">
+                        <h3 class="text-sm font-bold text-white group-hover:text-purple-300 transition-colors">
+                            {{ mg.month_name }}
+                        </h3>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold border {{ 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' if mg.achievement_score >= 75 else ('bg-brand-500/15 border-brand-500/30 text-brand-300' if mg.achievement_score >= 40 else 'bg-slate-700/50 border-slate-600 text-slate-400') }}">
+                            {{ mg.achievement_score }}% Score
+                        </span>
+                    </div>
+
+                    <div class="space-y-1.5 pt-2 text-xs">
+                        <div class="flex justify-between text-slate-300">
+                            <span>🎯 Monthly Goals:</span>
+                            <span class="font-bold text-emerald-400">{{ mg.goals_done }}/{{ mg.goals_total }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-300">
+                            <span>🚩 Milestones:</span>
+                            <span class="font-bold text-amber-400">{{ mg.milestones_done }}/{{ mg.milestones_total }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-300">
+                            <span>🔄 Active Habits:</span>
+                            <span class="font-bold text-purple-400">{{ mg.habits_count }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <a href="{{ url_for('planner.monthly', year=selected_year, month=mg.month_num) }}" class="mt-2 w-full py-1.5 px-3 rounded-lg bg-slate-900/60 hover:bg-purple-600/30 border border-slate-700/60 hover:border-purple-500/40 text-[11px] font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center space-x-1">
+                    <span>Open {{ mg.month_name }} Plan</span>
+                    <i class="fa-solid fa-chevron-right text-[9px]"></i>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Main Dual Layout: Resolutions & High Level Objectives -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Annual Resolutions Card -->
+        <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-star text-amber-400"></i>
+                    <h2 class="text-lg font-bold text-white">Annual Resolutions</h2>
+                </div>
+                <span class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                    {{ resolutions|selectattr('completed')|list|length }}/{{ resolutions|length }} Accomplished
+                </span>
+            </div>
+
+            <!-- Add Resolution Form -->
+            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+                <input type="hidden" name="action" value="add_resolution">
+                <input type="text" name="resolution_text" required placeholder="New annual resolution..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <div class="flex items-center space-x-2">
+                    <select name="category" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="Personal">Personal</option>
+                        <option value="Career">Career</option>
+                        <option value="Health">Health</option>
+                        <option value="Financial">Financial</option>
+                    </select>
+                    <button type="submit" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-amber-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span>Add</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Resolutions List -->
+            <div class="space-y-3">
+                {% if resolutions %}
+                    {% for r in resolutions %}
+                    <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                        <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
+                            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="inline">
+                                <input type="hidden" name="action" value="toggle_resolution">
+                                <input type="hidden" name="resolution_id" value="{{ r.id }}">
+                                <button type="submit" class="text-sm">
+                                    <i class="fa-regular {{ 'fa-square-check text-emerald-400' if r.completed else 'fa-square text-slate-500' }} text-lg"></i>
+                                </button>
+                            </form>
+                            <span class="text-sm font-medium text-slate-200 truncate {{ 'line-through-fade' if r.completed }}">
+                                {{ r.text }}
+                            </span>
+                        </div>
+
+                        <div class="flex items-center space-x-2 flex-shrink-0">
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-700 text-slate-300">
+                                {{ r.category }}
+                            </span>
+                            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="inline">
+                                <input type="hidden" name="action" value="delete_resolution">
+                                <input type="hidden" name="resolution_id" value="{{ r.id }}">
+                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-8">No resolutions set for {{ selected_year }}.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- High-Level Strategic Objectives -->
+        <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-compass text-purple-400"></i>
+                    <h2 class="text-lg font-bold text-white">Quarterly High-Level Objectives</h2>
+                </div>
+                <span class="text-xs text-slate-400">Strategic Targets</span>
+            </div>
+
+            <!-- Add Objective Form -->
+            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+                <input type="hidden" name="action" value="add_objective">
+                <input type="text" name="objective_title" required placeholder="High level objective..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <div class="flex items-center space-x-2">
+                    <select name="quarter" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="Q1">Q1</option>
+                        <option value="Q2">Q2</option>
+                        <option value="Q3">Q3</option>
+                        <option value="Q4">Q4</option>
+                        <option value="Full Year">Full Year</option>
+                    </select>
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-purple-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span>Add</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Objectives List -->
+            <div class="space-y-3">
+                {% if objectives %}
+                    {% for o in objectives %}
+                    <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                        <div class="space-y-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                                    {{ o.quarter }}
+                                </span>
+                                <h3 class="text-sm font-semibold text-slate-100">
+                                    {{ o.title }}
+                                </h3>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="inline">
+                                <input type="hidden" name="action" value="update_objective_status">
+                                <input type="hidden" name="objective_id" value="{{ o.id }}">
+                                <select name="status" onchange="this.form.submit()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none">
+                                    <option value="In Progress" {{ 'selected' if o.status == 'In Progress' }}>In Progress</option>
+                                    <option value="On Track" {{ 'selected' if o.status == 'On Track' }}>On Track</option>
+                                    <option value="Completed" {{ 'selected' if o.status == 'Completed' }}>Completed</option>
+                                    <option value="Behind" {{ 'selected' if o.status == 'Behind' }}>Behind</option>
+                                </select>
+                            </form>
+
+                            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="inline">
+                                <input type="hidden" name="action" value="delete_objective">
+                                <input type="hidden" name="objective_id" value="{{ o.id }}">
+                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-8">No objectives created for {{ selected_year }}.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Year-in-Review Reflection -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60">
+        <div class="flex items-center space-x-2 pb-3 border-b border-slate-700/50 mb-4">
+            <i class="fa-solid fa-book-open text-brand-400"></i>
+            <h2 class="text-lg font-bold text-white">{{ selected_year }} Year-in-Review Reflection Journal</h2>
+        </div>
+
+        <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="space-y-3">
+            <input type="hidden" name="action" value="save_reflections">
+            <textarea name="reflections" rows="5" placeholder="Reflect on your major achievements, lessons learned, and memorable moments from {{ selected_year }}..." class="w-full bg-slate-800/80 border border-slate-700 rounded-xl p-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">{{ reflections }}</textarea>
+            <div class="flex justify-end">
+                <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Save Annual Reflections</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

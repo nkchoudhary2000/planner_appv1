@@ -1,0 +1,1374 @@
+from datetime import date, datetime, timedelta
+import calendar
+import io
+import json
+from flask import render_template, redirect, url_for, flash, request, jsonify, send_file
+from flask_login import login_required, current_user
+from sqlalchemy.orm.attributes import flag_modified
+from app import db
+from app.planner import planner
+from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan
+
+@planner.route('/')
+def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('planner.dashboard'))
+    return redirect(url_for('auth.login'))
+
+
+@planner.route('/dashboard')
+@login_required
+def dashboard():
+    today = date.today()
+    current_year = today.year
+    current_month = today.month
+
+    # Get or create today's daily plan
+    daily_plan = DailyPlan.query.filter_by(user_id=current_user.id, date=today).first()
+    today_tasks = daily_plan.tasks if daily_plan and daily_plan.tasks else []
+    completed_today = sum(1 for t in today_tasks if t.get('completed'))
+    total_today = len(today_tasks)
+    today_completion_pct = int((completed_today / total_today * 100)) if total_today > 0 else 0
+
+    # Get current month's plan
+    monthly_plan = MonthlyPlan.query.filter_by(user_id=current_user.id, year=current_year, month=current_month).first()
+    monthly_goals = monthly_plan.goals if monthly_plan and monthly_plan.goals else []
+    monthly_habits = monthly_plan.habits if monthly_plan and monthly_plan.habits else []
+    goals_completed = sum(1 for g in monthly_goals if g.get('status') == 'Completed')
+
+    # Get current year's plan
+    yearly_plan = YearlyPlan.query.filter_by(user_id=current_user.id, year=current_year).first()
+    yearly_resolutions = yearly_plan.resolutions if yearly_plan and yearly_plan.resolutions else []
+    yearly_objectives = yearly_plan.objectives if yearly_plan and yearly_plan.objectives else []
+
+    # Format month name
+    month_name = calendar.month_name[current_month]
+
+    # Aggregate Depression Tracker Analytics across recent DailyPlan entries
+    all_daily_plans = DailyPlan.query.filter_by(user_id=current_user.id).order_by(DailyPlan.date.desc()).limit(30).all()
+    recent_episodes = []
+    total_episodes_count = 0
+    intensity_sum = 0
+    peak_intensity = 0
+    coping_strategies_map = {}
+
+    for dp in all_daily_plans:
+        if dp.depression_episodes:
+            for ep in dp.depression_episodes:
+                total_episodes_count += 1
+                intensity = int(ep.get('intensity', 5))
+                intensity_sum += intensity
+                if intensity > peak_intensity:
+                    peak_intensity = intensity
+
+                coping = ep.get('coping_mechanism', '').strip()
+                if coping:
+                    coping_strategies_map[coping] = coping_strategies_map.get(coping, 0) + 1
+
+                ep_copy = dict(ep)
+                ep_copy['date_str'] = dp.date.strftime('%b %d, %Y')
+                recent_episodes.append(ep_copy)
+
+    avg_intensity = round(intensity_sum / total_episodes_count, 1) if total_episodes_count > 0 else 0
+    top_coping_strategies = sorted(coping_strategies_map.items(), key=lambda x: x[1], reverse=True)[:3]
+
+    return render_template(
+        'planner/dashboard.html',
+        today=today,
+        today_tasks=today_tasks,
+        completed_today=completed_today,
+        total_today=total_today,
+        today_completion_pct=today_completion_pct,
+        daily_plan=daily_plan,
+        monthly_plan=monthly_plan,
+        monthly_goals=monthly_goals,
+        monthly_habits=monthly_habits,
+        goals_completed=goals_completed,
+        yearly_plan=yearly_plan,
+        yearly_resolutions=yearly_resolutions,
+        yearly_objectives=yearly_objectives,
+        current_year=current_year,
+        month_name=month_name,
+        recent_episodes=recent_episodes[:5],
+        total_episodes_count=total_episodes_count,
+        avg_intensity=avg_intensity,
+        peak_intensity=peak_intensity,
+        top_coping_strategies=top_coping_strategies
+    )
+
+
+@planner.route('/weekly', methods=['GET', 'POST'])
+@login_required
+def weekly():
+    year_param = request.args.get('year', type=int)
+    week_param = request.args.get('week', type=int)
+
+    today = date.today()
+    if not year_param or not week_param:
+        year_param, week_param, _ = today.isocalendar()
+
+    first_day_of_year = date(year_param, 1, 4)
+    start_of_week = first_day_of_year + timedelta(weeks=week_param - 1) - timedelta(days=first_day_of_year.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+
+    days_of_week = []
+    day_abbrs = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    for i in range(7):
+        d = start_of_week + timedelta(days=i)
+        days_of_week.append({
+            'abbr': day_abbrs[i],
+            'name': d.strftime('%A'),
+            'date_str': d.strftime('%b %d'),
+            'full_date': d.strftime('%Y-%m-%d'),
+            'date_obj': d
+        })
+
+    plan = WeeklyPlan.query.filter_by(user_id=current_user.id, year=year_param, week_number=week_param).first()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if not plan:
+            plan = WeeklyPlan(
+                user_id=current_user.id,
+                year=year_param,
+                week_number=week_param,
+                start_date=start_of_week,
+                goals=[],
+                daily_todos={abbr: [] for abbr in day_abbrs},
+                shopping_list=[],
+                meals_menu={abbr: {'breakfast': '', 'lunch': '', 'dinner': ''} for abbr in day_abbrs},
+                notes=''
+            )
+            db.session.add(plan)
+
+        goals = plan.goals or []
+        daily_todos = plan.daily_todos or {abbr: [] for abbr in day_abbrs}
+        shopping_list = plan.shopping_list or []
+        meals_menu = plan.meals_menu or {abbr: {'breakfast': '', 'lunch': '', 'dinner': ''} for abbr in day_abbrs}
+
+        if action == 'add_weekly_goal':
+            goal_title = request.form.get('goal_title', '').strip()
+            if goal_title:
+                goals.append({
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'title': goal_title,
+                    'completed': False
+                })
+                plan.goals = goals
+                flag_modified(plan, 'goals')
+                db.session.commit()
+                flash('Weekly goal added!', 'success')
+
+        elif action == 'toggle_weekly_goal':
+            goal_id = request.form.get('goal_id')
+            for g in goals:
+                if g.get('id') == goal_id:
+                    g['completed'] = not g.get('completed', False)
+            plan.goals = goals
+            flag_modified(plan, 'goals')
+            db.session.commit()
+
+        elif action == 'delete_weekly_goal':
+            goal_id = request.form.get('goal_id')
+            plan.goals = [g for g in goals if g.get('id') != goal_id]
+            flag_modified(plan, 'goals')
+            db.session.commit()
+            flash('Weekly goal removed.', 'info')
+
+        elif action == 'add_daily_todo':
+            day_abbr = request.form.get('day_abbr')
+            todo_text = request.form.get('todo_text', '').strip()
+            if day_abbr in day_abbrs and todo_text:
+                if day_abbr not in daily_todos:
+                    daily_todos[day_abbr] = []
+                daily_todos[day_abbr].append({
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'text': todo_text,
+                    'completed': False
+                })
+                plan.daily_todos = daily_todos
+                flag_modified(plan, 'daily_todos')
+                db.session.commit()
+                flash(f'To-do added to {day_abbr}!', 'success')
+
+        elif action == 'toggle_daily_todo':
+            day_abbr = request.form.get('day_abbr')
+            todo_id = request.form.get('todo_id')
+            if day_abbr in daily_todos:
+                for t in daily_todos[day_abbr]:
+                    if t.get('id') == todo_id:
+                        t['completed'] = not t.get('completed', False)
+                plan.daily_todos = daily_todos
+                flag_modified(plan, 'daily_todos')
+                db.session.commit()
+
+        elif action == 'delete_daily_todo':
+            day_abbr = request.form.get('day_abbr')
+            todo_id = request.form.get('todo_id')
+            if day_abbr in daily_todos:
+                daily_todos[day_abbr] = [t for t in daily_todos[day_abbr] if t.get('id') != todo_id]
+                plan.daily_todos = daily_todos
+                flag_modified(plan, 'daily_todos')
+                db.session.commit()
+                flash('To-do item deleted.', 'info')
+
+        elif action == 'add_shopping_item':
+            item_name = request.form.get('item_name', '').strip()
+            category = request.form.get('category', 'Groceries').strip()
+            if item_name:
+                shopping_list.append({
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'item': item_name,
+                    'category': category,
+                    'bought': False
+                })
+                plan.shopping_list = shopping_list
+                flag_modified(plan, 'shopping_list')
+                db.session.commit()
+                flash('Shopping item added!', 'success')
+
+        elif action == 'toggle_shopping_item':
+            item_id = request.form.get('item_id')
+            for s in shopping_list:
+                if s.get('id') == item_id:
+                    s['bought'] = not s.get('bought', False)
+            plan.shopping_list = shopping_list
+            flag_modified(plan, 'shopping_list')
+            db.session.commit()
+
+        elif action == 'delete_shopping_item':
+            item_id = request.form.get('item_id')
+            plan.shopping_list = [s for s in shopping_list if s.get('id') != item_id]
+            flag_modified(plan, 'shopping_list')
+            db.session.commit()
+            flash('Shopping item deleted.', 'info')
+
+        elif action == 'save_meals_menu':
+            for abbr in day_abbrs:
+                meals_menu[abbr] = {
+                    'breakfast': request.form.get(f'meal_bf_{abbr}', '').strip(),
+                    'lunch': request.form.get(f'meal_lu_{abbr}', '').strip(),
+                    'dinner': request.form.get(f'meal_dn_{abbr}', '').strip()
+                }
+            plan.meals_menu = meals_menu
+            flag_modified(plan, 'meals_menu')
+            db.session.commit()
+            flash('Weekly meal menu saved!', 'success')
+
+        elif action == 'save_weekly_notes':
+            notes = request.form.get('notes', '').strip()
+            plan.notes = notes
+            db.session.commit()
+            flash('Weekly notes updated!', 'success')
+
+        return redirect(url_for('planner.weekly', year=year_param, week=week_param))
+
+    goals = plan.goals if plan and plan.goals else []
+    daily_todos = plan.daily_todos if plan and plan.daily_todos else {abbr: [] for abbr in day_abbrs}
+    shopping_list = plan.shopping_list if plan and plan.shopping_list else []
+    meals_menu = plan.meals_menu if plan and plan.meals_menu else {abbr: {'breakfast': '', 'lunch': '', 'dinner': ''} for abbr in day_abbrs}
+    notes = plan.notes if plan and plan.notes else ''
+
+    for abbr in day_abbrs:
+        if abbr not in daily_todos:
+            daily_todos[abbr] = []
+        if abbr not in meals_menu:
+            meals_menu[abbr] = {'breakfast': '', 'lunch': '', 'dinner': ''}
+
+    # Entire Week Report calculations
+    total_todos = sum(len(daily_todos.get(abbr, [])) for abbr in day_abbrs)
+    completed_todos = sum(sum(1 for t in daily_todos.get(abbr, []) if t.get('completed')) for abbr in day_abbrs)
+    todo_completion_pct = int((completed_todos / total_todos * 100)) if total_todos > 0 else 0
+
+    total_goals = len(goals)
+    completed_goals = sum(1 for g in goals if g.get('completed'))
+
+    total_shopping = len(shopping_list)
+    bought_shopping = sum(1 for s in shopping_list if s.get('bought'))
+
+    meals_planned = sum(sum(1 for m_type in ['breakfast', 'lunch', 'dinner'] if meals_menu.get(abbr, {}).get(m_type)) for abbr in day_abbrs)
+    meal_planning_pct = int((meals_planned / 21 * 100))
+
+    # Depression episode summary for this week
+    week_episodes = []
+    week_daily_plans = DailyPlan.query.filter(
+        DailyPlan.user_id == current_user.id,
+        DailyPlan.date >= start_of_week,
+        DailyPlan.date <= end_of_week
+    ).all()
+    for dp in week_daily_plans:
+        if dp.depression_episodes:
+            for ep in dp.depression_episodes:
+                ep_copy = dict(ep)
+                ep_copy['date_str'] = dp.date.strftime('%b %d')
+                week_episodes.append(ep_copy)
+
+    score_components = []
+    if total_todos > 0:
+        score_components.append(todo_completion_pct)
+    if total_goals > 0:
+        score_components.append(int(completed_goals / total_goals * 100))
+    if meals_planned > 0:
+        score_components.append(meal_planning_pct)
+    weekly_score = int(sum(score_components) / len(score_components)) if score_components else (100 if completed_todos > 0 or completed_goals > 0 else 0)
+
+    # Daily Planner -> Weekly Summary Cascade
+    daily_tasks_done = 0
+    daily_tasks_total = 0
+    daily_mood_tally = {}
+    for dp in week_daily_plans:
+        if dp.tasks:
+            daily_tasks_total += len(dp.tasks)
+            daily_tasks_done += sum(1 for t in dp.tasks if t.get('completed'))
+        if dp.schedule:
+            for slot, sdata in dp.schedule.items():
+                if isinstance(sdata, dict) and sdata.get('mood'):
+                    m = sdata.get('mood')
+                    daily_mood_tally[m] = daily_mood_tally.get(m, 0) + 1
+
+    prev_week_date = start_of_week - timedelta(days=7)
+    prev_year, prev_week, _ = prev_week_date.isocalendar()
+    next_week_date = start_of_week + timedelta(days=7)
+    next_year, next_week, _ = next_week_date.isocalendar()
+
+    return render_template(
+        'planner/weekly.html',
+        selected_year=year_param,
+        selected_week=week_param,
+        start_of_week=start_of_week,
+        end_of_week=end_of_week,
+        days_of_week=days_of_week,
+        plan=plan,
+        goals=goals,
+        daily_todos=daily_todos,
+        shopping_list=shopping_list,
+        meals_menu=meals_menu,
+        notes=notes,
+        total_todos=total_todos,
+        completed_todos=completed_todos,
+        todo_completion_pct=todo_completion_pct,
+        total_goals=total_goals,
+        completed_goals=completed_goals,
+        total_shopping=total_shopping,
+        bought_shopping=bought_shopping,
+        meals_planned=meals_planned,
+        meal_planning_pct=meal_planning_pct,
+        week_episodes=week_episodes,
+        weekly_score=weekly_score,
+        daily_tasks_done=daily_tasks_done,
+        daily_tasks_total=daily_tasks_total,
+        daily_mood_tally=daily_mood_tally,
+        daily_planned_days=len(week_daily_plans),
+        prev_year=prev_year,
+        prev_week=prev_week,
+        next_year=next_year,
+        next_week=next_week
+    )
+
+
+@planner.route('/daily', methods=['GET', 'POST'])
+@login_required
+def daily():
+    date_param = request.args.get('date')
+    if date_param:
+        try:
+            selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = date.today()
+    else:
+        selected_date = date.today()
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=selected_date).first()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if not plan:
+            plan = DailyPlan(user_id=current_user.id, date=selected_date, schedule={}, tasks=[], notes='')
+            db.session.add(plan)
+
+        tasks = plan.tasks or []
+        schedule = plan.schedule or {}
+
+        if action == 'add_task':
+            task_text = request.form.get('task_text', '').strip()
+            priority = request.form.get('priority', 'Medium')
+            if task_text:
+                new_task = {
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'text': task_text,
+                    'priority': priority,
+                    'completed': False
+                }
+                tasks.append(new_task)
+                plan.tasks = tasks
+                flag_modified(plan, 'tasks')
+                db.session.commit()
+                flash('Task added successfully!', 'success')
+
+        elif action == 'delete_task':
+            task_id = request.form.get('task_id')
+            plan.tasks = [t for t in tasks if t.get('id') != task_id]
+            flag_modified(plan, 'tasks')
+            db.session.commit()
+            flash('Task deleted.', 'info')
+
+        elif action == 'save_schedule':
+            new_schedule = {}
+            default_slots = [
+                "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM",
+                "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
+                "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"
+            ]
+            for time_slot in default_slots:
+                slot_id = time_slot.replace(':', '_').replace(' ', '_')
+                act = request.form.get(f'slot_act_{slot_id}', request.form.get(f'slot_{time_slot}', '')).strip()
+                mood = request.form.get(f'slot_mood_{slot_id}', '').strip()
+                if act or mood:
+                    new_schedule[time_slot] = {'activity': act, 'mood': mood}
+
+            plan.schedule = new_schedule
+            flag_modified(plan, 'schedule')
+            db.session.commit()
+            flash('Hourly activity & mood tracker saved successfully!', 'success')
+
+        elif action == 'save_notes':
+            notes = request.form.get('notes', '').strip()
+            plan.notes = notes
+            db.session.commit()
+            flash('Notes updated!', 'success')
+
+        elif action == 'add_depression_episode':
+            start_time = request.form.get('start_time', '').strip() or 'N/A'
+            duration = request.form.get('duration', '').strip() or 'N/A'
+            try:
+                intensity = int(request.form.get('intensity', 5))
+            except ValueError:
+                intensity = 5
+            triggers = request.form.get('triggers', '').strip()
+            coping_mechanism = request.form.get('coping_mechanism', '').strip()
+            coping_effectiveness = request.form.get('coping_effectiveness', 'Helpful').strip()
+            notes = request.form.get('notes', '').strip()
+            entry_time = datetime.now().strftime('%I:%M %p')
+
+            new_episode = {
+                'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                'entry_time': entry_time,
+                'start_time': start_time,
+                'duration': duration,
+                'intensity': intensity,
+                'triggers': triggers,
+                'coping_mechanism': coping_mechanism,
+                'coping_effectiveness': coping_effectiveness,
+                'notes': notes
+            }
+
+            episodes = plan.depression_episodes or []
+            episodes.append(new_episode)
+            plan.depression_episodes = episodes
+            flag_modified(plan, 'depression_episodes')
+            db.session.commit()
+            flash('Depression episode & symptom logged.', 'success')
+
+        elif action == 'delete_depression_episode':
+            episode_id = request.form.get('episode_id')
+            episodes = plan.depression_episodes or []
+            plan.depression_episodes = [ep for ep in episodes if ep.get('id') != episode_id]
+            flag_modified(plan, 'depression_episodes')
+            db.session.commit()
+            flash('Depression episode record deleted.', 'info')
+
+        return redirect(url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')))
+
+    # 12-Hour AM/PM default schedule slots (06:00 AM to 11:00 PM)
+    default_slots = [
+        "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM",
+        "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
+        "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"
+    ]
+
+    # Normalize schedule dict for 12h format & mood tracking
+    raw_schedule = plan.schedule if plan and plan.schedule else {}
+    normalized_schedule = {}
+    legacy_map = {f'{h:02d}:00': f'{(h if (h % 12 != 0) else 12):02d}:00 {"AM" if h < 12 else "PM"}' for h in range(6, 24)}
+
+    for slot in default_slots:
+        val = raw_schedule.get(slot)
+        if not val:
+            for k24, v12 in legacy_map.items():
+                if v12 == slot and k24 in raw_schedule:
+                    val = raw_schedule[k24]
+                    break
+
+        if isinstance(val, dict):
+            normalized_schedule[slot] = val
+        elif isinstance(val, str) and val:
+            normalized_schedule[slot] = {'activity': val, 'mood': ''}
+        else:
+            normalized_schedule[slot] = {'activity': '', 'mood': ''}
+    
+    return render_template(
+        'planner/daily.html',
+        selected_date=selected_date,
+        plan=plan,
+        tasks=plan.tasks if plan else [],
+        schedule=normalized_schedule,
+        notes=plan.notes if plan else '',
+        depression_episodes=plan.depression_episodes if plan and plan.depression_episodes else [],
+        default_slots=default_slots
+    )
+
+
+@planner.route('/monthly', methods=['GET', 'POST'])
+@login_required
+def monthly():
+    today = date.today()
+    try:
+        selected_year = int(request.args.get('year', today.year))
+        selected_month = int(request.args.get('month', today.month))
+    except (ValueError, TypeError):
+        selected_year = today.year
+        selected_month = today.month
+
+    # Ensure valid month
+    if selected_month < 1 or selected_month > 12:
+        selected_month = today.month
+
+    plan = MonthlyPlan.query.filter_by(user_id=current_user.id, year=selected_year, month=selected_month).first()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if not plan:
+            plan = MonthlyPlan(user_id=current_user.id, year=selected_year, month=selected_month, goals=[], habits=[], milestones=[], calendar_days={}, notes='')
+            db.session.add(plan)
+
+        goals = plan.goals or []
+        habits = plan.habits or []
+        milestones = plan.milestones or []
+        calendar_days = plan.calendar_days or {}
+
+        if action == 'add_goal':
+            title = request.form.get('goal_title', '').strip()
+            category = request.form.get('category', 'Personal')
+            if title:
+                new_goal = {
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'title': title,
+                    'category': category,
+                    'status': 'In Progress'
+                }
+                goals.append(new_goal)
+                plan.goals = goals
+                flag_modified(plan, 'goals')
+                db.session.commit()
+                flash('Goal added!', 'success')
+
+        elif action == 'toggle_goal_status':
+            goal_id = request.form.get('goal_id')
+            for g in goals:
+                if g.get('id') == goal_id:
+                    g['status'] = 'Completed' if g.get('status') != 'Completed' else 'In Progress'
+            plan.goals = goals
+            flag_modified(plan, 'goals')
+            db.session.commit()
+
+        elif action == 'delete_goal':
+            goal_id = request.form.get('goal_id')
+            plan.goals = [g for g in goals if g.get('id') != goal_id]
+            flag_modified(plan, 'goals')
+            db.session.commit()
+            flash('Goal removed.', 'info')
+
+        elif action == 'add_habit':
+            name = request.form.get('habit_name', '').strip()
+            if name:
+                new_habit = {
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'name': name,
+                    'completed_days': []
+                }
+                habits.append(new_habit)
+                plan.habits = habits
+                flag_modified(plan, 'habits')
+                db.session.commit()
+                flash('Habit added!', 'success')
+
+        elif action == 'delete_habit':
+            habit_id = request.form.get('habit_id')
+            plan.habits = [h for h in habits if h.get('id') != habit_id]
+            flag_modified(plan, 'habits')
+            db.session.commit()
+
+        elif action == 'add_milestone':
+            title = request.form.get('milestone_title', '').strip()
+            target_day = request.form.get('target_day', '').strip()
+            if title:
+                new_ms = {
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'title': title,
+                    'day': target_day,
+                    'completed': False
+                }
+                milestones.append(new_ms)
+                plan.milestones = milestones
+                flag_modified(plan, 'milestones')
+                db.session.commit()
+                flash('Milestone added!', 'success')
+
+        elif action == 'toggle_milestone':
+            ms_id = request.form.get('milestone_id')
+            for ms in milestones:
+                if ms.get('id') == ms_id:
+                    ms['completed'] = not ms.get('completed', False)
+            plan.milestones = milestones
+            flag_modified(plan, 'milestones')
+            db.session.commit()
+
+        elif action == 'delete_milestone':
+            ms_id = request.form.get('milestone_id')
+            plan.milestones = [m for m in milestones if m.get('id') != ms_id]
+            flag_modified(plan, 'milestones')
+            db.session.commit()
+
+        elif action == 'add_calendar_item':
+            day_str = str(request.form.get('day', '')).strip()
+            item_text = request.form.get('item_text', '').strip()
+            item_type = request.form.get('item_type', 'deadline')
+            sticker = request.form.get('sticker', '').strip()
+            image_url = request.form.get('image_url', '').strip()
+
+            if day_str and item_text:
+                if day_str not in calendar_days:
+                    calendar_days[day_str] = {'items': [], 'sticker': '', 'image_url': ''}
+                
+                day_entry = calendar_days[day_str]
+                items = day_entry.get('items', [])
+                items.append({
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'text': item_text,
+                    'type': item_type,
+                    'sticker': sticker,
+                    'image_url': image_url
+                })
+                day_entry['items'] = items
+                if sticker:
+                    day_entry['sticker'] = sticker
+                if image_url:
+                    day_entry['image_url'] = image_url
+
+                calendar_days[day_str] = day_entry
+                plan.calendar_days = calendar_days
+                flag_modified(plan, 'calendar_days')
+                db.session.commit()
+                flash(f'Plan item added to Day {day_str}!', 'success')
+
+        elif action == 'delete_calendar_item':
+            day_str = str(request.form.get('day', '')).strip()
+            item_id = request.form.get('item_id')
+            if day_str in calendar_days:
+                day_entry = calendar_days[day_str]
+                day_entry['items'] = [i for i in day_entry.get('items', []) if i.get('id') != item_id]
+                calendar_days[day_str] = day_entry
+                plan.calendar_days = calendar_days
+                flag_modified(plan, 'calendar_days')
+                db.session.commit()
+                flash('Calendar item removed.', 'info')
+
+        elif action == 'set_day_sticker':
+            day_str = str(request.form.get('day', '')).strip()
+            sticker = request.form.get('sticker', '').strip()
+            image_url = request.form.get('image_url', '').strip()
+            if day_str:
+                if day_str not in calendar_days:
+                    calendar_days[day_str] = {'items': [], 'sticker': '', 'image_url': ''}
+                calendar_days[day_str]['sticker'] = sticker
+                if image_url:
+                    calendar_days[day_str]['image_url'] = image_url
+                plan.calendar_days = calendar_days
+                flag_modified(plan, 'calendar_days')
+                db.session.commit()
+                flash(f'Sticker updated for Day {day_str}!', 'success')
+
+        elif action == 'save_notes':
+            notes = request.form.get('notes', '').strip()
+            plan.notes = notes
+            db.session.commit()
+            flash('Monthly notes updated!', 'success')
+
+        return redirect(url_for('planner.monthly', year=selected_year, month=selected_month))
+
+    days_in_month = calendar.monthrange(selected_year, selected_month)[1]
+    month_name = calendar.month_name[selected_month]
+
+    # Calculate exact calendar weeks for grid view (Monday to Sunday)
+    cal = calendar.Calendar(firstweekday=0)
+    month_weeks = cal.monthdatescalendar(selected_year, selected_month)
+
+    # Weekly Summaries Cascade -> Monthly Planner
+    first_day_of_month = date(selected_year, selected_month, 1)
+    last_day_of_month = date(selected_year, selected_month, days_in_month)
+    month_weekly_plans = WeeklyPlan.query.filter(
+        WeeklyPlan.user_id == current_user.id,
+        WeeklyPlan.start_date >= (first_day_of_month - timedelta(days=6)),
+        WeeklyPlan.start_date <= last_day_of_month
+    ).order_by(WeeklyPlan.start_date.asc()).all()
+
+    weekly_summaries_list = []
+    for wp in month_weekly_plans:
+        w_goals = wp.goals or []
+        w_goals_completed = sum(1 for g in w_goals if g.get('completed'))
+        w_todos = wp.daily_todos or {}
+        w_todos_total = sum(len(w_todos.get(d, [])) for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'])
+        w_todos_completed = sum(sum(1 for t in w_todos.get(d, []) if t.get('completed')) for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'])
+
+        weekly_summaries_list.append({
+            'week_number': wp.week_number,
+            'start_date_str': wp.start_date.strftime('%b %d'),
+            'goals_done': f"{w_goals_completed}/{len(w_goals)}",
+            'todos_done': f"{w_todos_completed}/{w_todos_total}",
+            'notes': wp.notes or ''
+        })
+
+    return render_template(
+        'planner/monthly.html',
+        selected_year=selected_year,
+        selected_month=selected_month,
+        month_name=month_name,
+        days_in_month=days_in_month,
+        month_weeks=month_weeks,
+        today=today,
+        plan=plan,
+        goals=plan.goals if plan else [],
+        habits=plan.habits if plan else [],
+        milestones=plan.milestones if plan else [],
+        calendar_days=plan.calendar_days if (plan and plan.calendar_days) else {},
+        notes=plan.notes if plan else '',
+        weekly_summaries_list=weekly_summaries_list,
+        calendar=calendar
+    )
+
+
+@planner.route('/yearly', methods=['GET', 'POST'])
+@login_required
+def yearly():
+    today = date.today()
+    try:
+        selected_year = int(request.args.get('year', today.year))
+    except (ValueError, TypeError):
+        selected_year = today.year
+
+    plan = YearlyPlan.query.filter_by(user_id=current_user.id, year=selected_year).first()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if not plan:
+            plan = YearlyPlan(user_id=current_user.id, year=selected_year, resolutions=[], objectives=[], reflections='')
+            db.session.add(plan)
+
+        resolutions = plan.resolutions or []
+        objectives = plan.objectives or []
+
+        if action == 'add_resolution':
+            text = request.form.get('resolution_text', '').strip()
+            category = request.form.get('category', 'Personal')
+            if text:
+                new_res = {
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'text': text,
+                    'category': category,
+                    'completed': False
+                }
+                resolutions.append(new_res)
+                plan.resolutions = resolutions
+                flag_modified(plan, 'resolutions')
+                db.session.commit()
+                flash('Resolution added!', 'success')
+
+        elif action == 'toggle_resolution':
+            res_id = request.form.get('resolution_id')
+            for r in resolutions:
+                if r.get('id') == res_id:
+                    r['completed'] = not r.get('completed', False)
+            plan.resolutions = resolutions
+            flag_modified(plan, 'resolutions')
+            db.session.commit()
+
+        elif action == 'delete_resolution':
+            res_id = request.form.get('resolution_id')
+            plan.resolutions = [r for r in resolutions if r.get('id') != res_id]
+            flag_modified(plan, 'resolutions')
+            db.session.commit()
+
+        elif action == 'add_objective':
+            title = request.form.get('objective_title', '').strip()
+            quarter = request.form.get('quarter', 'Q1')
+            if title:
+                new_obj = {
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'title': title,
+                    'quarter': quarter,
+                    'status': 'In Progress'
+                }
+                objectives.append(new_obj)
+                plan.objectives = objectives
+                flag_modified(plan, 'objectives')
+                db.session.commit()
+                flash('Objective added!', 'success')
+
+        elif action == 'update_objective_status':
+            obj_id = request.form.get('objective_id')
+            new_status = request.form.get('status', 'In Progress')
+            for o in objectives:
+                if o.get('id') == obj_id:
+                    o['status'] = new_status
+            plan.objectives = objectives
+            flag_modified(plan, 'objectives')
+            db.session.commit()
+
+        elif action == 'delete_objective':
+            obj_id = request.form.get('objective_id')
+            plan.objectives = [o for o in objectives if o.get('id') != obj_id]
+            flag_modified(plan, 'objectives')
+            db.session.commit()
+
+        elif action == 'save_reflections':
+            reflections = request.form.get('reflections', '').strip()
+            plan.reflections = reflections
+            db.session.commit()
+            flash('Yearly reflections saved!', 'success')
+
+        return redirect(url_for('planner.yearly', year=selected_year))
+
+    # 12-Month Achievement Grid Summary Cascade (Monthly -> Yearly)
+    all_monthly_plans = MonthlyPlan.query.filter_by(user_id=current_user.id, year=selected_year).all()
+    monthly_plan_by_month = {mp.month: mp for mp in all_monthly_plans}
+
+    months_achievement_grid = []
+    for m in range(1, 13):
+        m_name = calendar.month_name[m]
+        mp = monthly_plan_by_month.get(m)
+
+        m_goals = mp.goals if mp and mp.goals else []
+        m_goals_completed = sum(1 for g in m_goals if g.get('status') == 'Completed')
+        m_goals_total = len(m_goals)
+
+        m_milestones = mp.milestones if mp and mp.milestones else []
+        m_milestones_completed = sum(1 for ms in m_milestones if ms.get('completed'))
+        m_milestones_total = len(m_milestones)
+
+        m_habits = mp.habits if mp and mp.habits else []
+        m_habits_count = len(m_habits)
+
+        components = []
+        if m_goals_total > 0:
+            components.append(int(m_goals_completed / m_goals_total * 100))
+        if m_milestones_total > 0:
+            components.append(int(m_milestones_completed / m_milestones_total * 100))
+
+        achievement_score = int(sum(components) / len(components)) if components else (100 if m_goals_completed > 0 or m_milestones_completed > 0 else 0)
+
+        months_achievement_grid.append({
+            'month_num': m,
+            'month_name': m_name,
+            'has_plan': mp is not None,
+            'goals_done': m_goals_completed,
+            'goals_total': m_goals_total,
+            'milestones_done': m_milestones_completed,
+            'milestones_total': m_milestones_total,
+            'habits_count': m_habits_count,
+            'achievement_score': achievement_score
+        })
+
+    return render_template(
+        'planner/yearly.html',
+        selected_year=selected_year,
+        plan=plan,
+        resolutions=plan.resolutions if plan else [],
+        objectives=plan.objectives if plan else [],
+        reflections=plan.reflections if plan else '',
+        months_achievement_grid=months_achievement_grid
+    )
+
+
+# AJAX Endpoint for dynamic toggling of tasks
+@planner.route('/api/daily/task/toggle', methods=['POST'])
+@login_required
+def api_toggle_task():
+    data = request.get_json() or {}
+    date_str = data.get('date')
+    task_id = data.get('task_id')
+
+    if not date_str or not task_id:
+        return jsonify({'success': False, 'message': 'Missing arguments'}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+    if not plan:
+        return jsonify({'success': False, 'message': 'Plan not found'}), 404
+
+    tasks = plan.tasks or []
+    updated = False
+    new_state = False
+
+    for t in tasks:
+        if t.get('id') == task_id:
+            t['completed'] = not t.get('completed', False)
+            new_state = t['completed']
+            updated = True
+            break
+
+    if updated:
+        plan.tasks = tasks
+        flag_modified(plan, 'tasks')
+        db.session.commit()
+        return jsonify({'success': True, 'completed': new_state})
+    
+    return jsonify({'success': False, 'message': 'Task not found'}), 404
+
+
+# AJAX Endpoint for habit tracker day toggle
+@planner.route('/api/monthly/habit/toggle', methods=['POST'])
+@login_required
+def api_toggle_habit_day():
+    data = request.get_json() or {}
+    year = data.get('year')
+    month = data.get('month')
+    habit_id = data.get('habit_id')
+    day = data.get('day')
+
+    if not all([year, month, habit_id, day]):
+        return jsonify({'success': False, 'message': 'Missing arguments'}), 400
+
+    plan = MonthlyPlan.query.filter_by(user_id=current_user.id, year=int(year), month=int(month)).first()
+    if not plan:
+        return jsonify({'success': False, 'message': 'Plan not found'}), 404
+
+    habits = plan.habits or []
+    updated = False
+    is_checked = False
+
+    for h in habits:
+        if h.get('id') == habit_id:
+            completed = h.get('completed_days', [])
+            if day in completed:
+                completed.remove(day)
+                is_checked = False
+            else:
+                completed.append(day)
+                is_checked = True
+            h['completed_days'] = completed
+            updated = True
+            break
+
+    if updated:
+        plan.habits = habits
+        flag_modified(plan, 'habits')
+        db.session.commit()
+        return jsonify({'success': True, 'checked': is_checked})
+
+    return jsonify({'success': False, 'message': 'Habit not found'}), 404
+
+
+# Google Drive Backup Sync Endpoint
+@planner.route('/api/google/drive/sync', methods=['POST'])
+@login_required
+def api_google_drive_sync():
+    from app.services.google_service import sync_to_google_drive
+    try:
+        res = sync_to_google_drive(current_user)
+        last_sync = current_user.last_drive_sync.strftime('%Y-%m-%d %H:%M:%S UTC') if current_user.last_drive_sync else 'Just now'
+        return jsonify({
+            'success': res.get('success', False),
+            'message': res.get('message', 'Drive sync completed'),
+            'last_sync': last_sync,
+            'google_connected': res.get('google_connected', True)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Drive sync error: {str(e)}'}), 500
+
+
+# Google Drive Data Restore Endpoint
+@planner.route('/api/google/drive/restore', methods=['POST'])
+@login_required
+def api_google_drive_restore():
+    from app.services.google_service import restore_from_google_drive
+    try:
+        res = restore_from_google_drive(current_user)
+        if res.get('success'):
+            flash('Successfully restored planner data from Google Drive!', 'success')
+            return jsonify({'success': True, 'message': res.get('message')})
+        return jsonify({'success': False, 'message': res.get('message', 'Drive restore failed')}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Drive restore error: {str(e)}'}), 500
+
+
+# Direct Local JSON Backup Export Endpoint
+@planner.route('/api/backup/export_json')
+@login_required
+def api_backup_export_json():
+    from app.services.google_service import export_user_data_payload
+    payload = export_user_data_payload(current_user)
+    json_bytes = io.BytesIO(json.dumps(payload, indent=2).encode('utf-8'))
+    filename = f"Chronos_Planner_Backup_{current_user.username}.json"
+    return send_file(json_bytes, download_name=filename, as_attachment=True, mimetype="application/json")
+
+
+
+# Google Drive Folder Listing Endpoint
+@planner.route('/api/google/drive/folders', methods=['GET'])
+@login_required
+def api_google_drive_folders():
+    from app.services.google_service import list_google_drive_folders
+    try:
+        parent_id = request.args.get('parent_id', 'root')
+        folders = list_google_drive_folders(current_user, parent_id=parent_id)
+        selected_folder_id = current_user.google_drive_folder_id or 'root'
+        selected_folder_name = current_user.google_drive_folder_name or 'My Drive (Root Folder)'
+        selected_folder_path = current_user.google_drive_folder_path or selected_folder_name
+        return jsonify({
+            'success': True,
+            'folders': folders,
+            'parent_id': parent_id,
+            'current_folder_id': selected_folder_id,
+            'current_folder_name': selected_folder_name,
+            'current_folder_path': selected_folder_path
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Folder fetch error: {str(e)}'}), 500
+
+
+# Google Drive Folder Settings Endpoint
+@planner.route('/api/google/drive/folder_settings', methods=['POST'])
+@login_required
+def api_google_drive_folder_settings():
+    from app.services.google_service import create_google_drive_folder
+    data = request.get_json() or {}
+    folder_action = data.get('action', 'select')  # 'select' or 'create'
+    parent_id = data.get('parent_id', 'root')
+    folder_path = data.get('folder_path', '')
+
+    if folder_action == 'create':
+        folder_name = data.get('folder_name', 'chronos planner folder')
+        folder_info = create_google_drive_folder(current_user, folder_name, parent_id=parent_id)
+        folder_id = folder_info['id']
+        folder_name = folder_info['name']
+    else:
+        folder_id = data.get('folder_id', 'root')
+        folder_name = data.get('folder_name', 'My Drive (Root Folder)')
+
+    if not folder_path:
+        folder_path = folder_name
+
+    current_user.google_drive_folder_id = folder_id
+    current_user.google_drive_folder_name = folder_name
+    current_user.google_drive_folder_path = folder_path
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': f'Backup target folder set to "{folder_name}"',
+        'folder_id': folder_id,
+        'folder_name': folder_name,
+        'folder_path': folder_path
+    })
+
+
+
+
+# Excel Export Helper
+def create_styled_excel(title, sheets_data):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    wb = Workbook()
+    wb.remove(wb.active)  # Remove default active sheet
+
+    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    cell_font = Font(name="Calibri", size=10)
+    title_font = Font(name="Calibri", size=14, bold=True, color="1E3A8A")
+    thin_border = Border(
+        left=Side(style='thin', color='D1D5DB'),
+        right=Side(style='thin', color='D1D5DB'),
+        top=Side(style='thin', color='D1D5DB'),
+        bottom=Side(style='thin', color='D1D5DB')
+    )
+
+    for sheet_title, rows in sheets_data.items():
+        ws = wb.create_sheet(title=sheet_title[:31])
+        ws.cell(row=1, column=1, value=title).font = title_font
+        ws.append([])
+
+        if rows:
+            header_row = rows[0]
+            ws.append(header_row)
+            header_idx = ws.max_row
+            for col in range(1, len(header_row) + 1):
+                cell = ws.cell(row=header_idx, column=col)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            for row in rows[1:]:
+                ws.append(row)
+                row_idx = ws.max_row
+                for col in range(1, len(row) + 1):
+                    cell = ws.cell(row=row_idx, column=col)
+                    cell.font = cell_font
+                    cell.border = thin_border
+
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = col[0].column_letter
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+
+# 1. Daily Planner Excel Export
+@planner.route('/daily/export_excel')
+@login_required
+def export_daily_excel():
+    date_str = request.args.get('date')
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            target_date = date.today()
+    else:
+        target_date = date.today()
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+
+    # Tasks Sheet
+    tasks_rows = [["Task ID", "Task Description", "Priority Level", "Completion Status"]]
+    if plan and plan.tasks:
+        for t in plan.tasks:
+            tasks_rows.append([
+                str(t.get('id', '')),
+                str(t.get('text', '')),
+                str(t.get('priority', 'Medium')),
+                "Completed" if t.get('completed') else "Pending"
+            ])
+
+    # 12-Hour Schedule & Mood Sheet
+    default_slots = [
+        "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM",
+        "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
+        "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"
+    ]
+    schedule_rows = [["Time Slot", "Activity Details", "Hourly Mood Tag"]]
+    raw_schedule = plan.schedule if plan and plan.schedule else {}
+    for slot in default_slots:
+        val = raw_schedule.get(slot, {})
+        act = val.get('activity', '') if isinstance(val, dict) else str(val or '')
+        mood = val.get('mood', '') if isinstance(val, dict) else ''
+        schedule_rows.append([slot, act, mood])
+
+    # Depression Episodes Sheet
+    episodes_rows = [["Episode ID", "Time Logged", "Start Time", "Duration", "Intensity (1-10)", "Triggers / Symptoms", "Coping Mechanism", "Effectiveness", "Personal Notes"]]
+    if plan and plan.depression_episodes:
+        for ep in plan.depression_episodes:
+            episodes_rows.append([
+                str(ep.get('id', '')),
+                str(ep.get('entry_time', '')),
+                str(ep.get('start_time', '')),
+                str(ep.get('duration', '')),
+                str(ep.get('intensity', 5)),
+                str(ep.get('triggers', '')),
+                str(ep.get('coping_mechanism', '')),
+                str(ep.get('coping_effectiveness', '')),
+                str(ep.get('notes', ''))
+            ])
+
+    # Notes Sheet
+    notes_rows = [["Section", "Content"], ["Daily Reflection & Notes", plan.notes if plan else '']]
+
+    excel_file = create_styled_excel(
+        f"Chronos Daily Planner - {target_date.strftime('%B %d, %Y')}",
+        {
+            "Daily Tasks": tasks_rows,
+            "Hourly Activity & Mood": schedule_rows,
+            "Depression Tracker": episodes_rows,
+            "Daily Reflection": notes_rows
+        }
+    )
+
+    filename = f"Daily_Planner_{target_date.strftime('%Y_%m_%d')}.xlsx"
+    return send_file(excel_file, download_name=filename, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# 2. Weekly Planner Excel Export
+@planner.route('/weekly/export_excel')
+@login_required
+def export_weekly_excel():
+    year_param = request.args.get('year', type=int)
+    week_param = request.args.get('week', type=int)
+    today = date.today()
+    if not year_param or not week_param:
+        year_param, week_param, _ = today.isocalendar()
+
+    plan = WeeklyPlan.query.filter_by(user_id=current_user.id, year=year_param, week_number=week_param).first()
+
+    # Goals Sheet
+    goals_rows = [["Goal ID", "Weekly Goal Title", "Status"]]
+    if plan and plan.goals:
+        for g in plan.goals:
+            goals_rows.append([str(g.get('id', '')), str(g.get('title', '')), "Achieved" if g.get('completed') else "In Progress"])
+
+    # Shopping List Sheet
+    shopping_rows = [["Item ID", "Shopping Item Name", "Category", "Bought Status"]]
+    if plan and plan.shopping_list:
+        for s in plan.shopping_list:
+            shopping_rows.append([str(s.get('id', '')), str(s.get('item', '')), str(s.get('category', 'Groceries')), "Bought" if s.get('bought') else "Pending"])
+
+    # 7-Day To-Dos Grid Sheet
+    day_abbrs = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    todos_rows = [["Day", "To-Do Description", "Status"]]
+    daily_todos = plan.daily_todos if plan and plan.daily_todos else {}
+    for d in day_abbrs:
+        for t in daily_todos.get(d, []):
+            todos_rows.append([d, str(t.get('text', '')), "Completed" if t.get('completed') else "Pending"])
+
+    # Meals Menu Sheet
+    meals_rows = [["Day", "Breakfast", "Lunch", "Dinner"]]
+    meals_menu = plan.meals_menu if plan and plan.meals_menu else {}
+    for d in day_abbrs:
+        dm = meals_menu.get(d, {})
+        meals_rows.append([d, str(dm.get('breakfast', '')), str(dm.get('lunch', '')), str(dm.get('dinner', ''))])
+
+    # Notes Sheet
+    notes_rows = [["Section", "Content"], ["Weekly Reflection & Notes", plan.notes if plan else '']]
+
+    excel_file = create_styled_excel(
+        f"Chronos Weekly Planner - Week {week_param}, {year_param}",
+        {
+            "Weekly Goals": goals_rows,
+            "Shopping List": shopping_rows,
+            "7-Day To-Dos": todos_rows,
+            "Meals Menu": meals_rows,
+            "Weekly Reflection": notes_rows
+        }
+    )
+
+    filename = f"Weekly_Planner_{year_param}_W{week_param:02d}.xlsx"
+    return send_file(excel_file, download_name=filename, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# 3. Monthly Planner Excel Export
+@planner.route('/monthly/export_excel')
+@login_required
+def export_monthly_excel():
+    today = date.today()
+    selected_year = request.args.get('year', type=int, default=today.year)
+    selected_month = request.args.get('month', type=int, default=today.month)
+    month_name = calendar.month_name[selected_month]
+
+    plan = MonthlyPlan.query.filter_by(user_id=current_user.id, year=selected_year, month=selected_month).first()
+
+    # Goals Sheet
+    goals_rows = [["Goal ID", "Monthly Goal Title", "Category", "Status"]]
+    if plan and plan.goals:
+        for g in plan.goals:
+            goals_rows.append([str(g.get('id', '')), str(g.get('title', '')), str(g.get('category', 'Personal')), str(g.get('status', 'In Progress'))])
+
+    # Milestones Sheet
+    milestones_rows = [["Milestone ID", "Milestone Description", "Target Day", "Status"]]
+    if plan and plan.milestones:
+        for m in plan.milestones:
+            milestones_rows.append([str(m.get('id', '')), str(m.get('title', '')), str(m.get('day', '')), "Achieved" if m.get('completed') else "Pending"])
+
+    # Habits Sheet
+    habits_rows = [["Habit ID", "Habit Name", "Days Completed Count"]]
+    if plan and plan.habits:
+        for h in plan.habits:
+            habits_rows.append([str(h.get('id', '')), str(h.get('name', '')), str(len(h.get('completed_days', [])))])
+
+    # Notes Sheet
+    notes_rows = [["Section", "Content"], ["Monthly Reflections & Notes", plan.notes if plan else '']]
+
+    excel_file = create_styled_excel(
+        f"Chronos Monthly Planner - {month_name} {selected_year}",
+        {
+            "Monthly Goals": goals_rows,
+            "Key Milestones": milestones_rows,
+            "Tracked Habits": habits_rows,
+            "Monthly Notes": notes_rows
+        }
+    )
+
+    filename = f"Monthly_Planner_{selected_year}_{selected_month:02d}.xlsx"
+    return send_file(excel_file, download_name=filename, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# 4. Yearly Planner Excel Export
+@planner.route('/yearly/export_excel')
+@login_required
+def export_yearly_excel():
+    today = date.today()
+    selected_year = request.args.get('year', type=int, default=today.year)
+
+    plan = YearlyPlan.query.filter_by(user_id=current_user.id, year=selected_year).first()
+
+    # Resolutions Sheet
+    resolutions_rows = [["Resolution ID", "Resolution Text", "Category", "Status"]]
+    if plan and plan.resolutions:
+        for r in plan.resolutions:
+            resolutions_rows.append([str(r.get('id', '')), str(r.get('text', '')), str(r.get('category', 'Personal')), "Accomplished" if r.get('completed') else "In Progress"])
+
+    # Objectives Sheet
+    objectives_rows = [["Objective ID", "Strategic Objective Title", "Quarter", "Status"]]
+    if plan and plan.objectives:
+        for o in plan.objectives:
+            objectives_rows.append([str(o.get('id', '')), str(o.get('title', '')), str(o.get('quarter', 'Q1')), str(o.get('status', 'In Progress'))])
+
+    # 12-Month Achievement Grid Sheet
+    all_monthly_plans = MonthlyPlan.query.filter_by(user_id=current_user.id, year=selected_year).all()
+    monthly_map = {mp.month: mp for mp in all_monthly_plans}
+    grid_rows = [["Month #", "Month Name", "Goals Accomplished", "Milestones Reached", "Habits Tracked", "Achievement Score"]]
+    for m in range(1, 13):
+        m_name = calendar.month_name[m]
+        mp = monthly_map.get(m)
+        m_goals = mp.goals if mp and mp.goals else []
+        m_goals_completed = sum(1 for g in m_goals if g.get('status') == 'Completed')
+        m_milestones = mp.milestones if mp and mp.milestones else []
+        m_milestones_completed = sum(1 for ms in m_milestones if ms.get('completed'))
+        m_habits = mp.habits if mp and mp.habits else []
+        
+        comps = []
+        if len(m_goals) > 0:
+            comps.append(int(m_goals_completed / len(m_goals) * 100))
+        if len(m_milestones) > 0:
+            comps.append(int(m_milestones_completed / len(m_milestones) * 100))
+        score = int(sum(comps) / len(comps)) if comps else (100 if m_goals_completed > 0 or m_milestones_completed > 0 else 0)
+
+        grid_rows.append([str(m), m_name, f"{m_goals_completed}/{len(m_goals)}", f"{m_milestones_completed}/{len(m_milestones)}", str(len(m_habits)), f"{score}%"])
+
+    # Reflections Sheet
+    reflections_rows = [["Section", "Content"], ["Year-in-Review Reflections", plan.reflections if plan else '']]
+
+    excel_file = create_styled_excel(
+        f"Chronos Yearly Planner - Year {selected_year}",
+        {
+            "Annual Resolutions": resolutions_rows,
+            "Strategic Objectives": objectives_rows,
+            "12-Month Achievement Grid": grid_rows,
+            "Year Reflections": reflections_rows
+        }
+    )
+
+    filename = f"Yearly_Planner_{selected_year}.xlsx"
+    return send_file(excel_file, download_name=filename, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+
