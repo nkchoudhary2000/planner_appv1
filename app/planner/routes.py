@@ -32,6 +32,16 @@ def index():
     return redirect(url_for('auth.login'))
 
 
+@planner.before_app_request
+def auto_daily_drive_sync():
+    """Triggers automatic Google Drive backup once per day when authenticated user accesses the app."""
+    if current_user and current_user.is_authenticated:
+        from app.services.google_service import check_and_trigger_daily_drive_sync
+        res = check_and_trigger_daily_drive_sync(current_user)
+        if res and isinstance(res, dict) and res.get('success'):
+            flash('Daily automatic Google Drive backup completed!', 'success')
+
+
 def process_task_spillovers(user_id, target_date):
     """
     Automatically rolls over uncompleted non-default tasks from past dates up to target_date.
@@ -1386,6 +1396,183 @@ def api_edit_task():
         db.session.commit()
         return jsonify({'success': True})
     return jsonify({'success': False, 'message': 'Task not found'}), 404
+
+
+# AJAX Endpoint for dynamic task addition
+@planner.route('/api/daily/task/add', methods=['POST'])
+@login_required
+def api_add_task():
+    data = request.get_json() or {}
+    date_str = data.get('date')
+    task_text = data.get('text', '').strip()
+    priority = data.get('priority', 'Medium')
+    is_default = bool(data.get('is_default'))
+
+    if not date_str or not task_text:
+        return jsonify({'success': False, 'message': 'Task text is required'}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+    if not plan:
+        plan = DailyPlan(user_id=current_user.id, date=target_date, schedule={}, tasks=[], notes='')
+        db.session.add(plan)
+
+    tasks = list(plan.tasks or [])
+    new_task = {
+        'id': str(int(datetime.utcnow().timestamp() * 1000)),
+        'text': task_text,
+        'priority': priority,
+        'completed': False,
+        'is_default': is_default,
+        'is_spillover': False,
+        'spillover_count': 0,
+        'original_date': target_date.strftime('%Y-%m-%d')
+    }
+    tasks.append(new_task)
+    plan.tasks = tasks
+    flag_modified(plan, 'tasks')
+
+    # Clear previous deletion/dismissal records on this plan for this task text
+    raw_sched = plan.schedule or {}
+    if isinstance(raw_sched, dict):
+        t_key = task_text.lower()
+        deleted_defs = [d for d in raw_sched.get('_deleted_defaults', []) if str(d).lower() != t_key]
+        dismissed = [d for d in raw_sched.get('_dismissed_tasks', []) if str(d).lower() != t_key]
+        if len(deleted_defs) != len(raw_sched.get('_deleted_defaults', [])) or len(dismissed) != len(raw_sched.get('_dismissed_tasks', [])):
+            raw_sched['_deleted_defaults'] = deleted_defs
+            raw_sched['_dismissed_tasks'] = dismissed
+            plan.schedule = raw_sched
+            flag_modified(plan, 'schedule')
+
+    db.session.commit()
+    return jsonify({'success': True, 'task': new_task})
+
+
+# AJAX Endpoint for dynamic task deletion
+@planner.route('/api/daily/task/delete', methods=['POST'])
+@login_required
+def api_delete_task():
+    data = request.get_json() or {}
+    date_str = data.get('date')
+    task_id = data.get('task_id')
+
+    if not date_str or not task_id:
+        return jsonify({'success': False, 'message': 'Missing task_id or date'}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+    if not plan:
+        return jsonify({'success': False, 'message': 'Plan not found'}), 404
+
+    tasks = plan.tasks or []
+    deleted_task = None
+    for t in tasks:
+        if isinstance(t, dict) and t.get('id') == task_id:
+            deleted_task = t
+            break
+
+    if not deleted_task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+
+    plan.tasks = [t for t in tasks if isinstance(t, dict) and t.get('id') != task_id]
+    
+    raw_sched = plan.schedule or {}
+    if not isinstance(raw_sched, dict):
+        raw_sched = {}
+
+    dismissed = list(raw_sched.get('_dismissed_tasks', []))
+    deleted_defs = list(raw_sched.get('_deleted_defaults', []))
+
+    if task_id not in dismissed:
+        dismissed.append(task_id)
+
+    t_text = deleted_task.get('text', '').strip().lower()
+    if t_text and t_text not in deleted_defs:
+        deleted_defs.append(t_text)
+    if task_id not in deleted_defs:
+        deleted_defs.append(task_id)
+
+    raw_sched['_dismissed_tasks'] = dismissed
+    raw_sched['_deleted_defaults'] = deleted_defs
+    plan.schedule = raw_sched
+    flag_modified(plan, 'schedule')
+    flag_modified(plan, 'tasks')
+    db.session.commit()
+
+    return jsonify({'success': True})
+
+
+# AJAX Endpoint for real-time background schedule & mood slot updates
+@planner.route('/api/daily/schedule/update', methods=['POST'])
+@login_required
+def api_update_schedule():
+    data = request.get_json() or {}
+    date_str = data.get('date')
+    slot = data.get('slot')
+    activity = data.get('activity', '').strip()
+    mood = data.get('mood', '').strip()
+    is_default = bool(data.get('is_default'))
+
+    if not date_str or not slot:
+        return jsonify({'success': False, 'message': 'Missing date or slot'}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+    if not plan:
+        plan = DailyPlan(user_id=current_user.id, date=target_date, schedule={}, tasks=[], notes='')
+        db.session.add(plan)
+
+    schedule = dict(plan.schedule or {})
+    schedule[slot] = {
+        'activity': activity,
+        'mood': mood,
+        'is_default': is_default
+    }
+
+    plan.schedule = schedule
+    flag_modified(plan, 'schedule')
+    db.session.commit()
+
+    return jsonify({'success': True})
+
+
+# AJAX Endpoint for real-time background daily notes updates
+@planner.route('/api/daily/notes/update', methods=['POST'])
+@login_required
+def api_update_notes():
+    data = request.get_json() or {}
+    date_str = data.get('date')
+    notes = data.get('notes', '').strip()
+
+    if not date_str:
+        return jsonify({'success': False, 'message': 'Missing date'}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+    if not plan:
+        plan = DailyPlan(user_id=current_user.id, date=target_date, schedule={}, tasks=[], notes='')
+        db.session.add(plan)
+
+    plan.notes = notes
+    db.session.commit()
+
+    return jsonify({'success': True})
 
 
 # AJAX Endpoint for habit tracker day toggle

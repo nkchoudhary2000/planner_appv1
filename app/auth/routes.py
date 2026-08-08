@@ -29,6 +29,11 @@ def login():
             return redirect(url_for('auth.login'))
 
         login_user(user, remember=remember)
+        from app.services.google_service import check_and_trigger_daily_drive_sync
+        sync_res = check_and_trigger_daily_drive_sync(user)
+        if sync_res and isinstance(sync_res, dict) and sync_res.get('success'):
+            flash('Daily automatic Google Drive backup completed!', 'success')
+
         next_page = request.args.get('next')
         if not next_page or not next_page.startswith('/'):
             next_page = url_for('planner.dashboard')

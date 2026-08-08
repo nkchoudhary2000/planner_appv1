@@ -104,6 +104,10 @@ class GoogleDriveTestCase(unittest.TestCase):
 
     def test_drive_sync_api_endpoints(self):
         self.register_and_login()
+        user = User.query.filter_by(username='driveuser').first()
+        user.google_token = {'access_token': 'mock_token'}
+        db.session.commit()
+
         sync_res = self.client.post('/api/google/drive/sync')
         self.assertEqual(sync_res.status_code, 200)
         sync_data = sync_res.get_json()
@@ -113,6 +117,44 @@ class GoogleDriveTestCase(unittest.TestCase):
         self.assertEqual(restore_res.status_code, 200)
         restore_data = restore_res.get_json()
         self.assertTrue(restore_data['success'])
+
+    def test_daily_auto_drive_sync_on_login(self):
+        # 1. Register user without Google token
+        self.client.post('/auth/register', data={
+            'username': 'autosyncuser',
+            'email': 'autosync@example.com',
+            'password': 'password123',
+            'confirm_password': 'password123'
+        }, follow_redirects=True)
+
+        user = User.query.filter_by(username='autosyncuser').first()
+        self.assertIsNone(user.last_drive_sync)
+
+        # Login without Google token -> should NOT trigger auto drive sync
+        self.client.post('/auth/login', data={
+            'login_input': 'autosyncuser',
+            'password': 'password123'
+        }, follow_redirects=True)
+
+        db.session.expire_all()
+        user_no_token = User.query.filter_by(username='autosyncuser').first()
+        self.assertIsNone(user_no_token.last_drive_sync)
+
+        # 2. Attach Google token to user (simulate connected Google Account)
+        user_no_token.google_token = {'access_token': 'mock_access_token'}
+        db.session.commit()
+
+        # Login with connected Google token -> should trigger daily auto drive sync
+        login_res = self.client.post('/auth/login', data={
+            'login_input': 'autosyncuser',
+            'password': 'password123'
+        }, follow_redirects=True)
+        self.assertEqual(login_res.status_code, 200)
+
+        # Verify last_drive_sync was updated automatically
+        db.session.expire_all()
+        user_after = User.query.filter_by(username='autosyncuser').first()
+        self.assertIsNotNone(user_after.last_drive_sync)
 
 if __name__ == '__main__':
     unittest.main()

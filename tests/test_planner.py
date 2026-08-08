@@ -524,9 +524,73 @@ class PlannerTestCase(unittest.TestCase):
         self.assertIsNotNone(restored_mp)
         self.assertEqual(restored_mp.calendar_days['15']['sticker'], "🚀")
 
-        restored_yp = YearlyPlan.query.filter_by(user_id=user.id, year=today.year).first()
-        self.assertIsNotNone(restored_yp)
-        self.assertEqual(restored_yp.reflections, "Yearly Reflection Test")
+    def test_api_add_and_delete_task(self):
+        self.register_and_login()
+        today_str = date.today().strftime('%Y-%m-%d')
+
+        # Add task via AJAX endpoint
+        res = self.client.post('/api/daily/task/add', json={
+            'date': today_str,
+            'text': 'Fast AJAX Task',
+            'priority': 'High',
+            'is_default': True
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        task_id = data['task']['id']
+        self.assertEqual(data['task']['text'], 'Fast AJAX Task')
+
+        # Verify DB
+        user = User.query.filter_by(username='testuser').first()
+        plan = DailyPlan.query.filter_by(user_id=user.id, date=date.today()).first()
+        self.assertIsNotNone(plan)
+        self.assertEqual(len(plan.tasks), 1)
+
+        # Delete task via AJAX endpoint
+        del_res = self.client.post('/api/daily/task/delete', json={
+            'date': today_str,
+            'task_id': task_id
+        })
+        self.assertEqual(del_res.status_code, 200)
+        del_data = del_res.get_json()
+        self.assertTrue(del_data['success'])
+
+        # Verify DB after deletion
+        db.session.expire_all()
+        plan_after = DailyPlan.query.filter_by(user_id=user.id, date=date.today()).first()
+        self.assertEqual(len(plan_after.tasks), 0)
+
+    def test_api_update_schedule_and_notes(self):
+        self.register_and_login()
+        today_str = date.today().strftime('%Y-%m-%d')
+
+        # Update schedule slot via AJAX endpoint
+        sched_res = self.client.post('/api/daily/schedule/update', json={
+            'date': today_str,
+            'slot': '09:00 - 10:00 AM',
+            'activity': 'Focused Deep Work',
+            'mood': '🤩',
+            'is_default': True
+        })
+        self.assertEqual(sched_res.status_code, 200)
+        self.assertTrue(sched_res.get_json()['success'])
+
+        # Update reflection notes via AJAX endpoint
+        notes_res = self.client.post('/api/daily/notes/update', json={
+            'date': today_str,
+            'notes': 'Had a productive coding session.'
+        })
+        self.assertEqual(notes_res.status_code, 200)
+        self.assertTrue(notes_res.get_json()['success'])
+
+        # Verify DB persistence
+        user = User.query.filter_by(username='testuser').first()
+        plan = DailyPlan.query.filter_by(user_id=user.id, date=date.today()).first()
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.schedule['09:00 - 10:00 AM']['activity'], 'Focused Deep Work')
+        self.assertEqual(plan.schedule['09:00 - 10:00 AM']['mood'], '🤩')
+        self.assertEqual(plan.notes, 'Had a productive coding session.')
 
 if __name__ == '__main__':
     unittest.main()

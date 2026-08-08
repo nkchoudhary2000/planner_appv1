@@ -357,6 +357,15 @@ def sync_to_google_drive(user):
                     'google_connected': True
                 }
 
+    # Check if user has connected Google OAuth token or if MOCK mode is set
+    if not token or not isinstance(token, dict) or 'access_token' not in token:
+        if current_app.config.get('GOOGLE_CLIENT_ID') != 'MOCK_GOOGLE_CLIENT_ID':
+            return {
+                'success': False,
+                'message': 'Google Account is not connected. Please connect your Google Account to enable Cloud Drive Sync.',
+                'google_connected': False
+            }
+
     # Backup / Mock sync mode
     user.last_drive_sync = datetime.utcnow()
     db.session.commit()
@@ -429,6 +438,14 @@ def restore_from_google_drive(user):
                     'message': f'Google Drive Restore Note: {str(e)}'
                 }
 
+    if not token or not isinstance(token, dict) or 'access_token' not in token:
+        if current_app.config.get('GOOGLE_CLIENT_ID') != 'MOCK_GOOGLE_CLIENT_ID':
+            return {
+                'success': False,
+                'message': 'Google Account is not connected. Please connect your Google Account to restore from Google Drive.',
+                'google_connected': False
+            }
+
     # Backup / Mock restore mode
     user.last_drive_sync = datetime.utcnow()
     db.session.commit()
@@ -436,6 +453,48 @@ def restore_from_google_drive(user):
         'success': True,
         'message': 'Planner backup data restored successfully!'
     }
+
+
+def check_and_trigger_daily_drive_sync(user):
+    """
+    Triggers Google Drive sync automatically ONCE per day when user logs in or accesses app.
+    Only executes for users who have connected their Google Account.
+    Returns sync result dict if executed, None otherwise.
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return None
+
+    if hasattr(user, 'drive_sync_enabled') and not user.drive_sync_enabled:
+        return None
+
+    # Only auto-sync if Google Account is connected with a token
+    token = getattr(user, 'google_token', None)
+    if not token or not isinstance(token, dict) or 'access_token' not in token:
+        return None
+
+    today_date = datetime.now().date()
+    try:
+        from zoneinfo import ZoneInfo
+        tz_name = current_app.config.get('APP_TIMEZONE', 'Asia/Kolkata')
+        today_date = datetime.now(ZoneInfo(tz_name)).date()
+    except Exception:
+        pass
+
+    # Check if already synced today
+    if user.last_drive_sync:
+        sync_date = user.last_drive_sync.date()
+        if sync_date >= today_date:
+            return None
+
+    try:
+        res = sync_to_google_drive(user)
+        if res and isinstance(res, dict) and res.get('success'):
+            return res
+    except Exception as e:
+        current_app.logger.warning(f"Daily auto Drive sync error: {e}")
+
+    return None
+
 
 
 
