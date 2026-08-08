@@ -982,7 +982,9 @@ async function submitTaskEdit(e) {
         });
         const data = await response.json();
         if (data.success) {
-            window.location.reload();
+            closeEditTaskModal();
+            await refreshMainContentAsync();
+            showToast('Task updated successfully!', 'success');
         } else {
             showToast(data.message || 'Failed to update task', 'danger');
         }

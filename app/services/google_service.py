@@ -461,11 +461,23 @@ def restore_from_google_drive(user):
     }
 
 
+import threading
+
+def _async_daily_drive_sync_task(app_obj, user_id):
+    with app_obj.app_context():
+        try:
+            u = User.query.get(user_id)
+            if u:
+                sync_to_google_drive(u)
+        except Exception as e:
+            app_obj.logger.warning(f"Async daily Drive sync error for user {user_id}: {e}")
+
 def check_and_trigger_daily_drive_sync(user):
     """
     Triggers Google Drive sync automatically ONCE per day when user logs in or accesses app.
     Only executes for users who have connected their Google Account.
-    Returns sync result dict if executed, None otherwise.
+    Runs asynchronously in a background thread to prevent blocking page loads.
+    Returns sync result dict if initiated, None otherwise.
     """
     if not user or not getattr(user, 'is_authenticated', False):
         return None
@@ -492,14 +504,23 @@ def check_and_trigger_daily_drive_sync(user):
         if sync_date >= today_date:
             return None
 
+    # Update timestamp immediately to avoid redundant triggers today
     try:
-        res = sync_to_google_drive(user)
-        if res and isinstance(res, dict) and res.get('success'):
-            return res
+        user.last_drive_sync = datetime.utcnow()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        app_obj = current_app._get_current_object()
+        thread = threading.Thread(target=_async_daily_drive_sync_task, args=(app_obj, user.id), daemon=True)
+        thread.start()
+        return {'success': True, 'async': True, 'message': 'Daily background Drive sync started'}
     except Exception as e:
-        current_app.logger.warning(f"Daily auto Drive sync error: {e}")
+        current_app.logger.warning(f"Daily auto Drive sync thread start error: {e}")
 
     return None
+
 
 
 

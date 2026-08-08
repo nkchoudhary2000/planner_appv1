@@ -46,10 +46,13 @@ def process_task_spillovers(user_id, target_date):
     """
     Automatically rolls over uncompleted non-default tasks from past dates up to target_date.
     Increments spillover_count (pending days) and escalates priority up to 'High' (max severity).
+    Restricted to past 30 days for maximum performance.
     """
+    cutoff_date = target_date - timedelta(days=30)
     past_plans = DailyPlan.query.filter(
         DailyPlan.user_id == user_id,
-        DailyPlan.date < target_date
+        DailyPlan.date < target_date,
+        DailyPlan.date >= cutoff_date
     ).order_by(DailyPlan.date.asc()).all()
 
     if not past_plans:
@@ -127,7 +130,7 @@ def populate_daily_defaults(user_id, target_date):
     past_plans = DailyPlan.query.filter(
         DailyPlan.user_id == user_id,
         DailyPlan.date <= target_date
-    ).order_by(DailyPlan.date.desc()).all()
+    ).order_by(DailyPlan.date.desc()).limit(30).all()
 
     if not past_plans:
         return
@@ -562,6 +565,8 @@ def weekly():
             db.session.commit()
             flash('Weekly notes updated!', 'success')
 
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
+            return jsonify({'success': True, 'action': action, 'message': 'Operation completed successfully'})
         return redirect(url_for('planner.weekly', year=year_param, week=week_param))
 
     goals = plan.goals if plan and plan.goals else []
@@ -913,6 +918,8 @@ def daily():
             db.session.commit()
             flash('Sleep tracker metrics saved successfully.', 'success')
 
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
+            return jsonify({'success': True, 'action': action, 'message': 'Operation completed successfully'})
         return redirect(url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')))
 
     # Hourly default schedule slots (05:00 - 06:00 AM to 11:00 - 12:00 AM)
@@ -1187,6 +1194,8 @@ def monthly():
             db.session.commit()
             flash('Monthly notes updated!', 'success')
 
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
+            return jsonify({'success': True, 'action': action, 'message': 'Operation completed successfully'})
         return redirect(url_for('planner.monthly', year=selected_year, month=selected_month))
 
     days_in_month = calendar.monthrange(selected_year, selected_month)[1]
@@ -1330,6 +1339,8 @@ def yearly():
             db.session.commit()
             flash('Yearly reflections saved!', 'success')
 
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
+            return jsonify({'success': True, 'action': action, 'message': 'Operation completed successfully'})
         return redirect(url_for('planner.yearly', year=selected_year))
 
     # 12-Month Achievement Grid Summary Cascade (Monthly -> Yearly)

@@ -234,4 +234,88 @@ async function uploadLocalBackupFile(input) {
     }
 }
 
+// Seamless AJAX Content Refreshing without full browser page reload
+async function refreshMainContentAsync() {
+    try {
+        const response = await fetch(window.location.href, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const htmlText = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, 'text/html');
+        const newContent = doc.getElementById('app-main-content');
+        const currentContent = document.getElementById('app-main-content');
+        if (newContent && currentContent) {
+            currentContent.innerHTML = newContent.innerHTML;
+            if (window.bindTaskDragEvents) {
+                document.querySelectorAll('.task-card-wrapper').forEach(wrapper => {
+                    window.bindTaskDragEvents(wrapper);
+                });
+            }
+        }
+    } catch (err) {
+        console.error('Async main content refresh error:', err);
+    }
+}
+
+// Global Interceptor for POST forms across planners
+document.addEventListener('submit', async (e) => {
+    const form = e.target;
+    if (!form || !form.method || form.method.toUpperCase() !== 'POST') return;
+    if (form.getAttribute('data-no-ajax') === 'true') return;
+
+    const actionUrl = form.action || window.location.href;
+    if (actionUrl.includes('/auth/') || actionUrl.includes('/admin/') || actionUrl.includes('/api/backup/restore_json')) return;
+    if (form.querySelector('input[type="file"]')) return;
+
+    e.preventDefault();
+    const formData = new FormData(form);
+    formData.append('is_ajax', 'true');
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        const response = await fetch(actionUrl, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        });
+        
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (jsonErr) {
+            data = { success: true };
+        }
+
+        if (data.success) {
+            // Close open modal containers if any
+            const modalElems = document.querySelectorAll('dialog[open], #edit-task-modal:not(.hidden), #depression-modal:not(.hidden), #memory-modal:not(.hidden), #add-item-modal:not(.hidden)');
+            modalElems.forEach(m => {
+                if (m.tagName && m.tagName.toLowerCase() === 'dialog') {
+                    m.close();
+                } else {
+                    m.classList.add('hidden');
+                }
+            });
+
+            await refreshMainContentAsync();
+            if (data.message) {
+                showToast(data.message, 'success');
+            }
+        } else {
+            showToast(data.message || 'Operation failed', 'danger');
+        }
+    } catch (err) {
+        console.error('Global AJAX submit error:', err);
+        showToast('Server error executing request', 'danger');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+});
+
+
 
