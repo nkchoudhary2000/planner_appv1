@@ -50,6 +50,19 @@ def create_app(config_class=Config):
 
     with app.app_context():
         db.create_all()
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            if 'daily_plan' in inspector.get_table_names():
+                columns = [c['name'] for c in inspector.get_columns('daily_plan')]
+                if 'memory_logs' not in columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE daily_plan ADD COLUMN memory_logs JSON DEFAULT '[]'"))
+                if 'sleep_log' not in columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE daily_plan ADD COLUMN sleep_log JSON DEFAULT '{}'"))
+        except Exception:
+            pass
 
     return app
 

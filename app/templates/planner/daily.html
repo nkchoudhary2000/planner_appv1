@@ -310,6 +310,92 @@
                 </div>
             </div>
 
+            <!-- Memory Tracker Section (Cognitive Slips) -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-5">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                            <i class="fa-solid fa-brain text-sm"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-white">Daily Memory Tracker</h2>
+                            <p class="text-xs text-slate-400">Log &amp; monitor cognitive slips, forgotten items, brain fog &amp; recovery strategies</p>
+                        </div>
+                    </div>
+                    
+                    <button type="button" onclick="openMemoryModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold shadow-md shadow-cyan-500/20 transition-all flex items-center space-x-1.5 whitespace-nowrap">
+                        <i class="fa-solid fa-plus text-[10px]"></i>
+                        <span>Log Memory Slip</span>
+                    </button>
+                </div>
+
+                <!-- Memory Log List -->
+                <div class="space-y-3">
+                    {% if memory_logs %}
+                        {% for log in memory_logs %}
+                        {% set impact_val = log.impact|default('Mild') %}
+                        {% set impact_bg = 'bg-blue-500/15 border-blue-500/30 text-blue-300' if impact_val == 'Mild' else ('bg-amber-500/15 border-amber-500/30 text-amber-300' if impact_val == 'Moderate' else 'bg-rose-500/15 border-rose-500/30 text-rose-300') %}
+                        
+                        <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 space-y-2.5 hover:border-slate-600 transition-all">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                                    <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold border {{ impact_bg }}">
+                                        ⚡ Impact: {{ log.impact }}
+                                    </span>
+                                    <span class="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
+                                        🏷️ {{ log.category }}
+                                    </span>
+                                    <span class="text-xs text-slate-400 font-medium">
+                                        <i class="fa-regular fa-clock text-slate-500 mr-1"></i>Time: {{ log.time }}
+                                    </span>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                    {% if log.recovery %}
+                                    <span class="text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                                        💡 {{ log.recovery }}
+                                    </span>
+                                    {% endif %}
+                                    <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="inline">
+                                        <input type="hidden" name="action" value="delete_memory_log">
+                                        <input type="hidden" name="log_id" value="{{ log.id }}">
+                                        <button type="submit" class="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors" title="Delete Memory Record">
+                                            <i class="fa-solid fa-trash-can text-xs"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <div class="text-sm font-semibold text-slate-100 flex items-start space-x-1.5">
+                                <span class="text-cyan-400">•</span>
+                                <span>{{ log.item }}</span>
+                            </div>
+
+                            {% if log.context %}
+                            <div class="text-xs text-slate-300">
+                                <span class="font-semibold text-slate-400">Trigger / Context:</span> {{ log.context }}
+                            </div>
+                            {% endif %}
+
+                            {% if log.notes %}
+                            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-700/40 text-xs text-slate-300 italic leading-relaxed">
+                                <span class="font-semibold text-slate-400 not-italic mr-1">Mitigation / Notes:</span> "{{ log.notes }}"
+                            </div>
+                            {% endif %}
+                            
+                            <div class="text-[10px] text-slate-500 text-right">
+                                Logged at {{ log.entry_time }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-6 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
+                            <p class="text-slate-400 text-xs">No memory slips logged for today.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- End of Day Reflections & Notes -->
             <div class="glass-panel p-6 rounded-2xl border border-slate-700/60">
                 <div class="flex items-center space-x-2 pb-3 border-b border-slate-700/50 mb-4">
@@ -420,6 +506,99 @@
                     </button>
                 </div>
             </form>
+
+            <!-- Sleep Tracker Section (Placed Directly Below Activity Tracker) -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-5">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                            <i class="fa-solid fa-moon text-sm"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-white">Daily Sleep Tracker</h2>
+                            <p class="text-xs text-slate-400">Log sleep duration, quality rating, bedtime &amp; night disruptions</p>
+                        </div>
+                    </div>
+
+                    {% set s_log = sleep_log|default({}) %}
+                    {% if s_log.hours %}
+                    <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-bed text-xs"></i>
+                        <span>{{ s_log.hours }} Hours Logged</span>
+                    </span>
+                    {% endif %}
+                </div>
+
+                <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="space-y-4">
+                    <input type="hidden" name="action" value="save_sleep_log">
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Sleep Duration (Hours) -->
+                        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 space-y-1.5">
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                                <span>Sleep Duration</span>
+                                <span class="text-indigo-400 font-bold" id="sleep-hours-label">{{ s_log.get('hours', 7.5) }} hrs</span>
+                            </label>
+                            <input type="number" step="0.5" min="0" max="24" name="sleep_hours" value="{{ s_log.get('hours', 7.5) }}" 
+                                   oninput="document.getElementById('sleep-hours-label').innerText = this.value + ' hrs'"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+
+                        <!-- Bedtime -->
+                        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 space-y-1.5">
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Bedtime</label>
+                            <input type="text" name="bedtime" value="{{ s_log.get('bedtime', '11:00 PM') }}" placeholder="e.g. 11:00 PM"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+
+                        <!-- Wake-up Time -->
+                        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 space-y-1.5">
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Wake-up Time</label>
+                            <input type="text" name="wake_time" value="{{ s_log.get('wake_time', '06:30 AM') }}" placeholder="e.g. 06:30 AM"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+
+                        <!-- Sleep Quality Score -->
+                        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 space-y-1.5">
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Sleep Quality</label>
+                            {% set q_val = s_log.get('quality', 8)|int %}
+                            <select name="sleep_quality" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="10" {{ 'selected' if q_val == 10 }}>🌟 10/10 - Exceptional</option>
+                                <option value="9" {{ 'selected' if q_val == 9 }}>😊 9/10 - Deep &amp; Restful</option>
+                                <option value="8" {{ 'selected' if q_val == 8 }}>👍 8/10 - Good Sleep</option>
+                                <option value="7" {{ 'selected' if q_val == 7 }}>😐 7/10 - Average</option>
+                                <option value="6" {{ 'selected' if q_val == 6 }}>🥱 6/10 - Slightly Tired</option>
+                                <option value="5" {{ 'selected' if q_val == 5 }}>😓 5/10 - Restless</option>
+                                <option value="4" {{ 'selected' if q_val == 4 }}>🌧️ 4/10 - Poor Quality</option>
+                                <option value="3" {{ 'selected' if q_val == 3 }}>😴 3/10 - Insomnia / Exhausted</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Night Disruptions -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Night Disruptions / Awakenings</label>
+                            <input type="text" name="disruptions" value="{{ s_log.get('disruptions', 'None') }}" placeholder="e.g. None, Woke up 2x, Restless legs..."
+                                   class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+
+                        <!-- Sleep Notes & Factors -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Sleep Notes &amp; Habits</label>
+                            <input type="text" name="notes" value="{{ s_log.get('notes', '') }}" placeholder="e.g. No screens before bed, Read 20 mins..."
+                                   class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex justify-end">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-indigo-500/20 transition-all flex items-center space-x-2">
+                            <i class="fa-solid fa-moon text-xs"></i>
+                            <span>Save Sleep Metrics</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -520,6 +699,104 @@
     </div>
 </div>
 
+<!-- Memory Log Modal -->
+<div id="memory-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+    <div class="glass-panel max-w-lg w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-5 animate-floatToastIn">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                    <i class="fa-solid fa-brain text-base"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Log Memory Slip / Brain Fog</h3>
+                    <p class="text-xs text-slate-400">Track forgotten items, context triggers &amp; recovery strategy</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeMemoryModal()" class="text-slate-400 hover:text-white transition-colors p-1">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form action="{{ url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')) }}" method="POST" class="space-y-4">
+            <input type="hidden" name="action" value="add_memory_log">
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">What Was Forgotten? *</label>
+                <input type="text" name="item" required placeholder="e.g. Morning medication, Keys, Meeting Agenda item..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Time of Moment / Slip</label>
+                    <input type="text" name="time" placeholder="e.g. 10:30 AM, Morning" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Category</label>
+                    <select name="category" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        <option value="Task / To-Do">Task / To-Do</option>
+                        <option value="Item / Belonging">Item / Belonging</option>
+                        <option value="Appointment / Meeting">Appointment / Meeting</option>
+                        <option value="Name / Detail">Name / Detail</option>
+                        <option value="Brain Fog / Mind Blank">Brain Fog / Mind Blank</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Trigger / Context</label>
+                    <select name="context" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        <option value="Overwhelmed / Exhausted">Overwhelmed / Exhausted</option>
+                        <option value="Stress / Anxiety">Stress / Anxiety</option>
+                        <option value="Depressive Episode">Depressive Episode</option>
+                        <option value="Multitasking">Multitasking</option>
+                        <option value="Distracted">Distracted</option>
+                        <option value="Lack of Sleep">Lack of Sleep</option>
+                        <option value="Other Context">Other Context</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Impact Level</label>
+                    <select name="impact" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        <option value="Mild">Mild (Minor delay/inconvenience)</option>
+                        <option value="Moderate">Moderate (Disrupted schedule)</option>
+                        <option value="Severe">Severe (Missed key event/safety)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Recovery Status</label>
+                <select name="recovery" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    <option value="Remembered later">Remembered later</option>
+                    <option value="Reminded by alarm / calendar">Reminded by alarm / calendar</option>
+                    <option value="Reminded by someone else">Reminded by someone else</option>
+                    <option value="Still forgotten / Unresolved">Still forgotten / Unresolved</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Mitigation &amp; Notes</label>
+                <textarea name="notes" rows="2" placeholder="Notes on how to prevent it next time (e.g. Put keys in entry dish)..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-700/60">
+                <button type="button" onclick="closeMemoryModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-cyan-500/20 transition-all flex items-center space-x-1.5">
+                    <i class="fa-solid fa-brain text-xs"></i>
+                    <span>Save Memory Log</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Edit Task Modal -->
 <div id="edit-task-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
     <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-5 animate-floatToastIn">
@@ -597,6 +874,14 @@ function openDepressionModal() {
 
 function closeDepressionModal() {
     document.getElementById('depression-modal').classList.add('hidden');
+}
+
+function openMemoryModal() {
+    document.getElementById('memory-modal').classList.remove('hidden');
+}
+
+function closeMemoryModal() {
+    document.getElementById('memory-modal').classList.add('hidden');
 }
 
 function updateIntensityVal(val) {

@@ -48,6 +48,8 @@ class DailyPlan(db.Model):
     tasks = db.Column(db.JSON, default=list)       # e.g. [{"id": "t1", "text": "Draft RFC", "completed": True, "priority": "High"}]
     notes = db.Column(db.Text, default='')
     depression_episodes = db.Column(db.JSON, default=list)  # e.g. [{"id": "ep1", "start_time": "08:30 AM", "duration": "45m", "intensity": 6, ...}]
+    memory_logs = db.Column(db.JSON, default=list)          # e.g. [{"id": "mem1", "time": "10:30 AM", "item": "Keys", "category": "Belonging", ...}]
+    sleep_log = db.Column(db.JSON, default=dict)            # e.g. {"hours": 7.5, "bedtime": "11:00 PM", "wake_time": "06:30 AM", "quality": 8, ...}
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

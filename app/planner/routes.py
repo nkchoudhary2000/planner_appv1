@@ -306,6 +306,61 @@ def dashboard():
     avg_intensity = round(intensity_sum / total_episodes_count, 1) if total_episodes_count > 0 else 0
     top_coping_strategies = sorted(coping_strategies_map.items(), key=lambda x: x[1], reverse=True)[:3]
 
+    # Aggregate Memory Tracker Analytics across recent DailyPlan entries
+    recent_memory_logs = []
+    total_memory_slips_count = 0
+    recovered_slips_count = 0
+    memory_category_map = {}
+
+    for dp in all_daily_plans:
+        if dp.memory_logs:
+            for log in dp.memory_logs:
+                total_memory_slips_count += 1
+                recovery = log.get('recovery', '').strip()
+                if recovery and 'unresolved' not in recovery.lower() and 'still forgot' not in recovery.lower():
+                    recovered_slips_count += 1
+                
+                cat = log.get('category', 'General').strip()
+                if cat:
+                    memory_category_map[cat] = memory_category_map.get(cat, 0) + 1
+                
+                log_copy = dict(log)
+                log_copy['date_str'] = dp.date.strftime('%b %d, %Y')
+                recent_memory_logs.append(log_copy)
+
+    memory_recovery_pct = int((recovered_slips_count / total_memory_slips_count) * 100) if total_memory_slips_count > 0 else 0
+    top_memory_categories = sorted(memory_category_map.items(), key=lambda x: x[1], reverse=True)[:3]
+    today_memory_count = len(daily_plan.memory_logs or []) if daily_plan and daily_plan.memory_logs else 0
+
+    # Aggregate Sleep Tracker Analytics across recent DailyPlan entries
+    recent_sleep_logs = []
+    total_sleep_hours_sum = 0
+    sleep_days_count = 0
+    sleep_quality_sum = 0
+
+    for dp in all_daily_plans:
+        if dp.sleep_log and isinstance(dp.sleep_log, dict) and dp.sleep_log.get('hours'):
+            try:
+                s_hours = float(dp.sleep_log.get('hours', 0))
+            except (ValueError, TypeError):
+                s_hours = 0
+            try:
+                s_quality = int(dp.sleep_log.get('quality', 0))
+            except (ValueError, TypeError):
+                s_quality = 0
+
+            if s_hours > 0:
+                total_sleep_hours_sum += s_hours
+                sleep_days_count += 1
+                sleep_quality_sum += s_quality
+
+                log_copy = dict(dp.sleep_log)
+                log_copy['date_str'] = dp.date.strftime('%b %d, %Y')
+                recent_sleep_logs.append(log_copy)
+
+    avg_sleep_hours = round(total_sleep_hours_sum / sleep_days_count, 1) if sleep_days_count > 0 else 0
+    avg_sleep_quality = round(sleep_quality_sum / sleep_days_count, 1) if sleep_days_count > 0 else 0
+
     return render_template(
         'planner/dashboard.html',
         today=today,
@@ -327,7 +382,16 @@ def dashboard():
         total_episodes_count=total_episodes_count,
         avg_intensity=avg_intensity,
         peak_intensity=peak_intensity,
-        top_coping_strategies=top_coping_strategies
+        top_coping_strategies=top_coping_strategies,
+        recent_memory_logs=recent_memory_logs[:5],
+        total_memory_slips_count=total_memory_slips_count,
+        memory_recovery_pct=memory_recovery_pct,
+        top_memory_categories=top_memory_categories,
+        today_memory_count=today_memory_count,
+        recent_sleep_logs=recent_sleep_logs[:5],
+        avg_sleep_hours=avg_sleep_hours,
+        avg_sleep_quality=avg_sleep_quality,
+        sleep_days_count=sleep_days_count
     )
 
 
@@ -784,6 +848,71 @@ def daily():
             db.session.commit()
             flash('Depression episode record deleted.', 'info')
 
+        elif action == 'add_memory_log':
+            time_val = request.form.get('time', '').strip() or 'N/A'
+            item = request.form.get('item', '').strip()
+            category = request.form.get('category', 'General').strip()
+            context = request.form.get('context', '').strip()
+            impact = request.form.get('impact', 'Mild').strip()
+            recovery = request.form.get('recovery', 'Remembered later').strip()
+            notes = request.form.get('notes', '').strip()
+            entry_time = datetime.now().strftime('%I:%M %p')
+
+            new_log = {
+                'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                'entry_time': entry_time,
+                'time': time_val,
+                'item': item,
+                'category': category,
+                'context': context,
+                'impact': impact,
+                'recovery': recovery,
+                'notes': notes
+            }
+
+            logs = plan.memory_logs or []
+            logs.append(new_log)
+            plan.memory_logs = logs
+            flag_modified(plan, 'memory_logs')
+            db.session.commit()
+            flash('Memory slip logged successfully.', 'success')
+
+        elif action == 'delete_memory_log':
+            log_id = request.form.get('log_id')
+            logs = plan.memory_logs or []
+            plan.memory_logs = [m for m in logs if m.get('id') != log_id]
+            flag_modified(plan, 'memory_logs')
+            db.session.commit()
+            flash('Memory log record deleted.', 'info')
+
+        elif action == 'save_sleep_log':
+            try:
+                hours = float(request.form.get('sleep_hours', 7.0))
+            except ValueError:
+                hours = 7.0
+            try:
+                quality = int(request.form.get('sleep_quality', 8))
+            except ValueError:
+                quality = 8
+
+            bedtime = request.form.get('bedtime', '').strip() or '11:00 PM'
+            wake_time = request.form.get('wake_time', '').strip() or '07:00 AM'
+            disruptions = request.form.get('disruptions', 'None').strip()
+            notes = request.form.get('notes', '').strip()
+
+            plan.sleep_log = {
+                'hours': hours,
+                'bedtime': bedtime,
+                'wake_time': wake_time,
+                'quality': quality,
+                'disruptions': disruptions,
+                'notes': notes,
+                'updated_at': datetime.now().strftime('%I:%M %p')
+            }
+            flag_modified(plan, 'sleep_log')
+            db.session.commit()
+            flash('Sleep tracker metrics saved successfully.', 'success')
+
         return redirect(url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')))
 
     # Hourly default schedule slots (05:00 - 06:00 AM to 11:00 - 12:00 AM)
@@ -828,6 +957,8 @@ def daily():
         schedule=normalized_schedule,
         notes=plan.notes if plan else '',
         depression_episodes=plan.depression_episodes if plan and plan.depression_episodes else [],
+        memory_logs=plan.memory_logs if plan and plan.memory_logs else [],
+        sleep_log=plan.sleep_log if plan and plan.sleep_log else {},
         default_slots=default_slots
     )
 
@@ -1864,6 +1995,34 @@ def export_daily_excel():
                 str(ep.get('notes', ''))
             ])
 
+    # Memory Tracker Sheet
+    memory_rows = [["Log ID", "Time Logged", "Time of Slip", "Forgotten Detail / Task", "Category", "Trigger / Context", "Impact Level", "Recovery Status", "Notes"]]
+    if plan and plan.memory_logs:
+        for m in plan.memory_logs:
+            memory_rows.append([
+                str(m.get('id', '')),
+                str(m.get('entry_time', '')),
+                str(m.get('time', '')),
+                str(m.get('item', '')),
+                str(m.get('category', '')),
+                str(m.get('context', '')),
+                str(m.get('impact', '')),
+                str(m.get('recovery', '')),
+                str(m.get('notes', ''))
+            ])
+
+    # Sleep Tracker Sheet
+    s_log = plan.sleep_log if plan and plan.sleep_log else {}
+    sleep_rows = [
+        ["Metric", "Value"],
+        ["Sleep Duration (Hours)", f"{s_log.get('hours', 0)} hrs"],
+        ["Bedtime", s_log.get('bedtime', 'N/A')],
+        ["Wake-up Time", s_log.get('wake_time', 'N/A')],
+        ["Sleep Quality (1-10)", s_log.get('quality', 'N/A')],
+        ["Disruptions", s_log.get('disruptions', 'None')],
+        ["Sleep Notes & Factors", s_log.get('notes', '')]
+    ]
+
     # Notes Sheet
     notes_rows = [["Section", "Content"], ["Daily Reflection & Notes", plan.notes if plan else '']]
 
@@ -1872,7 +2031,9 @@ def export_daily_excel():
         {
             "Daily Tasks": tasks_rows,
             "Hourly Activity & Mood": schedule_rows,
+            "Sleep Tracker": sleep_rows,
             "Depression Tracker": episodes_rows,
+            "Memory Tracker": memory_rows,
             "Daily Reflection": notes_rows
         }
     )

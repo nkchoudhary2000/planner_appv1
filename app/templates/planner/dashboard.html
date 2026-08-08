@@ -92,229 +92,384 @@
         </div>
     </div>
 
-    <!-- Main Content Dual Grid -->
+    <!-- Main 3-Column Layout: Left (2 Cols Main Content) & Right (1 Col Sidebar) -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Today's Schedule & Task List (2 Columns) -->
+        
+        <!-- Left Main Content Column (Span 2) -->
         <div class="lg:col-span-2 space-y-6">
-            <!-- Today's Tasks Section -->
-            <div class="glass-panel p-6 rounded-2xl border border-slate-700/60">
-                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50">
-                    <div class="flex items-center space-x-2">
-                        <i class="fa-solid fa-sun text-amber-400"></i>
-                        <h2 class="text-lg font-bold text-white">Today's Focus Tasks</h2>
-                    </div>
-                    <a href="{{ url_for('planner.daily') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium flex items-center space-x-1">
-                        <span>View Full Schedule</span>
-                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                    </a>
-                </div>
-
-                {% if today_tasks %}
-                <div class="space-y-3">
-                    {% for task in today_tasks %}
-                    {% set is_spill = task.is_spillover or task.spillover_count %}
-                    {% set spill_count = task.spillover_count or 1 %}
-
-                    <div class="task-item flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl transition-all gap-2 {{ 'bg-rose-950/25 border border-rose-500/40 hover:border-rose-400 shadow-sm' if (is_spill and task.priority == 'High') else ('bg-amber-950/20 border border-amber-500/30' if is_spill else 'bg-slate-800/60 border border-slate-700/40 hover:border-slate-600') }}">
-                        <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
-                            <input type="checkbox" 
-                                   {{ 'checked' if task.completed }} 
-                                   onchange="toggleTask('{{ today.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)"
-                                   class="custom-checkbox flex-shrink-0">
-                            <span class="task-text text-sm font-medium text-slate-200 truncate {{ 'line-through-fade' if task.completed }}">
-                                {{ task.text }}
-                            </span>
+            
+            <!-- 1. Side-by-Side: Today's Focus Tasks & Month Habit Tracker -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Today's Focus Tasks -->
+                <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50">
+                            <div class="flex items-center space-x-2">
+                                <i class="fa-solid fa-sun text-amber-400"></i>
+                                <h2 class="text-lg font-bold text-white">Today's Focus Tasks</h2>
+                            </div>
+                            <a href="{{ url_for('planner.daily') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium flex items-center space-x-1">
+                                <span>View Full Schedule</span>
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </a>
                         </div>
 
-                        <div class="flex items-center space-x-2 flex-shrink-0 self-end sm:self-auto">
-                            {% if is_spill %}
-                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1" title="Carried forward from {{ task.original_date or 'previous day' }}">
-                                <i class="fa-solid fa-fire text-amber-400 text-[9px]"></i>
-                                <span>Spillover (Pending {{ spill_count }}d)</span>
-                            </span>
-                            {% endif %}
+                        {% if today_tasks %}
+                        <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
+                            {% for task in today_tasks %}
+                            {% set is_spill = task.is_spillover or task.spillover_count %}
+                            {% set spill_count = task.spillover_count or 1 %}
 
-                            <span class="text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider {{ 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' if task.priority == 'High' else ('bg-amber-500/20 text-amber-300 border border-amber-500/30' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300 border border-slate-600') }}">
-                                {{ task.priority }}
-                            </span>
+                            <div class="task-item flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl transition-all gap-2 {{ 'bg-rose-950/25 border border-rose-500/40 hover:border-rose-400 shadow-sm' if (is_spill and task.priority == 'High') else ('bg-amber-950/20 border border-amber-500/30' if is_spill else 'bg-slate-800/60 border border-slate-700/40 hover:border-slate-600') }}">
+                                <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
+                                    <input type="checkbox" 
+                                           {{ 'checked' if task.completed }} 
+                                           onchange="toggleTask('{{ today.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)"
+                                           class="custom-checkbox flex-shrink-0">
+                                    <span class="task-text text-sm font-medium text-slate-200 truncate {{ 'line-through-fade' if task.completed }}">
+                                        {{ task.text }}
+                                    </span>
+                                </div>
+
+                                <div class="flex items-center space-x-2 flex-shrink-0 self-end sm:self-auto">
+                                    {% if is_spill %}
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1" title="Carried forward from {{ task.original_date or 'previous day' }}">
+                                        <i class="fa-solid fa-fire text-amber-400 text-[9px]"></i>
+                                        <span>Spillover (Pending {{ spill_count }}d)</span>
+                                    </span>
+                                    {% endif %}
+
+                                    <span class="text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider {{ 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' if task.priority == 'High' else ('bg-amber-500/20 text-amber-300 border border-amber-500/30' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300 border border-slate-600') }}">
+                                        {{ task.priority }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
                         </div>
+                        {% else %}
+                        <div class="text-center py-8 bg-slate-800/40 rounded-xl border border-dashed border-slate-700">
+                            <i class="fa-solid fa-clipboard-check text-3xl text-slate-600 mb-2"></i>
+                            <p class="text-sm text-slate-400">No tasks created for today yet.</p>
+                            <a href="{{ url_for('planner.daily') }}" class="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 hover:bg-brand-600/50 transition-colors">
+                                <i class="fa-solid fa-plus mr-1.5"></i> Add First Task
+                            </a>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endfor %}
                 </div>
-                {% else %}
-                <div class="text-center py-8 bg-slate-800/40 rounded-xl border border-dashed border-slate-700">
-                    <i class="fa-solid fa-clipboard-check text-3xl text-slate-600 mb-2"></i>
-                    <p class="text-sm text-slate-400">No tasks created for today yet.</p>
-                    <a href="{{ url_for('planner.daily') }}" class="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 hover:bg-brand-600/50 transition-colors">
-                        <i class="fa-solid fa-plus mr-1.5"></i> Add First Task
-                    </a>
+
+                <!-- {month_name} Habit Tracker -->
+                <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50">
+                            <div class="flex items-center space-x-2">
+                                <i class="fa-solid fa-fire text-rose-400"></i>
+                                <h2 class="text-lg font-bold text-white">{{ month_name }} Habit Tracker</h2>
+                            </div>
+                            <a href="{{ url_for('planner.monthly') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium">
+                                Open Habit Grid
+                            </a>
+                        </div>
+
+                        {% if monthly_habits %}
+                        <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
+                            {% for habit in monthly_habits %}
+                            <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-200">{{ habit.name }}</span>
+                                <div class="flex items-center space-x-1.5">
+                                    <span class="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                        {{ habit.completed_days|length }} days completed
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-8 bg-slate-800/40 rounded-xl border border-dashed border-slate-700">
+                            <p class="text-sm text-slate-400">No active habits for this month.</p>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
-                {% endif %}
             </div>
 
-            <!-- Quick Habit Tracker Summary -->
-            <div class="glass-panel p-6 rounded-2xl border border-slate-700/60">
-                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50">
-                    <div class="flex items-center space-x-2">
-                        <i class="fa-solid fa-fire text-rose-400"></i>
-                        <h2 class="text-lg font-bold text-white">{{ month_name }} Habit Tracker</h2>
+            <!-- 2. Side-by-Side: Memory Tracker Summary & Sleep Tracker Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Memory Tracker Summary -->
+                <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                                <i class="fa-solid fa-brain text-sm"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-base font-bold text-white">Memory Tracker Summary</h2>
+                                <p class="text-[11px] text-slate-400">Cognitive slip tracking &amp; recovery metrics</p>
+                            </div>
+                        </div>
+                        <a href="{{ url_for('planner.daily') }}" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium">Log Details</a>
                     </div>
-                    <a href="{{ url_for('planner.monthly') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium">
-                        Open Habit Grid
-                    </a>
-                </div>
 
-                {% if monthly_habits %}
-                <div class="space-y-3">
-                    {% for habit in monthly_habits %}
-                    <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
-                        <span class="text-sm font-medium text-slate-200">{{ habit.name }}</span>
-                        <div class="flex items-center space-x-1.5">
-                            <span class="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                                {{ habit.completed_days|length }} days completed
-                            </span>
+                    <!-- Stats Counters -->
+                    <div class="grid grid-cols-3 gap-3 text-center">
+                        <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                            <span class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">30D Slips</span>
+                            <span class="text-xl font-extrabold text-white mt-0.5">{{ total_memory_slips_count }}</span>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                            <span class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Resolved</span>
+                            <span class="text-xl font-extrabold text-emerald-400 mt-0.5">{{ memory_recovery_pct }}%</span>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                            <span class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Today</span>
+                            <span class="text-xl font-extrabold text-cyan-400 mt-0.5">{{ today_memory_count }}</span>
                         </div>
                     </div>
-                    {% endfor %}
+
+                    <!-- Top Categories -->
+                    {% if top_memory_categories %}
+                    <div class="space-y-1.5 pt-1">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Frequent Categories:</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            {% for category, count in top_memory_categories %}
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                                🏷️ {{ category }} ({{ count }})
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Recent Memory Slip Logs Timeline -->
+                    {% if recent_memory_logs %}
+                    <div class="space-y-2 pt-2 border-t border-slate-700/40">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Recent Memory Slips:</span>
+                        <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {% for log in recent_memory_logs %}
+                            {% set impact_val = log.impact|default('Mild') %}
+                            {% set impact_badge = 'bg-blue-500/15 border-blue-500/30 text-blue-300' if impact_val == 'Mild' else ('bg-amber-500/15 border-amber-500/30 text-amber-300' if impact_val == 'Moderate' else 'bg-rose-500/15 border-rose-500/30 text-rose-300') %}
+                            <div class="p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/40 space-y-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-bold text-slate-200">{{ log.date_str }} • {{ log.time }}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border {{ impact_badge }}">
+                                        Impact: {{ log.impact }}
+                                    </span>
+                                </div>
+                                <p class="text-slate-100 font-medium text-[11px]">• {{ log.item }}</p>
+                                {% if log.recovery %}
+                                <p class="text-emerald-400 text-[10px]">💡 {{ log.recovery }}</p>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-xs text-slate-400 text-center py-2">No memory slips recorded recently.</p>
+                    {% endif %}
                 </div>
-                {% else %}
-                <div class="text-center py-6 bg-slate-800/40 rounded-xl border border-dashed border-slate-700">
-                    <p class="text-sm text-slate-400">No active habits for this month.</p>
+
+                <!-- Sleep Tracker Summary -->
+                <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+                                <i class="fa-solid fa-moon text-sm"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-base font-bold text-white">Sleep Tracker Summary</h2>
+                                <p class="text-[11px] text-slate-400">Sleep duration, quality ratings &amp; night wellness</p>
+                            </div>
+                        </div>
+                        <a href="{{ url_for('planner.daily') }}" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Log Details</a>
+                    </div>
+
+                    <!-- Stats Counters -->
+                    <div class="grid grid-cols-3 gap-3 text-center">
+                        <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                            <span class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg Sleep</span>
+                            <span class="text-xl font-extrabold text-white mt-0.5">{{ avg_sleep_hours }} <span class="text-xs text-indigo-400 font-normal">hrs</span></span>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                            <span class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg Quality</span>
+                            <span class="text-xl font-extrabold text-indigo-400 mt-0.5">{{ avg_sleep_quality }}/10</span>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                            <span class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Tracked</span>
+                            <span class="text-xl font-extrabold text-emerald-400 mt-0.5">{{ sleep_days_count }} <span class="text-xs font-normal">Days</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Recent Sleep Logs Timeline -->
+                    {% if recent_sleep_logs %}
+                    <div class="space-y-2 pt-2 border-t border-slate-700/40">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Recent Sleep Logs:</span>
+                        <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {% for slog in recent_sleep_logs %}
+                            {% set q_num = slog.quality|default(8)|int %}
+                            {% set q_color = 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' if q_num >= 8 else ('bg-amber-500/15 border-amber-500/30 text-amber-300' if q_num >= 6 else 'bg-rose-500/15 border-rose-500/30 text-rose-300') %}
+                            <div class="p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/40 space-y-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-bold text-slate-200">{{ slog.date_str }}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border {{ q_color }}">
+                                        Quality {{ slog.quality }}/10
+                                    </span>
+                                </div>
+                                <div class="flex items-center space-x-2 text-[11px] text-slate-300">
+                                    <span class="font-medium text-indigo-300">😴 {{ slog.hours }} hrs</span>
+                                    <span>•</span>
+                                    <span class="text-slate-400">Bed {{ slog.bedtime }} → Wake {{ slog.wake_time }}</span>
+                                </div>
+                                {% if slog.disruptions and slog.disruptions != 'None' %}
+                                <p class="text-amber-300 text-[10px]">⚡ Disruptions: {{ slog.disruptions }}</p>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-xs text-slate-400 text-center py-2">No sleep metrics logged recently.</p>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
 
-            <!-- Depression & Mood Wellness Summary Widget (Placed Below Habit Tracker) -->
+            <!-- 3. Full Row (inside 2-col main container): Depression Tracker Summary -->
             <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
-                    <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-2.5">
                         <div class="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
                             <i class="fa-solid fa-heart-pulse text-sm"></i>
                         </div>
                         <div>
-                            <h2 class="text-base font-bold text-white">Depression Tracker Summary</h2>
-                            <p class="text-[11px] text-slate-400">Wellness insights &amp; episode logs</p>
+                            <h2 class="text-base font-bold text-white">Depression Episode Tracker Summary</h2>
+                            <p class="text-[11px] text-slate-400">Episode frequency, symptom intensity trends &amp; coping mechanism effectiveness</p>
                         </div>
                     </div>
                     <a href="{{ url_for('planner.daily') }}" class="text-xs text-purple-400 hover:text-purple-300 font-medium">Log Details</a>
                 </div>
 
                 <!-- Stats Counters -->
-                <div class="grid grid-cols-3 gap-3 text-center">
-                    <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
-                        <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Episodes</span>
-                        <span class="text-xl font-extrabold text-white mt-0.5">{{ total_episodes_count }}</span>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                    <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                        <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">30D Episodes Logged</span>
+                        <span class="text-2xl font-extrabold text-white mt-1 block">{{ total_episodes_count }}</span>
                     </div>
-                    <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
-                        <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg Intensity</span>
-                        <span class="text-xl font-extrabold text-amber-400 mt-0.5">{{ avg_intensity }}/10</span>
+                    <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                        <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Average Intensity</span>
+                        <span class="text-2xl font-extrabold text-amber-400 mt-1 block">{{ avg_intensity }}/10</span>
                     </div>
-                    <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/40">
-                        <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Peak Severity</span>
-                        <span class="text-xl font-extrabold text-rose-400 mt-0.5">{{ peak_intensity }}/10</span>
+                    <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                        <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Peak Severity Score</span>
+                        <span class="text-2xl font-extrabold text-rose-400 mt-1 block">{{ peak_intensity }}/10</span>
                     </div>
                 </div>
 
-                <!-- Top Coping Strategies -->
-                {% if top_coping_strategies %}
-                <div class="space-y-1.5 pt-1">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Most Effective Coping:</span>
-                    <div class="flex flex-wrap gap-1.5">
-                        {% for strategy, count in top_coping_strategies %}
-                        <span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-                            🛡️ {{ strategy }} ({{ count }})
-                        </span>
-                        {% endfor %}
+                <!-- Top Coping Strategies & Timeline Dual Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                    <!-- Top Coping Strategies -->
+                    <div class="space-y-2">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Most Effective Coping Strategies:</span>
+                        {% if top_coping_strategies %}
+                        <div class="flex flex-wrap gap-2 pt-1">
+                            {% for strategy, count in top_coping_strategies %}
+                            <span class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center space-x-1">
+                                <span>🛡️ {{ strategy }}</span>
+                                <span class="px-1.5 py-0.5 rounded-md bg-indigo-900/60 text-[10px] text-indigo-200">{{ count }}x</span>
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-xs text-slate-400 italic py-2">No coping strategies recorded yet.</p>
+                        {% endif %}
                     </div>
-                </div>
-                {% endif %}
 
-                <!-- Recent Episode Logs Timeline -->
-                {% if recent_episodes %}
-                <div class="space-y-2 pt-2 border-t border-slate-700/40">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Recent Episodes:</span>
-                    <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {% for ep in recent_episodes %}
-                        {% set intensity = ep.intensity|int %}
-                        {% set severity_badge = 'bg-amber-500/15 border-amber-500/30 text-amber-300' if intensity <= 3 else ('bg-orange-500/15 border-orange-500/30 text-orange-300' if intensity <= 6 else ('bg-rose-500/15 border-rose-500/30 text-rose-300' if intensity <= 8 else 'bg-purple-500/20 border-purple-500/40 text-purple-300')) %}
-                        <div class="p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/40 space-y-1 text-xs">
-                            <div class="flex items-center justify-between">
-                                <span class="font-bold text-slate-200">{{ ep.date_str }} • {{ ep.start_time }}</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold border {{ severity_badge }}">
+                    <!-- Recent Episode Logs Timeline -->
+                    <div class="space-y-2">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Recent Episodes Timeline:</span>
+                        {% if recent_episodes %}
+                        <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {% for ep in recent_episodes %}
+                            {% set intensity = ep.intensity|int %}
+                            {% set severity_badge = 'bg-amber-500/15 border-amber-500/30 text-amber-300' if intensity <= 3 else ('bg-orange-500/15 border-orange-500/30 text-orange-300' if intensity <= 6 else ('bg-rose-500/15 border-rose-500/30 text-rose-300' if intensity <= 8 else 'bg-purple-500/20 border-purple-500/40 text-purple-300')) %}
+                            <div class="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-center justify-between text-xs">
+                                <div class="space-y-0.5">
+                                    <span class="font-bold text-slate-200 block">{{ ep.date_str }} • {{ ep.start_time }}</span>
+                                    {% if ep.coping_mechanism %}
+                                    <p class="text-slate-400 text-[11px]">🛡️ Coping: <span class="text-slate-200">{{ ep.coping_mechanism }}</span></p>
+                                    {% endif %}
+                                </div>
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-bold border {{ severity_badge }}">
                                     Intensity {{ ep.intensity }}/10
                                 </span>
                             </div>
-                            {% if ep.coping_mechanism %}
-                            <p class="text-slate-400 text-[11px]">🛡️ Coping: <span class="text-slate-200">{{ ep.coping_mechanism }}</span></p>
-                            {% endif %}
+                            {% endfor %}
                         </div>
-                        {% endfor %}
+                        {% else %}
+                        <p class="text-xs text-slate-400 italic py-2">No depression episodes recorded recently.</p>
+                        {% endif %}
                     </div>
                 </div>
-                {% else %}
-                <p class="text-xs text-slate-400 text-center py-2">No depression episodes recorded recently.</p>
-                {% endif %}
             </div>
         </div>
 
-        <!-- Right Side Panel (Quick Links) -->
+        <!-- Right Sidebar Column (Span 1): Planner Views & Resolutions -->
         <div class="space-y-6">
-
             <!-- Planner Navigation Cards -->
             <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-3">
                 <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-2">Planner Views</h2>
 
-                <a href="{{ url_for('planner.daily') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                            <i class="fa-solid fa-sun"></i>
+                <div class="space-y-3">
+                    <a href="{{ url_for('planner.daily') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                                <i class="fa-solid fa-sun"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-white group-hover:text-brand-300">Daily Planner</h3>
+                                <p class="text-xs text-slate-400">Schedule &amp; wellness trackers</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 class="text-sm font-semibold text-white group-hover:text-brand-300">Daily Planner</h3>
-                            <p class="text-xs text-slate-400">Hourly schedule &amp; depression tracker</p>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
-                </a>
+                        <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
+                    </a>
 
-                <a href="{{ url_for('planner.weekly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-9 h-9 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center">
-                            <i class="fa-solid fa-calendar-week"></i>
+                    <a href="{{ url_for('planner.weekly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center">
+                                <i class="fa-solid fa-calendar-week"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-white group-hover:text-brand-300">Weekly Planner</h3>
+                                <p class="text-xs text-slate-400">7-Day to-dos &amp; report</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 class="text-sm font-semibold text-white group-hover:text-brand-300">Weekly Planner</h3>
-                            <p class="text-xs text-slate-400">7-Day to-dos, shopping, meals &amp; report</p>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
-                </a>
+                        <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
+                    </a>
 
-                <a href="{{ url_for('planner.monthly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-9 h-9 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                            <i class="fa-solid fa-calendar-days"></i>
+                    <a href="{{ url_for('planner.monthly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                                <i class="fa-solid fa-calendar-days"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-white group-hover:text-brand-300">Monthly Planner</h3>
+                                <p class="text-xs text-slate-400">Habits, goals &amp; milestones</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 class="text-sm font-semibold text-white group-hover:text-brand-300">Monthly Planner</h3>
-                            <p class="text-xs text-slate-400">Habits, goals &amp; milestones</p>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
-                </a>
+                        <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
+                    </a>
 
-                <a href="{{ url_for('planner.yearly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                            <i class="fa-solid fa-bullseye"></i>
+                    <a href="{{ url_for('planner.yearly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                                <i class="fa-solid fa-bullseye"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-white group-hover:text-brand-300">Yearly Planner</h3>
+                                <p class="text-xs text-slate-400">Resolutions &amp; reflections</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 class="text-sm font-semibold text-white group-hover:text-brand-300">Yearly Planner</h3>
-                            <p class="text-xs text-slate-400">Annual resolutions &amp; reflections</p>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
-                </a>
+                        <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
+                    </a>
+                </div>
             </div>
 
             <!-- Annual Resolutions Snapshot -->
@@ -326,7 +481,7 @@
 
                 {% if yearly_resolutions %}
                 <ul class="space-y-2.5">
-                    {% for res in yearly_resolutions[:4] %}
+                    {% for res in yearly_resolutions[:5] %}
                     <li class="flex items-center space-x-2 text-sm text-slate-300">
                         <i class="fa-solid fa-angle-right text-brand-400 text-xs"></i>
                         <span class="{{ 'line-through-fade' if res.completed }}">{{ res.text }}</span>

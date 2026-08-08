@@ -592,5 +592,71 @@ class PlannerTestCase(unittest.TestCase):
         self.assertEqual(plan.schedule['09:00 - 10:00 AM']['mood'], '🤩')
         self.assertEqual(plan.notes, 'Had a productive coding session.')
 
+    def test_daily_plan_memory_log(self):
+        self.register_and_login()
+        today_str = date.today().strftime('%Y-%m-%d')
+
+        # Log memory slip
+        res = self.client.post(f'/daily?date={today_str}', data={
+            'action': 'add_memory_log',
+            'time': '10:30 AM',
+            'item': 'Forgot where car keys were placed',
+            'category': 'Item / Belonging',
+            'context': 'Overwhelmed / Exhausted',
+            'impact': 'Moderate',
+            'recovery': 'Remembered later',
+            'notes': 'Keep keys in bowl by front door'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        # Check DB
+        user = User.query.filter_by(username='testuser').first()
+        plan = DailyPlan.query.filter_by(user_id=user.id, date=date.today()).first()
+        self.assertIsNotNone(plan)
+        self.assertEqual(len(plan.memory_logs), 1)
+        log = plan.memory_logs[0]
+        self.assertEqual(log['item'], 'Forgot where car keys were placed')
+        self.assertEqual(log['category'], 'Item / Belonging')
+        self.assertEqual(log['impact'], 'Moderate')
+
+        # Delete memory log
+        log_id = log['id']
+        del_res = self.client.post(f'/daily?date={today_str}', data={
+            'action': 'delete_memory_log',
+            'log_id': log_id
+        }, follow_redirects=True)
+        self.assertEqual(del_res.status_code, 200)
+
+        db.session.expire_all()
+        plan_after = DailyPlan.query.filter_by(user_id=user.id, date=date.today()).first()
+        self.assertEqual(len(plan_after.memory_logs), 0)
+
+    def test_daily_plan_sleep_log(self):
+        self.register_and_login()
+        today_str = date.today().strftime('%Y-%m-%d')
+
+        # Save sleep log
+        res = self.client.post(f'/daily?date={today_str}', data={
+            'action': 'save_sleep_log',
+            'sleep_hours': '8.0',
+            'bedtime': '10:30 PM',
+            'wake_time': '06:30 AM',
+            'sleep_quality': '9',
+            'disruptions': 'Woke up once at 3 AM',
+            'notes': 'Read a book before sleep'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        # Check DB
+        user = User.query.filter_by(username='testuser').first()
+        plan = DailyPlan.query.filter_by(user_id=user.id, date=date.today()).first()
+        self.assertIsNotNone(plan)
+        self.assertIsNotNone(plan.sleep_log)
+        self.assertEqual(plan.sleep_log.get('hours'), 8.0)
+        self.assertEqual(plan.sleep_log.get('bedtime'), '10:30 PM')
+        self.assertEqual(plan.sleep_log.get('wake_time'), '06:30 AM')
+        self.assertEqual(plan.sleep_log.get('quality'), 9)
+        self.assertEqual(plan.sleep_log.get('disruptions'), 'Woke up once at 3 AM')
+
 if __name__ == '__main__':
     unittest.main()

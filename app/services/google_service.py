@@ -47,7 +47,9 @@ def export_user_data_payload(user):
                 "schedule": dp.schedule or {},
                 "tasks": dp.tasks or [],
                 "notes": dp.notes or '',
-                "depression_episodes": dp.depression_episodes or []
+                "depression_episodes": dp.depression_episodes or [],
+                "memory_logs": dp.memory_logs or [],
+                "sleep_log": dp.sleep_log or {}
             }
             for dp in daily_plans
         ],
@@ -109,9 +111,13 @@ def import_user_data_payload(user, payload):
         dp.tasks = dp_data.get('tasks', [])
         dp.notes = dp_data.get('notes', '')
         dp.depression_episodes = dp_data.get('depression_episodes', [])
+        dp.memory_logs = dp_data.get('memory_logs', [])
+        dp.sleep_log = dp_data.get('sleep_log', {})
         flag_modified(dp, 'schedule')
         flag_modified(dp, 'tasks')
         flag_modified(dp, 'depression_episodes')
+        flag_modified(dp, 'memory_logs')
+        flag_modified(dp, 'sleep_log')
 
     # Restore Weekly Plans
     for wp_data in payload.get('weekly_plans', []):
