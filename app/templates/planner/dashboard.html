@@ -27,6 +27,100 @@
         </div>
     </div>
 
+    <!-- 2-Column Banner Row: Active Reminders & Daily Motivational Quote -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Active Reminders & Alerts Carousel Card -->
+        <div class="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-slate-900/90 relative overflow-hidden shadow-xl shadow-amber-500/5 space-y-3 flex flex-col justify-between" id="reminder-carousel-container">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+                <div class="flex items-center space-x-2">
+                    <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                        <i class="fa-solid fa-bullhorn text-xs animate-pulse"></i>
+                    </div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-white">Active Reminders</h2>
+                </div>
+
+                {% if marquee_alerts %}
+                <div class="flex items-center space-x-1.5">
+                    <!-- Carousel Counter -->
+                    <span class="text-xs text-slate-400 font-mono font-medium px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">
+                        <span id="reminder-current-slide">1</span>/<span id="reminder-total-slides">{{ marquee_alerts|length }}</span>
+                    </span>
+                    <!-- Carousel Navigation Controls -->
+                    <button type="button" onclick="slideReminderCarousel(-1)" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Previous Reminder">
+                        <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                    </button>
+                    <button type="button" onclick="slideReminderCarousel(1)" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Next Reminder">
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Carousel Slide Track (No Duplicate Entries) -->
+            <div class="relative overflow-hidden min-h-[60px] flex items-center" id="reminder-carousel-wrapper">
+                {% if marquee_alerts %}
+                    <div class="w-full transition-transform duration-500 ease-in-out flex" id="reminder-carousel-track">
+                        {% for alert in marquee_alerts %}
+                        <div class="w-full flex-shrink-0 space-y-2 p-3 rounded-xl bg-slate-800/70 border border-slate-700/50">
+                            <div class="flex items-center justify-between">
+                                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider border {{ alert.badge_color }} flex items-center space-x-1">
+                                    <i class="{{ alert.icon }} text-[9px]"></i>
+                                    <span>{{ alert.badge }}</span>
+                                </span>
+                            </div>
+                            <p class="text-xs font-semibold text-slate-100 break-words leading-relaxed">{{ alert.text }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="w-full p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-center space-x-2.5 text-slate-300 text-xs">
+                        <i class="fa-solid fa-circle-check text-emerald-400 text-base flex-shrink-0"></i>
+                        <div>
+                            <span class="font-bold text-emerald-300">All Caught Up!</span>
+                            <p class="text-[11px] text-slate-400">No active alerts for today.</p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Dots Bar -->
+            {% if marquee_alerts and marquee_alerts|length > 1 %}
+            <div class="flex items-center justify-center space-x-1.5 pt-1" id="reminder-dots-bar">
+                {% for alert in marquee_alerts %}
+                <button type="button" onclick="goToReminderSlide({{ loop.index0 }})" class="reminder-dot w-2 h-2 rounded-full transition-all bg-slate-600 hover:bg-slate-400 cursor-pointer" data-slide-index="{{ loop.index0 }}"></button>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Daily Motivational Quote Card -->
+        <div class="glass-panel p-5 rounded-2xl border border-indigo-500/30 bg-slate-900/90 relative overflow-hidden shadow-xl shadow-indigo-500/5 space-y-3 flex flex-col justify-between" id="quote-container">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+                <div class="flex items-center space-x-2">
+                    <div class="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                        <i class="fa-solid fa-quote-left text-xs"></i>
+                    </div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-white">Daily Inspiration</h2>
+                </div>
+                <button type="button" onclick="fetchNextQuote()" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Refresh Quote">
+                    <i class="fa-solid fa-rotate text-[10px]" id="quote-refresh-icon"></i>
+                </button>
+            </div>
+
+            <div class="flex items-center space-x-3.5 p-3.5 rounded-xl bg-slate-800/70 border border-slate-700/50 min-h-[75px]">
+                <img id="quote-author-img" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" alt="Author" class="w-12 h-12 rounded-full object-cover border-2 border-indigo-400/40 flex-shrink-0 shadow-md">
+                <div class="min-w-0 flex-1 space-y-1">
+                    <p id="quote-text" class="text-xs font-semibold text-slate-100 italic leading-relaxed line-clamp-3">
+                        "The only way to do great work is to love what you do."
+                    </p>
+                    <p id="quote-author" class="text-[11px] font-bold text-indigo-300 flex items-center space-x-1">
+                        — <span id="quote-author-name">Steve Jobs</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Summary Stats Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <!-- Daily Progress Card -->
@@ -413,70 +507,6 @@
 
         <!-- Right Sidebar Column (Span 1): Reminders, Planner Views & Resolutions -->
         <div class="space-y-6">
-            <!-- Active Reminders & Alerts Carousel Card -->
-            <div class="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-slate-900/90 relative overflow-hidden shadow-xl shadow-amber-500/5 space-y-3" id="reminder-carousel-container">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
-                    <div class="flex items-center space-x-2">
-                        <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                            <i class="fa-solid fa-bullhorn text-xs animate-pulse"></i>
-                        </div>
-                        <h2 class="text-sm font-bold uppercase tracking-wider text-white">Active Reminders</h2>
-                    </div>
-
-                    {% if marquee_alerts %}
-                    <div class="flex items-center space-x-1.5">
-                        <!-- Carousel Counter -->
-                        <span class="text-xs text-slate-400 font-mono font-medium px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">
-                            <span id="reminder-current-slide">1</span>/<span id="reminder-total-slides">{{ marquee_alerts|length }}</span>
-                        </span>
-                        <!-- Carousel Navigation Controls -->
-                        <button type="button" onclick="slideReminderCarousel(-1)" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Previous Reminder">
-                            <i class="fa-solid fa-chevron-left text-[10px]"></i>
-                        </button>
-                        <button type="button" onclick="slideReminderCarousel(1)" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Next Reminder">
-                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                        </button>
-                    </div>
-                    {% endif %}
-                </div>
-
-                <!-- Carousel Slide Track (No Duplicate Entries) -->
-                <div class="relative overflow-hidden min-h-[60px] flex items-center" id="reminder-carousel-wrapper">
-                    {% if marquee_alerts %}
-                        <div class="w-full transition-transform duration-500 ease-in-out flex" id="reminder-carousel-track">
-                            {% for alert in marquee_alerts %}
-                            <div class="w-full flex-shrink-0 space-y-2 p-3 rounded-xl bg-slate-800/70 border border-slate-700/50">
-                                <div class="flex items-center justify-between">
-                                    <span class="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider border {{ alert.badge_color }} flex items-center space-x-1">
-                                        <i class="{{ alert.icon }} text-[9px]"></i>
-                                        <span>{{ alert.badge }}</span>
-                                    </span>
-                                </div>
-                                <p class="text-xs font-semibold text-slate-100 break-words leading-relaxed">{{ alert.text }}</p>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="w-full p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-center space-x-2.5 text-slate-300 text-xs">
-                            <i class="fa-solid fa-circle-check text-emerald-400 text-base flex-shrink-0"></i>
-                            <div>
-                                <span class="font-bold text-emerald-300">All Caught Up!</span>
-                                <p class="text-[11px] text-slate-400">No active alerts for today.</p>
-                            </div>
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Dots Bar -->
-                {% if marquee_alerts and marquee_alerts|length > 1 %}
-                <div class="flex items-center justify-center space-x-1.5 pt-1" id="reminder-dots-bar">
-                    {% for alert in marquee_alerts %}
-                    <button type="button" onclick="goToReminderSlide({{ loop.index0 }})" class="reminder-dot w-2 h-2 rounded-full transition-all bg-slate-600 hover:bg-slate-400 cursor-pointer" data-slide-index="{{ loop.index0 }}"></button>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-
             <!-- Planner Navigation Cards -->
             <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-3">
                 <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-2">Planner Views</h2>
@@ -622,8 +652,103 @@
             container.addEventListener('mouseenter', stopAutoSlide);
             container.addEventListener('mouseleave', startAutoSlide);
         }
+
+        // Initialize Motivational Quote
+        fetchNextQuote();
     });
 })();
+
+// Online & Curated Motivational Quote Handler
+const FALLBACK_QUOTES = [
+    {
+        quote: "The only way to do great work is to love what you do.",
+        author: "Steve Jobs",
+        image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+        author: "Winston Churchill",
+        image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "Believe you can and you're halfway there.",
+        author: "Theodore Roosevelt",
+        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "The future belongs to those who believe in the beauty of their dreams.",
+        author: "Eleanor Roosevelt",
+        image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "It always seems impossible until it's done.",
+        author: "Nelson Mandela",
+        image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "In the middle of every difficulty lies opportunity.",
+        author: "Albert Einstein",
+        image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "Do what you can, with what you have, where you are.",
+        author: "Theodore Roosevelt",
+        image: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "What you get by achieving your goals is not as important as what you become by achieving your goals.",
+        author: "Zig Ziglar",
+        image: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "Act as if what you do makes a difference. It does.",
+        author: "William James",
+        image: "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+        quote: "Keep your face always toward the sunshine—and shadows will fall behind you.",
+        author: "Walt Whitman",
+        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80"
+    }
+];
+
+async function fetchNextQuote() {
+    const refreshBtn = document.getElementById('quote-refresh-icon');
+    if (refreshBtn) refreshBtn.classList.add('animate-spin');
+
+    const quoteTextElem = document.getElementById('quote-text');
+    const authorNameElem = document.getElementById('quote-author-name');
+    const authorImgElem = document.getElementById('quote-author-img');
+
+    try {
+        const res = await fetch('https://dummyjson.com/quotes/random', { cache: 'no-store' });
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.quote && data.author) {
+                if (quoteTextElem) quoteTextElem.innerText = `"${data.quote}"`;
+                if (authorNameElem) authorNameElem.innerText = data.author;
+                if (authorImgElem) {
+                    authorImgElem.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.author)}&background=6366f1&color=fff&bold=true`;
+                }
+                if (refreshBtn) {
+                    setTimeout(() => refreshBtn.classList.remove('animate-spin'), 400);
+                }
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn('Online quote API call failed, using fallback collection', e);
+    }
+
+    const item = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
+    if (quoteTextElem) quoteTextElem.innerText = `"${item.quote}"`;
+    if (authorNameElem) authorNameElem.innerText = item.author;
+    if (authorImgElem) authorImgElem.src = item.image;
+
+    if (refreshBtn) {
+        setTimeout(() => refreshBtn.classList.remove('animate-spin'), 400);
+    }
+}
 </script>
 {% endblock %}
 
