@@ -24,7 +24,16 @@ def login():
             (func.lower(User.username) == login_input.lower())
         ).first()
 
-        if not user or not user.check_password(password):
+        if not user:
+            flash('Invalid email/username or password. Please try again.', 'danger')
+            return redirect(url_for('auth.login'))
+
+        # Check if user registered via Google Sign-In only and hasn't set a local password yet
+        if not user.password_hash:
+            flash('This account was created using Google Sign-In and does not have a local password set yet. Please log in with Google, or register with this email to set up a local password.', 'warning')
+            return redirect(url_for('auth.login'))
+
+        if not user.check_password(password):
             flash('Invalid email/username or password. Please try again.', 'danger')
             return redirect(url_for('auth.login'))
 
@@ -67,12 +76,33 @@ def register():
             flash('Password must be at least 6 characters long.', 'danger')
             return redirect(url_for('auth.register'))
 
-        existing_user = User.query.filter((User.email == email) | (User.username == username)).first()
-        if existing_user:
-            if existing_user.email == email:
-                flash('An account with this email already exists.', 'warning')
+        # Check if user exists by email or username
+        existing_email_user = User.query.filter(func.lower(User.email) == email.lower()).first()
+        existing_username_user = User.query.filter(func.lower(User.username) == username.lower()).first()
+
+        if existing_email_user:
+            # Case 1: User signed up with Google previously and hasn't set a local password yet
+            if not existing_email_user.password_hash:
+                # Check username collision with another user
+                if existing_username_user and existing_username_user.id != existing_email_user.id:
+                    flash('Username is already taken by another account. Please choose a different username.', 'warning')
+                    return redirect(url_for('auth.register'))
+                
+                # Merge local password & username into existing Google account
+                existing_email_user.username = username
+                existing_email_user.set_password(password)
+                db.session.commit()
+
+                login_user(existing_email_user)
+                flash('Your account (previously created with Google Sign-In) has been merged with your local login password! You can now log in using either Google or your password.', 'success')
+                return redirect(url_for('planner.dashboard'))
             else:
-                flash('Username is already taken. Please choose another.', 'warning')
+                # Case 2: Account exists and already has a password set
+                flash('An account with this email already exists. You can log in using your password or Google.', 'warning')
+                return redirect(url_for('auth.login'))
+
+        if existing_username_user:
+            flash('Username is already taken. Please choose another username.', 'warning')
             return redirect(url_for('auth.register'))
 
         new_user = User(username=username, email=email)
@@ -80,10 +110,37 @@ def register():
         db.session.add(new_user)
         db.session.commit()
 
-        flash('Registration successful! You can now log in.', 'success')
-        return redirect(url_for('auth.login'))
+        login_user(new_user)
+        flash('Registration successful! Your account has been created.', 'success')
+        return redirect(url_for('planner.dashboard'))
 
     return render_template('auth/register.html')
+
+
+@auth.route('/set-password', methods=['POST'])
+@login_required
+def set_password():
+    """Allows logged in user (e.g. Google user) to set or update their local password directly from profile."""
+    new_password = request.form.get('new_password', '').strip()
+    confirm_password = request.form.get('confirm_password', '').strip()
+
+    if not new_password or not confirm_password:
+        flash('Password fields cannot be empty.', 'danger')
+        return redirect(request.referrer or url_for('planner.dashboard'))
+
+    if new_password != confirm_password:
+        flash('Passwords do not match.', 'danger')
+        return redirect(request.referrer or url_for('planner.dashboard'))
+
+    if len(new_password) < 6:
+        flash('Password must be at least 6 characters long.', 'danger')
+        return redirect(request.referrer or url_for('planner.dashboard'))
+
+    current_user.set_password(new_password)
+    db.session.commit()
+
+    flash('Local login password saved successfully! You can now log in with either Google or local password.', 'success')
+    return redirect(request.referrer or url_for('planner.dashboard'))
 
 
 @auth.route('/google/login')
@@ -98,11 +155,17 @@ def google_login():
         mock_email = "user.google@gmail.com"
         mock_username = "GoogleUser"
         
-        user = User.query.filter((User.email == mock_email) | (User.username == mock_username)).first()
+        user = User.query.filter(
+            (func.lower(User.email) == mock_email.lower()) | 
+            (func.lower(User.username) == mock_username.lower())
+        ).first()
+        
         if not user:
             user = User(username=mock_username, email=mock_email, google_id="mock_google_id_12345")
             db.session.add(user)
-            db.session.commit()
+        else:
+            if not user.google_id:
+                user.google_id = "mock_google_id_12345"
 
         user.google_token = {"access_token": "mock_token", "token_type": "Bearer"}
         db.session.commit()
@@ -125,17 +188,22 @@ def google_callback():
         email = user_info['email'].lower()
         username = user_info.get('name') or email.split('@')[0]
 
-        user = User.query.filter((User.google_id == google_id) | (User.email == email)).first()
+        user = User.query.filter((User.google_id == google_id) | (func.lower(User.email) == email.lower())).first()
         if not user:
+            existing_user_by_name = User.query.filter(func.lower(User.username) == username.lower()).first()
+            if existing_user_by_name:
+                username = f"{username}_{google_id[:5]}"
             user = User(username=username, email=email, google_id=google_id)
             db.session.add(user)
+        else:
+            if not user.google_id:
+                user.google_id = google_id
 
         user.google_token = token
-        user.google_id = google_id
         db.session.commit()
 
         login_user(user)
-        flash('Successfully authenticated with Google Account!', 'success')
+        flash('Successfully authenticated with Google Account! Your accounts are merged.', 'success')
         return redirect(url_for('planner.dashboard'))
 
     except Exception as e:
@@ -150,4 +218,5 @@ def logout():
     logout_user()
     flash('You have been logged out safely.', 'info')
     return redirect(url_for('auth.login'))
+
 

@@ -34,6 +34,12 @@
             <div class="relative flex justify-center text-xs uppercase"><span class="bg-slate-900 px-3 text-slate-400 font-semibold">Or sign in with email</span></div>
         </div>
 
+        <!-- Account Linking Info Banner -->
+        <div class="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl text-xs text-slate-300 flex items-center space-x-2.5">
+            <i class="fa-solid fa-link text-brand-400 text-sm flex-shrink-0"></i>
+            <span>Google Sign-In &amp; Local Password automatically merge for the same email address.</span>
+        </div>
+
         <form class="mt-4 space-y-6" action="{{ url_for('auth.login') }}" method="POST">
             <div class="space-y-4">
                 <div>

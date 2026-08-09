@@ -47,5 +47,56 @@ class GoogleAuthTestCase(unittest.TestCase):
         self.assertIsNone(queried_user.password_hash)
         self.assertFalse(queried_user.check_password("any_password"))
 
+    def test_merge_google_account_with_local_registration(self):
+        # 1. Create a Google user without local password
+        google_user = User(username="GoogleUser", email="user.google@gmail.com", google_id="google_sub_1001")
+        db.session.add(google_user)
+        db.session.commit()
+
+        # 2. User registers with the exact same email to set a local password
+        res = self.client.post('/auth/register', data={
+            'username': 'GoogleUserMerged',
+            'email': 'user.google@gmail.com',
+            'password': 'secretpassword123',
+            'confirm_password': 'secretpassword123'
+        }, follow_redirects=True)
+
+        self.assertEqual(res.status_code, 200)
+
+        # 3. Verify user in DB is merged (same ID, updated password, google_id intact)
+        user = User.query.filter_by(email="user.google@gmail.com").first()
+        self.assertIsNotNone(user)
+        self.assertEqual(user.id, google_user.id)
+        self.assertEqual(user.username, "GoogleUserMerged")
+        self.assertEqual(user.google_id, "google_sub_1001")
+        self.assertTrue(user.check_password("secretpassword123"))
+
+        # 4. Logout and verify logging in via local password works!
+        self.client.get('/auth/logout')
+        login_res = self.client.post('/auth/login', data={
+            'login_input': 'user.google@gmail.com',
+            'password': 'secretpassword123'
+        }, follow_redirects=True)
+        self.assertEqual(login_res.status_code, 200)
+        self.assertIn(b'Welcome back', login_res.data)
+
+    def test_google_login_merges_into_existing_local_user(self):
+        # 1. Create a local account first
+        local_user = User(username="LocalUser", email="user.google@gmail.com")
+        local_user.set_password("localpass123")
+        db.session.add(local_user)
+        db.session.commit()
+
+        # 2. User logs in via Google
+        res = self.client.get('/auth/google/login', follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        # 3. Verify user has both password and google_id linked
+        user = User.query.filter_by(email="user.google@gmail.com").first()
+        self.assertIsNotNone(user)
+        self.assertEqual(user.id, local_user.id)
+        self.assertEqual(user.google_id, "mock_google_id_12345")
+        self.assertTrue(user.check_password("localpass123"))
+
 if __name__ == '__main__':
     unittest.main()
