@@ -51,7 +51,7 @@
                 </div>
             </div>
             
-            <span class="px-3.5 py-1.5 rounded-full text-xs font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30 self-start sm:self-auto">
+            <span id="report-weekly-score" class="px-3.5 py-1.5 rounded-full text-xs font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30 self-start sm:self-auto">
                 Productivity Score: {{ weekly_score }}/100
             </span>
         </div>
@@ -61,11 +61,11 @@
             <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">7-Day To-Dos</span>
                 <div class="flex items-baseline space-x-2 mt-1">
-                    <span class="text-xl font-bold text-white">{{ completed_todos }}/{{ total_todos }}</span>
-                    <span class="text-xs text-brand-400 font-medium">({{ todo_completion_pct }}%)</span>
+                    <span id="report-todos-counter" class="text-xl font-bold text-white">{{ completed_todos }}/{{ total_todos }}</span>
+                    <span id="report-todos-pct" class="text-xs text-brand-400 font-medium">({{ todo_completion_pct }}%)</span>
                 </div>
                 <div class="w-full bg-slate-700 h-1.5 rounded-full mt-2.5 overflow-hidden">
-                    <div class="bg-brand-500 h-full rounded-full transition-all" style="width: {{ todo_completion_pct }}%"></div>
+                    <div id="report-todos-bar" class="bg-brand-500 h-full rounded-full transition-all" style="width: {{ todo_completion_pct }}%"></div>
                 </div>
             </div>
 
@@ -73,10 +73,10 @@
             <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Weekly Goals</span>
                 <div class="flex items-baseline space-x-2 mt-1">
-                    <span class="text-xl font-bold text-white">{{ completed_goals }}/{{ total_goals }}</span>
+                    <span id="report-goals-counter" class="text-xl font-bold text-white">{{ completed_goals }}/{{ total_goals }}</span>
                     <span class="text-xs text-emerald-400 font-medium">Achieved</span>
                 </div>
-                <p class="text-xs text-slate-400 mt-2">{{ total_goals - completed_goals }} goals remaining</p>
+                <p id="report-goals-remaining" class="text-xs text-slate-400 mt-2">{{ total_goals - completed_goals }} goals remaining</p>
             </div>
 
             <!-- Meal Plan Coverage -->
@@ -141,15 +141,15 @@
                     <i class="fa-solid fa-bullseye text-brand-400"></i>
                     <h2 class="text-lg font-bold text-white">Weekly Goals &amp; Priorities</h2>
                 </div>
-                <span class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                <span id="weekly-goals-counter" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
                     {{ completed_goals }}/{{ total_goals }} Done
                 </span>
             </div>
 
             <!-- Add Goal Form -->
-            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="flex gap-3">
+            <form id="add-weekly-goal-form" onsubmit="handleAddWeeklyGoalAJAX(event, {{ selected_year }}, {{ selected_week }})" class="flex gap-3">
                 <input type="hidden" name="action" value="add_weekly_goal">
-                <input type="text" name="goal_title" required placeholder="Add a key goal for this week..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <input type="text" id="weekly-goal-input" name="goal_title" required placeholder="Add a key goal for this week..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
                     <i class="fa-solid fa-plus text-xs"></i>
                     <span>Add</span>
@@ -157,34 +157,26 @@
             </form>
 
             <!-- Goals List -->
-            <div class="space-y-3">
+            <div id="weekly-goals-container" class="space-y-3">
                 {% if goals %}
                     {% for g in goals %}
-                    <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                    <div id="weekly-goal-item-{{ g.id }}" class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
                         <div class="flex items-center space-x-3">
-                            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="toggle_weekly_goal">
-                                <input type="hidden" name="goal_id" value="{{ g.id }}">
-                                <button type="submit" class="text-sm">
-                                    <i class="fa-regular {{ 'fa-square-check text-brand-400' if g.completed else 'fa-square text-slate-500' }} text-lg"></i>
-                                </button>
-                            </form>
-                            <span class="text-sm font-medium text-slate-200 {{ 'line-through-fade' if g.completed }}">
+                            <button type="button" onclick="handleToggleWeeklyGoalAJAX('{{ g.id }}', {{ selected_year }}, {{ selected_week }}, this)" class="text-sm">
+                                <i class="fa-regular {{ 'fa-square-check text-brand-400' if g.completed else 'fa-square text-slate-500' }} text-lg"></i>
+                            </button>
+                            <span class="goal-title-text text-sm font-medium text-slate-200 {{ 'line-through-fade' if g.completed }}">
                                 {{ g.title }}
                             </span>
                         </div>
 
-                        <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
-                            <input type="hidden" name="action" value="delete_weekly_goal">
-                            <input type="hidden" name="goal_id" value="{{ g.id }}">
-                            <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
-                                <i class="fa-solid fa-trash-can text-xs"></i>
-                            </button>
-                        </form>
+                        <button type="button" onclick="handleDeleteWeeklyGoalAJAX('{{ g.id }}', {{ selected_year }}, {{ selected_week }}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Goal">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
                     </div>
                     {% endfor %}
                 {% else %}
-                    <p class="text-sm text-slate-400 text-center py-6">No goals added for this week yet.</p>
+                    <p id="no-weekly-goals-msg" class="text-sm text-slate-400 text-center py-6">No goals added for this week yet.</p>
                 {% endif %}
             </div>
         </div>
@@ -196,17 +188,17 @@
                     <i class="fa-solid fa-cart-shopping text-emerald-400"></i>
                     <h2 class="text-lg font-bold text-white">Weekly Shopping List</h2>
                 </div>
-                <span class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                <span id="weekly-shopping-counter" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
                     {{ bought_shopping }}/{{ total_shopping }} Bought
                 </span>
             </div>
 
             <!-- Add Shopping Item Form -->
-            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <form id="add-shopping-item-form" onsubmit="handleAddShoppingItemAJAX(event, {{ selected_year }}, {{ selected_week }})" class="flex flex-col sm:flex-row gap-3">
                 <input type="hidden" name="action" value="add_shopping_item">
-                <input type="text" name="item_name" required placeholder="Add item (e.g. Milk, Eggs, Notebook)..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <input type="text" id="shopping-item-name-input" name="item_name" required placeholder="Add item (e.g. Milk, Eggs, Notebook)..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 <div class="flex items-center space-x-2">
-                    <select name="category" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <select id="shopping-item-category-input" name="category" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                         <option value="Groceries">Groceries</option>
                         <option value="Household">Household</option>
                         <option value="Personal">Personal</option>
@@ -220,39 +212,36 @@
             </form>
 
             <!-- Shopping List Items -->
-            <div class="space-y-3">
+            <div id="weekly-shopping-container" class="space-y-3">
                 {% if shopping_list %}
                     {% for item in shopping_list %}
-                    <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                    <div id="weekly-shopping-item-{{ item.id }}" class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
                         <div class="flex items-center space-x-3">
-                            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="toggle_shopping_item">
-                                <input type="hidden" name="item_id" value="{{ item.id }}">
-                                <button type="submit" class="text-sm">
-                                    <i class="fa-regular {{ 'fa-square-check text-emerald-400' if item.bought else 'fa-square text-slate-500' }} text-lg"></i>
-                                </button>
-                            </form>
-                            <span class="text-sm font-medium text-slate-200 {{ 'line-through-fade' if item.bought }}">
+                            <button type="button" onclick="handleToggleShoppingItemAJAX('{{ item.id }}', {{ selected_year }}, {{ selected_week }}, this)" class="text-sm">
+                                <i class="fa-regular {{ 'fa-square-check text-emerald-400' if item.bought else 'fa-square text-slate-500' }} text-lg"></i>
+                            </button>
+                            <span class="shopping-item-text text-sm font-medium text-slate-200 {{ 'line-through-fade' if item.bought }}">
                                 {{ item.item }}
                             </span>
                         </div>
 
                         <div class="flex items-center space-x-2">
+                            {% if item.added_date %}
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-mono bg-slate-900/80 text-emerald-400/90 border border-slate-700/60" title="Date Added">
+                                    <i class="fa-regular fa-clock text-[9px] mr-1"></i>{{ item.added_date }}
+                                </span>
+                            {% endif %}
                             <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-700 text-slate-300">
                                 {{ item.category }}
                             </span>
-                            <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="delete_shopping_item">
-                                <input type="hidden" name="item_id" value="{{ item.id }}">
-                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors">
-                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                </button>
-                            </form>
+                            <button type="button" onclick="handleDeleteShoppingItemAJAX('{{ item.id }}', {{ selected_year }}, {{ selected_week }}, this)" class="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors" title="Delete Shopping Item">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
                         </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                    <p class="text-sm text-slate-400 text-center py-6">Shopping list is empty.</p>
+                    <p id="no-weekly-shopping-msg" class="text-sm text-slate-400 text-center py-6">Shopping list is empty.</p>
                 {% endif %}
             </div>
         </div>
@@ -289,7 +278,7 @@
                     </div>
 
                     <!-- Add Day Todo Form -->
-                    <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="mt-3">
+                    <form onsubmit="handleAddWeeklyDayTodoAJAX(event, '{{ day.abbr }}', {{ selected_year }}, {{ selected_week }})" class="mt-3">
                         <input type="hidden" name="action" value="add_daily_todo">
                         <input type="hidden" name="day_abbr" value="{{ day.abbr }}">
                         <div class="flex items-center space-x-2">
@@ -300,36 +289,51 @@
                         </div>
                     </form>
 
-                    <!-- Day Todos Checklist -->
-                    <div class="space-y-2 mt-3.5 max-h-60 overflow-y-auto pr-1">
+                    <!-- Day Todos Checklist & Cascaded Items -->
+                    <div id="day-todos-container-{{ day.abbr }}" class="space-y-2 mt-3.5 max-h-60 overflow-y-auto pr-1">
+                        <!-- Cascaded Items from Monthly & Yearly -->
+                        {% if day.cascaded_items %}
+                            {% for citem in day.cascaded_items %}
+                                {% if citem.source in ['yearly', 'monthly'] %}
+                                <div class="p-2 rounded-xl bg-purple-950/20 border border-purple-500/30 flex items-start justify-between text-xs">
+                                    <div class="space-y-0.5">
+                                        <div class="flex items-center space-x-1.5 flex-wrap">
+                                            {% if citem.source == 'yearly' %}
+                                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Yearly</span>
+                                                {% if citem.event_type == 'birthday' %}
+                                                    <span class="text-[9px] font-bold text-rose-300">🎂 Birthday</span>
+                                                {% elif citem.event_type == 'anniversary' %}
+                                                    <span class="text-[9px] font-bold text-purple-300">💍 Anniversary</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Monthly</span>
+                                            {% endif %}
+                                            <span class="text-xs font-semibold text-slate-100">{{ citem.title or citem.text }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+
                         {% if day_todos %}
                             {% for t in day_todos %}
-                            <div class="p-2.5 rounded-xl bg-slate-900/50 border border-slate-700/40 flex items-start justify-between text-xs group hover:border-slate-600 transition-all">
+                            <div id="weekly-day-todo-{{ t.id }}" class="p-2.5 rounded-xl bg-slate-900/50 border border-slate-700/40 flex items-start justify-between text-xs group hover:border-slate-600 transition-all">
                                 <div class="flex items-start space-x-2.5 min-w-0 pr-2 flex-1">
-                                    <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline mt-0.5">
-                                        <input type="hidden" name="action" value="toggle_daily_todo">
-                                        <input type="hidden" name="day_abbr" value="{{ day.abbr }}">
-                                        <input type="hidden" name="todo_id" value="{{ t.id }}">
-                                        <button type="submit" class="text-slate-400 hover:text-white transition-colors">
-                                            <i class="fa-regular {{ 'fa-square-check text-brand-400' if t.completed else 'fa-square' }} text-sm"></i>
-                                        </button>
-                                    </form>
-                                    <span class="text-xs font-medium text-slate-200 leading-snug break-words {{ 'line-through-fade' if t.completed }}">
+                                    <button type="button" onclick="handleToggleWeeklyDayTodoAJAX('{{ day.abbr }}', '{{ t.id }}', {{ selected_year }}, {{ selected_week }}, this)" class="text-slate-400 hover:text-white transition-colors mt-0.5">
+                                        <i class="fa-regular {{ 'fa-square-check text-brand-400' if t.completed else 'fa-square' }} text-sm"></i>
+                                    </button>
+                                    <span class="day-todo-text text-xs font-medium text-slate-200 leading-snug break-words {{ 'line-through-fade' if t.completed }}">
                                         {{ t.text }}
                                     </span>
                                 </div>
 
-                                <form action="{{ url_for('planner.weekly', year=selected_year, week=selected_week) }}" method="POST" class="inline opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <input type="hidden" name="action" value="delete_daily_todo">
-                                    <input type="hidden" name="day_abbr" value="{{ day.abbr }}">
-                                    <input type="hidden" name="todo_id" value="{{ t.id }}">
-                                    <button type="submit" class="text-slate-500 hover:text-rose-400 p-1 rounded-md transition-colors" title="Delete Task">
-                                        <i class="fa-solid fa-xmark text-xs"></i>
-                                    </button>
-                                </form>
+                                <button type="button" onclick="handleDeleteWeeklyDayTodoAJAX('{{ day.abbr }}', '{{ t.id }}', {{ selected_year }}, {{ selected_week }}, this)" class="text-slate-500 hover:text-rose-400 p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100 transition-opacity" title="Delete Task">
+                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                </button>
                             </div>
                             {% endfor %}
-                        {% else %}
+                        {% elif not day.cascaded_items %}
                             <p class="text-xs text-slate-500 text-center py-4 italic">No tasks scheduled for {{ day.abbr }}</p>
                         {% endif %}
                     </div>
@@ -412,4 +416,494 @@
         </form>
     </div>
 </div>
+
+<script>
+function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, 
+        tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag] || tag)
+    );
+}
+
+function updateWeeklyStats(data) {
+    if (!data) return;
+    if (data.weekly_score !== undefined) {
+        const scoreEl = document.getElementById('report-weekly-score');
+        if (scoreEl) scoreEl.innerText = `Productivity Score: ${data.weekly_score}/100`;
+    }
+    if (data.completed_goals !== undefined && data.total_goals !== undefined) {
+        const goalCounter = document.getElementById('weekly-goals-counter');
+        if (goalCounter) goalCounter.innerText = `${data.completed_goals}/${data.total_goals} Done`;
+
+        const reportGoals = document.getElementById('report-goals-counter');
+        if (reportGoals) reportGoals.innerText = `${data.completed_goals}/${data.total_goals}`;
+
+        const reportRemaining = document.getElementById('report-goals-remaining');
+        if (reportRemaining) {
+            const rem = data.total_goals - data.completed_goals;
+            reportRemaining.innerText = `${rem} goal${rem !== 1 ? 's' : ''} remaining`;
+        }
+    }
+    if (data.bought_shopping !== undefined && data.total_shopping !== undefined) {
+        const shopCounter = document.getElementById('weekly-shopping-counter');
+        if (shopCounter) shopCounter.innerText = `${data.bought_shopping}/${data.total_shopping} Bought`;
+    }
+    if (data.completed_todos !== undefined && data.total_todos !== undefined) {
+        const todoCounter = document.getElementById('report-todos-counter');
+        if (todoCounter) todoCounter.innerText = `${data.completed_todos}/${data.total_todos}`;
+
+        const todoPct = document.getElementById('report-todos-pct');
+        const todoBar = document.getElementById('report-todos-bar');
+        const pct = data.todo_completion_pct !== undefined ? data.todo_completion_pct : (data.total_todos > 0 ? Math.round((data.completed_todos / data.total_todos) * 100) : 0);
+        if (todoPct) todoPct.innerText = `(${pct}%)`;
+        if (todoBar) todoBar.style.width = `${pct}%`;
+    }
+}
+
+async function handleAddWeeklyGoalAJAX(e, year, week) {
+    e.preventDefault();
+    const input = document.getElementById('weekly-goal-input');
+    const title = input ? input.value.trim() : '';
+    if (!title) return;
+
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'add_weekly_goal');
+        formData.append('goal_title', title);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success && data.goal) {
+            input.value = '';
+            const container = document.getElementById('weekly-goals-container');
+            const noMsg = document.getElementById('no-weekly-goals-msg');
+            if (noMsg) noMsg.remove();
+
+            const goal = data.goal;
+            const newElem = document.createElement('div');
+            newElem.id = `weekly-goal-item-${goal.id}`;
+            newElem.className = 'p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between';
+            newElem.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <button type="button" onclick="handleToggleWeeklyGoalAJAX('${goal.id}', ${year}, ${week}, this)" class="text-sm">
+                        <i class="fa-regular fa-square text-slate-500 text-lg"></i>
+                    </button>
+                    <span class="goal-title-text text-sm font-medium text-slate-200">
+                        ${escapeHTML(goal.title)}
+                    </span>
+                </div>
+                <button type="button" onclick="handleDeleteWeeklyGoalAJAX('${goal.id}', ${year}, ${week}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Goal">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            `;
+            container.appendChild(newElem);
+            updateWeeklyStats(data);
+            if (window.showToast) showToast(data.message || 'Weekly goal added!', 'success');
+        } else {
+            if (window.showToast) showToast(data.message || 'Failed to add goal', 'danger');
+        }
+    } catch (err) {
+        console.error('Error adding weekly goal:', err);
+        if (window.showToast) showToast('Server error adding goal', 'danger');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+async function handleToggleWeeklyGoalAJAX(goalId, year, week, btnElem) {
+    const icon = btnElem.querySelector('i');
+    const parentDiv = btnElem.closest('.flex.items-center.space-x-3') || btnElem.parentElement;
+    const textSpan = parentDiv.querySelector('.goal-title-text');
+    const isCurrentlyChecked = icon ? icon.classList.contains('fa-square-check') : false;
+
+    // Optimistic UI update immediately
+    if (isCurrentlyChecked) {
+        if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+        if (textSpan) textSpan.classList.remove('line-through-fade');
+    } else {
+        if (icon) icon.className = 'fa-regular fa-square-check text-brand-400 text-lg';
+        if (textSpan) textSpan.classList.add('line-through-fade');
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'toggle_weekly_goal');
+        formData.append('goal_id', goalId);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            updateWeeklyStats(data);
+        } else {
+            // Revert on failure
+            if (isCurrentlyChecked) {
+                if (icon) icon.className = 'fa-regular fa-square-check text-brand-400 text-lg';
+                if (textSpan) textSpan.classList.add('line-through-fade');
+            } else {
+                if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+                if (textSpan) textSpan.classList.remove('line-through-fade');
+            }
+            if (window.showToast) showToast(data.message || 'Failed to toggle goal', 'danger');
+        }
+    } catch (err) {
+        console.error('Error toggling weekly goal:', err);
+    }
+}
+
+async function handleDeleteWeeklyGoalAJAX(goalId, year, week, btnElem) {
+    const itemElem = document.getElementById(`weekly-goal-item-${goalId}`) || btnElem.closest('.p-3\\.5');
+    if (itemElem) itemElem.style.display = 'none';
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'delete_weekly_goal');
+        formData.append('goal_id', goalId);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            if (itemElem) itemElem.remove();
+            const container = document.getElementById('weekly-goals-container');
+            if (container && container.children.length === 0) {
+                container.innerHTML = '<p id="no-weekly-goals-msg" class="text-sm text-slate-400 text-center py-6">No goals added for this week yet.</p>';
+            }
+            updateWeeklyStats(data);
+            if (window.showToast) showToast(data.message || 'Weekly goal removed.', 'info');
+        } else {
+            if (itemElem) itemElem.style.display = '';
+            if (window.showToast) showToast(data.message || 'Failed to delete goal', 'danger');
+        }
+    } catch (err) {
+        if (itemElem) itemElem.style.display = '';
+        console.error('Error deleting weekly goal:', err);
+    }
+}
+
+async function handleAddShoppingItemAJAX(e, year, week) {
+    e.preventDefault();
+    const nameInput = document.getElementById('shopping-item-name-input');
+    const catInput = document.getElementById('shopping-item-category-input');
+    const itemName = nameInput ? nameInput.value.trim() : '';
+    const category = catInput ? catInput.value : 'Groceries';
+    if (!itemName) return;
+
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'add_shopping_item');
+        formData.append('item_name', itemName);
+        formData.append('category', category);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success && data.item) {
+            nameInput.value = '';
+            const container = document.getElementById('weekly-shopping-container');
+            const noMsg = document.getElementById('no-weekly-shopping-msg');
+            if (noMsg) noMsg.remove();
+
+            const item = data.item;
+            const newElem = document.createElement('div');
+            newElem.id = `weekly-shopping-item-${item.id}`;
+            newElem.className = 'p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between';
+            newElem.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <button type="button" onclick="handleToggleShoppingItemAJAX('${item.id}', ${year}, ${week}, this)" class="text-sm">
+                        <i class="fa-regular fa-square text-slate-500 text-lg"></i>
+                    </button>
+                    <span class="shopping-item-text text-sm font-medium text-slate-200">
+                        ${escapeHTML(item.item)}
+                    </span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    ${item.added_date ? `
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-mono bg-slate-900/80 text-emerald-400/90 border border-slate-700/60" title="Date Added">
+                        <i class="fa-regular fa-clock text-[9px] mr-1"></i>${escapeHTML(item.added_date)}
+                    </span>` : ''}
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-700 text-slate-300">
+                        ${escapeHTML(item.category)}
+                    </span>
+                    <button type="button" onclick="handleDeleteShoppingItemAJAX('${item.id}', ${year}, ${week}, this)" class="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors" title="Delete Shopping Item">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(newElem);
+            updateWeeklyStats(data);
+            if (window.showToast) showToast(data.message || 'Shopping item added!', 'success');
+        } else {
+            if (window.showToast) showToast(data.message || 'Failed to add shopping item', 'danger');
+        }
+    } catch (err) {
+        console.error('Error adding shopping item:', err);
+        if (window.showToast) showToast('Server error adding shopping item', 'danger');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+async function handleToggleShoppingItemAJAX(itemId, year, week, btnElem) {
+    const icon = btnElem.querySelector('i');
+    const parentDiv = btnElem.closest('.flex.items-center.space-x-3') || btnElem.parentElement;
+    const textSpan = parentDiv.querySelector('.shopping-item-text');
+    const isCurrentlyBought = icon ? icon.classList.contains('fa-square-check') : false;
+
+    // Optimistic UI update immediately
+    if (isCurrentlyBought) {
+        if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+        if (textSpan) textSpan.classList.remove('line-through-fade');
+    } else {
+        if (icon) icon.className = 'fa-regular fa-square-check text-emerald-400 text-lg';
+        if (textSpan) textSpan.classList.add('line-through-fade');
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'toggle_shopping_item');
+        formData.append('item_id', itemId);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            updateWeeklyStats(data);
+        } else {
+            // Revert on failure
+            if (isCurrentlyBought) {
+                if (icon) icon.className = 'fa-regular fa-square-check text-emerald-400 text-lg';
+                if (textSpan) textSpan.classList.add('line-through-fade');
+            } else {
+                if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+                if (textSpan) textSpan.classList.remove('line-through-fade');
+            }
+            if (window.showToast) showToast(data.message || 'Failed to toggle shopping item', 'danger');
+        }
+    } catch (err) {
+        console.error('Error toggling shopping item:', err);
+    }
+}
+
+async function handleDeleteShoppingItemAJAX(itemId, year, week, btnElem) {
+    const itemElem = document.getElementById(`weekly-shopping-item-${itemId}`) || btnElem.closest('.p-3\\.5');
+    if (itemElem) itemElem.style.display = 'none';
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'delete_shopping_item');
+        formData.append('item_id', itemId);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            if (itemElem) itemElem.remove();
+            const container = document.getElementById('weekly-shopping-container');
+            if (container && container.children.length === 0) {
+                container.innerHTML = '<p id="no-weekly-shopping-msg" class="text-sm text-slate-400 text-center py-6">Shopping list is empty.</p>';
+            }
+            updateWeeklyStats(data);
+            if (window.showToast) showToast(data.message || 'Shopping item deleted.', 'info');
+        } else {
+            if (itemElem) itemElem.style.display = '';
+            if (window.showToast) showToast(data.message || 'Failed to delete shopping item', 'danger');
+        }
+    } catch (err) {
+        if (itemElem) itemElem.style.display = '';
+        console.error('Error deleting shopping item:', err);
+    }
+}
+
+async function handleAddWeeklyDayTodoAJAX(e, dayAbbr, year, week) {
+    e.preventDefault();
+    const form = e.target;
+    const input = form.querySelector('input[name="todo_text"]');
+    const text = input ? input.value.trim() : '';
+    if (!text) return;
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'add_daily_todo');
+        formData.append('day_abbr', dayAbbr);
+        formData.append('todo_text', text);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success && data.todo) {
+            input.value = '';
+            const container = document.getElementById(`day-todos-container-${dayAbbr}`);
+            if (container) {
+                const emptyMsg = container.querySelector('p.italic');
+                if (emptyMsg) emptyMsg.remove();
+
+                const t = data.todo;
+                const newElem = document.createElement('div');
+                newElem.id = `weekly-day-todo-${t.id}`;
+                newElem.className = 'p-2.5 rounded-xl bg-slate-900/50 border border-slate-700/40 flex items-start justify-between text-xs group hover:border-slate-600 transition-all';
+                newElem.innerHTML = `
+                    <div class="flex items-start space-x-2.5 min-w-0 pr-2 flex-1">
+                        <button type="button" onclick="handleToggleWeeklyDayTodoAJAX('${dayAbbr}', '${t.id}', ${year}, ${week}, this)" class="text-slate-400 hover:text-white transition-colors mt-0.5">
+                            <i class="fa-regular fa-square text-sm"></i>
+                        </button>
+                        <span class="day-todo-text text-xs font-medium text-slate-200 leading-snug break-words">
+                            ${escapeHTML(t.text)}
+                        </span>
+                    </div>
+                    <button type="button" onclick="handleDeleteWeeklyDayTodoAJAX('${dayAbbr}', '${t.id}', ${year}, ${week}, this)" class="text-slate-500 hover:text-rose-400 p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100 transition-opacity" title="Delete Task">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                `;
+                container.appendChild(newElem);
+            }
+            updateWeeklyStats(data);
+            if (window.showToast) showToast(data.message || `To-do added to ${dayAbbr}!`, 'success');
+        } else {
+            if (window.showToast) showToast(data.message || 'Failed to add task', 'danger');
+        }
+    } catch (err) {
+        console.error('Error adding daily todo in weekly view:', err);
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+async function handleToggleWeeklyDayTodoAJAX(dayAbbr, todoId, year, week, btnElem) {
+    const icon = btnElem.querySelector('i');
+    const parentDiv = btnElem.closest('.flex.items-start.space-x-2\\.5') || btnElem.parentElement;
+    const textSpan = parentDiv.querySelector('.day-todo-text');
+    const isCurrentlyChecked = icon ? icon.classList.contains('fa-square-check') : false;
+
+    // Optimistic UI update immediately
+    if (isCurrentlyChecked) {
+        if (icon) icon.className = 'fa-regular fa-square text-sm';
+        if (textSpan) textSpan.classList.remove('line-through-fade');
+    } else {
+        if (icon) icon.className = 'fa-regular fa-square-check text-brand-400 text-sm';
+        if (textSpan) textSpan.classList.add('line-through-fade');
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'toggle_daily_todo');
+        formData.append('day_abbr', dayAbbr);
+        formData.append('todo_id', todoId);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            updateWeeklyStats(data);
+        } else {
+            if (isCurrentlyChecked) {
+                if (icon) icon.className = 'fa-regular fa-square-check text-brand-400 text-sm';
+                if (textSpan) textSpan.classList.add('line-through-fade');
+            } else {
+                if (icon) icon.className = 'fa-regular fa-square text-sm';
+                if (textSpan) textSpan.classList.remove('line-through-fade');
+            }
+        }
+    } catch (err) {
+        console.error('Error toggling daily todo in weekly view:', err);
+    }
+}
+
+async function handleDeleteWeeklyDayTodoAJAX(dayAbbr, todoId, year, week, btnElem) {
+    const itemElem = document.getElementById(`weekly-day-todo-${todoId}`) || btnElem.closest('.p-2\\.5');
+    if (itemElem) itemElem.style.display = 'none';
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'delete_daily_todo');
+        formData.append('day_abbr', dayAbbr);
+        formData.append('todo_id', todoId);
+        formData.append('is_ajax', 'true');
+
+        const response = await fetch(`/weekly?year=${year}&week=${week}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            if (itemElem) itemElem.remove();
+
+            const container = document.getElementById(`day-todos-container-${dayAbbr}`);
+            if (container && container.querySelectorAll('.group').length === 0) {
+                const cascaded = container.querySelector('.bg-purple-950\\/20');
+                if (!cascaded) {
+                    container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4 italic">No tasks scheduled for ${dayAbbr}</p>`;
+                }
+            }
+            updateWeeklyStats(data);
+            if (window.showToast) showToast(data.message || 'To-do item deleted.', 'info');
+        } else {
+            if (itemElem) itemElem.style.display = '';
+        }
+    } catch (err) {
+        if (itemElem) itemElem.style.display = '';
+        console.error('Error deleting daily todo in weekly view:', err);
+    }
+}
+</script>
 {% endblock %}

@@ -5,13 +5,16 @@
 {% block content %}
 <div class="space-y-6">
     <!-- Month Navigation Header -->
-    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div
+        class="glass-panel p-6 rounded-2xl border border-slate-700/60 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
-            <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Monthly Strategy &amp; Calendar</span>
+            <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Monthly Strategy &amp;
+                Calendar</span>
             <h1 class="text-2xl font-bold text-white mt-0.5 flex items-center space-x-3">
                 <span>{{ month_name }} {{ selected_year }}</span>
                 {% if selected_year == today.year and selected_month == today.month %}
-                <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center space-x-1.5">
+                <span
+                    class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center space-x-1.5">
                     <span class="pulse-indicator"></span>
                     <span>Current Month</span>
                 </span>
@@ -21,28 +24,35 @@
 
         <!-- Month & Year Selectors -->
         <form action="{{ url_for('planner.monthly') }}" method="GET" class="flex flex-wrap items-center gap-2 sm:gap-3">
-            <a href="{{ url_for('planner.monthly') }}" class="px-3 py-2 rounded-xl border text-xs font-semibold transition-all flex items-center space-x-1.5 {{ 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20' if (selected_year == today.year and selected_month == today.month) else 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white' }}" title="Jump to Current Month">
-                <i class="fa-solid fa-calendar-days text-xs {{ 'text-white' if (selected_year == today.year and selected_month == today.month) else 'text-indigo-400' }}"></i>
+            <a href="{{ url_for('planner.monthly') }}"
+                class="px-3 py-2 rounded-xl border text-xs font-semibold transition-all flex items-center space-x-1.5 {{ 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20' if (selected_year == today.year and selected_month == today.month) else 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white' }}"
+                title="Jump to Current Month">
+                <i
+                    class="fa-solid fa-calendar-days text-xs {{ 'text-white' if (selected_year == today.year and selected_month == today.month) else 'text-indigo-400' }}"></i>
                 <span>Current Month</span>
             </a>
 
-            <select name="month" onchange="this.form.submit()" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <select name="month" onchange="this.form.submit()"
+                class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 {% for m in range(1, 13) %}
-                    <option value="{{ m }}" {{ 'selected' if m == selected_month }}>
-                        {{ calendar.month_name[m] }}
-                    </option>
+                <option value="{{ m }}" {{ 'selected' if m==selected_month }}>
+                    {{ calendar.month_name[m] }}
+                </option>
                 {% endfor %}
             </select>
 
-            <select name="year" onchange="this.form.submit()" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <select name="year" onchange="this.form.submit()"
+                class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 {% for y in range(selected_year - 2, selected_year + 4) %}
-                    <option value="{{ y }}" {{ 'selected' if y == selected_year }}>
-                        {{ y }}
-                    </option>
+                <option value="{{ y }}" {{ 'selected' if y==selected_year }}>
+                    {{ y }}
+                </option>
                 {% endfor %}
             </select>
 
-            <a href="{{ url_for('planner.export_monthly_excel', year=selected_year, month=selected_month) }}" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5" title="Export Monthly Plan to Excel">
+            <a href="{{ url_for('planner.export_monthly_excel', year=selected_year, month=selected_month) }}"
+                class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5"
+                title="Export Monthly Plan to Excel">
                 <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
                 <span>Export Excel</span>
             </a>
@@ -51,13 +61,15 @@
 
     <!-- Weekly Summaries Cascade Widget (Weekly -> Monthly) -->
     {% if weekly_summaries_list %}
-    <div class="glass-panel p-5 rounded-2xl border border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800/60 to-slate-900 space-y-3">
+    <div
+        class="glass-panel p-5 rounded-2xl border border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800/60 to-slate-900 space-y-3">
         <div class="flex items-center justify-between pb-2 border-b border-slate-700/50">
             <div class="flex items-center space-x-2 text-xs font-bold text-brand-400 uppercase tracking-wider">
                 <i class="fa-solid fa-calendar-week"></i>
                 <span>Weekly Summaries Cascade ({{ month_name }})</span>
             </div>
-            <a href="{{ url_for('planner.weekly') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium">Open Weekly Planner</a>
+            <a href="{{ url_for('planner.weekly') }}"
+                class="text-xs text-brand-400 hover:text-brand-300 font-medium">Open Weekly Planner</a>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -82,7 +94,7 @@
 
     <!-- Monthly Goals & Milestones Grid (Placed Above Monthly Calendar) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
+
         <!-- Monthly Goals Section -->
         <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
             <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
@@ -90,23 +102,26 @@
                     <i class="fa-solid fa-bullseye text-emerald-400"></i>
                     <h2 class="text-lg font-bold text-white">Monthly Goals</h2>
                 </div>
-                <span class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                <span id="monthly-goals-counter" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
                     {{ goals|selectattr('status', 'equalto', 'Completed')|list|length }}/{{ goals|length }} Done
                 </span>
             </div>
 
             <!-- Add Goal Form -->
-            <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <form id="add-monthly-goal-form" onsubmit="handleAddMonthlyGoalAJAX(event, {{ selected_year }}, {{ selected_month }})" class="flex flex-col sm:flex-row gap-3">
                 <input type="hidden" name="action" value="add_goal">
-                <input type="text" name="goal_title" required placeholder="New goal for {{ month_name }}..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <input type="text" id="monthly-goal-input" name="goal_title" required placeholder="New goal for {{ month_name }}..."
+                    class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <div class="flex items-center space-x-2">
-                    <select name="category" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <select id="monthly-goal-category-input" name="category"
+                        class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
                         <option value="Personal">Personal</option>
                         <option value="Career">Career</option>
                         <option value="Health">Health</option>
                         <option value="Financial">Financial</option>
                     </select>
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
+                    <button type="submit"
+                        class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
                         <i class="fa-solid fa-plus text-xs"></i>
                         <span>Add</span>
                     </button>
@@ -114,42 +129,75 @@
             </form>
 
             <!-- Goals List -->
-            <div class="space-y-3">
-                {% if goals %}
-                    {% for g in goals %}
-                    <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
-                        <div class="space-y-1">
-                            <div class="flex items-center space-x-2">
-                                <span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-700 text-slate-300">
-                                    {{ g.category }}
-                                </span>
-                                <h3 class="text-sm font-semibold text-slate-100 {{ 'line-through-fade' if g.status == 'Completed' }}">
-                                    {{ g.title }}
-                                </h3>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center space-x-2">
-                            <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="toggle_goal_status">
-                                <input type="hidden" name="goal_id" value="{{ g.id }}">
-                                <button type="submit" class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors {{ 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' if g.status == 'Completed' else 'bg-slate-700 text-slate-300 hover:bg-slate-600' }}">
-                                    {{ g.status }}
-                                </button>
-                            </form>
-
-                            <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="delete_goal">
-                                <input type="hidden" name="goal_id" value="{{ g.id }}">
-                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
-                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                </button>
-                            </form>
+            <div id="monthly-goals-container" class="space-y-3">
+                {% if cascaded_yearly_events %}
+                {% for y_ev in cascaded_yearly_events %}
+                <div
+                    class="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/30 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <div class="flex items-center space-x-2 flex-wrap gap-1">
+                            <span
+                                class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center space-x-1">
+                                <i class="fa-solid fa-arrows-split-up-and-left text-[9px]"></i>
+                                <span>Yearly Cascade</span>
+                            </span>
+                            <h3 class="text-sm font-semibold text-purple-100">
+                                {{ y_ev.title }}
+                            </h3>
+                            {% if y_ev.event_type == 'birthday' %}
+                            <span
+                                class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">🎂
+                                Birthday</span>
+                            {% elif y_ev.event_type == 'anniversary' %}
+                            <span
+                                class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">💍
+                                Anniversary</span>
+                            {% else %}
+                            <span
+                                class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🎯
+                                Yearly Goal</span>
+                            {% endif %}
                         </div>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-sm text-slate-400 text-center py-6">No goals defined for this month.</p>
+                    <span
+                        class="text-xs font-mono text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-lg border border-slate-700/50">
+                        {{ y_ev.date }}
+                    </span>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                {% if goals %}
+                {% for g in goals %}
+                <div id="monthly-goal-item-{{ g.id }}"
+                    class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-700 text-slate-300">
+                                {{ g.category }}
+                            </span>
+                            <h3
+                                class="goal-title-text text-sm font-semibold text-slate-100 {{ 'line-through-fade' if g.status == 'Completed' }}">
+                                {{ g.title }}
+                            </h3>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <button type="button" onclick="handleToggleMonthlyGoalAJAX('{{ g.id }}', {{ selected_year }}, {{ selected_month }}, this)"
+                            class="goal-status-btn text-xs px-3 py-1.5 rounded-lg font-medium transition-colors {{ 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' if g.status == 'Completed' else 'bg-slate-700 text-slate-300 hover:bg-slate-600' }}">
+                            {{ g.status }}
+                        </button>
+
+                        <button type="button" onclick="handleDeleteMonthlyGoalAJAX('{{ g.id }}', {{ selected_year }}, {{ selected_month }}, this)"
+                            class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Goal">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% elif not cascaded_yearly_events %}
+                <p id="no-monthly-goals-msg" class="text-sm text-slate-400 text-center py-6">No goals defined for this month.</p>
                 {% endif %}
             </div>
         </div>
@@ -165,12 +213,17 @@
             </div>
 
             <!-- Add Milestone Form -->
-            <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <form id="add-milestone-form" onsubmit="handleAddMilestoneAJAX(event, {{ selected_year }}, {{ selected_month }})"
+                class="flex flex-col sm:flex-row gap-3">
                 <input type="hidden" name="action" value="add_milestone">
-                <input type="text" name="milestone_title" required placeholder="Milestone description..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <input type="text" id="milestone-title-input" name="milestone_title" required placeholder="Milestone description..."
+                    class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <div class="flex items-center space-x-2">
-                    <input type="number" name="target_day" min="1" max="{{ days_in_month }}" placeholder="Day #" required class="w-20 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                    <button type="submit" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-amber-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
+                    <input type="number" id="milestone-day-input" name="target_day" min="1" max="{{ days_in_month }}" placeholder="Day #"
+                        required
+                        class="w-20 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <button type="submit"
+                        class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-amber-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
                         <i class="fa-solid fa-plus text-xs"></i>
                         <span>Add</span>
                     </button>
@@ -178,39 +231,34 @@
             </form>
 
             <!-- Milestones List -->
-            <div class="space-y-3">
+            <div id="milestones-container" class="space-y-3">
                 {% if milestones %}
-                    {% for m in milestones %}
-                    <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="toggle_milestone">
-                                <input type="hidden" name="milestone_id" value="{{ m.id }}">
-                                <button type="submit" class="text-sm">
-                                    <i class="fa-regular {{ 'fa-square-check text-emerald-400' if m.completed else 'fa-square text-slate-500' }} text-lg"></i>
-                                </button>
-                            </form>
-                            <span class="text-sm font-medium text-slate-200 {{ 'line-through-fade' if m.completed }}">
-                                {{ m.title }}
-                            </span>
-                        </div>
-
-                        <div class="flex items-center space-x-3">
-                            <span class="text-xs font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-                                Day {{ m.day }}
-                            </span>
-                            <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="delete_milestone">
-                                <input type="hidden" name="milestone_id" value="{{ m.id }}">
-                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
-                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                </button>
-                            </form>
-                        </div>
+                {% for m in milestones %}
+                <div id="monthly-milestone-item-{{ m.id }}"
+                    class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <button type="button" onclick="handleToggleMilestoneAJAX('{{ m.id }}', {{ selected_year }}, {{ selected_month }}, this)" class="text-sm">
+                            <i class="fa-regular {{ 'fa-square-check text-emerald-400' if m.completed else 'fa-square text-slate-500' }} text-lg"></i>
+                        </button>
+                        <span class="milestone-title-text text-sm font-medium text-slate-200 {{ 'line-through-fade' if m.completed }}">
+                            {{ m.title }}
+                        </span>
                     </div>
-                    {% endfor %}
+
+                    <div class="flex items-center space-x-3">
+                        <span
+                            class="text-xs font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                            Day {{ m.day }}
+                        </span>
+                        <button type="button" onclick="handleDeleteMilestoneAJAX('{{ m.id }}', {{ selected_year }}, {{ selected_month }}, this)"
+                            class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Milestone">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
                 {% else %}
-                    <p class="text-sm text-slate-400 text-center py-6">No milestones scheduled.</p>
+                <p id="no-milestones-msg" class="text-sm text-slate-400 text-center py-6">No milestones scheduled.</p>
                 {% endif %}
             </div>
         </div>
@@ -220,7 +268,8 @@
     <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-700/50 gap-2">
             <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                <div
+                    class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
                     <i class="fa-solid fa-calendar-days text-base"></i>
                 </div>
                 <div>
@@ -256,7 +305,8 @@
                 <!-- Weekday Headers -->
                 <div class="grid grid-cols-7 gap-2.5 mb-2.5 text-center">
                     {% for day_name in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
-                    <div class="py-2 rounded-xl bg-slate-800/80 border border-slate-700/50 text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    <div
+                        class="py-2 rounded-xl bg-slate-800/80 border border-slate-700/50 text-xs font-semibold text-slate-300 uppercase tracking-wider">
                         {{ day_name[:3] }}
                     </div>
                     {% endfor %}
@@ -267,108 +317,117 @@
                     {% for week in month_weeks %}
                     <div class="grid grid-cols-7 gap-2.5">
                         {% for d in week %}
-                            {% set is_curr = (d.month == selected_month) %}
-                            {% set is_today = (d == today) %}
-                            {% set day_str = d.day|string %}
-                            {% set day_data = calendar_days.get(day_str, {}) if is_curr else {} %}
-                            {% set items = day_data.get('items', []) %}
-                            {% set sticker = day_data.get('sticker', '') %}
-                            {% set day_image = day_data.get('image_url', '') %}
+                        {% set is_curr = (d.month == selected_month) %}
+                        {% set is_today = (d == today) %}
+                        {% set day_str = d.day|string %}
+                        {% set day_data = calendar_days.get(day_str, {}) if is_curr else {} %}
+                        {% set items = day_data.get('items', []) %}
+                        {% set sticker = day_data.get('sticker', '') %}
+                        {% set day_image = day_data.get('image_url', '') %}
 
-                            <div class="min-h-[140px] rounded-2xl p-2.5 border flex flex-col justify-between transition-all group relative {{ 'bg-brand-950/20 border-brand-500 shadow-lg shadow-brand-500/10' if (is_curr and is_today) else ('bg-slate-800/60 border-slate-700/60 hover:border-slate-600' if is_curr else 'bg-slate-900/30 border-slate-800/40 opacity-40') }}">
-                                
-                                <!-- Top Row: Date Badge & Sticker / Image Indicator -->
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-1.5">
-                                        <a href="{{ url_for('planner.daily', date=d.strftime('%Y-%m-%d')) }}" class="px-2 py-0.5 rounded-lg text-xs font-bold transition-all hover:scale-105 inline-flex items-center space-x-1 {{ 'bg-brand-600 text-white shadow-sm hover:bg-brand-500' if (is_curr and is_today) else ('bg-slate-700/80 text-slate-200 hover:bg-slate-600 hover:text-white' if is_curr else 'bg-slate-800/40 text-slate-500 hover:text-slate-300') }}" title="Open Daily Planner for {{ d.strftime('%Y-%m-%d') }}">
-                                            {% if not is_curr %}
-                                                <span>{{ calendar.month_abbr[d.month] }} {{ d.day }}</span>
-                                            {% else %}
-                                                <span>{{ d.day }}</span>
-                                            {% endif %}
-                                        </a>
-                                        {% if is_curr and is_today %}
-                                        <a href="{{ url_for('planner.daily', date=d.strftime('%Y-%m-%d')) }}" class="text-[10px] font-bold text-brand-400 hover:text-brand-300 uppercase tracking-tight" title="Open Today's Daily Planner">Today</a>
-                                        {% endif %}
-                                    </div>
+                        <div id="calendar-day-cell-{{ d.day }}"
+                            class="min-h-[140px] rounded-2xl p-2.5 border flex flex-col justify-between transition-all group relative {{ 'bg-brand-950/20 border-brand-500 shadow-lg shadow-brand-500/10' if (is_curr and is_today) else ('bg-slate-800/60 border-slate-700/60 hover:border-slate-600' if is_curr else 'bg-slate-900/30 border-slate-800/40 opacity-40') }}">
 
-                                    <!-- Day Sticker / Image Badge -->
-                                    <div class="flex items-center space-x-1 group/sticker relative">
-                                        {% if sticker %}
-                                        <span class="text-base leading-none" title="Day Sticker">{{ sticker }}</span>
+                            <!-- Top Row: Date Badge & Sticker / Image Indicator -->
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-1.5">
+                                    <a href="{{ url_for('planner.daily', date=d.strftime('%Y-%m-%d')) }}"
+                                        class="px-2 py-0.5 rounded-lg text-xs font-bold transition-all hover:scale-105 inline-flex items-center space-x-1 {{ 'bg-brand-600 text-white shadow-sm hover:bg-brand-500' if (is_curr and is_today) else ('bg-slate-700/80 text-slate-200 hover:bg-slate-600 hover:text-white' if is_curr else 'bg-slate-800/40 text-slate-500 hover:text-slate-300') }}"
+                                        title="Open Daily Planner for {{ d.strftime('%Y-%m-%d') }}">
+                                        {% if not is_curr %}
+                                        <span>{{ calendar.month_abbr[d.month] }} {{ d.day }}</span>
+                                        {% else %}
+                                        <span>{{ d.day }}</span>
                                         {% endif %}
-                                        {% if day_image %}
-                                        <img src="{{ day_image }}" alt="Sticker" class="w-5 h-5 rounded object-cover border border-slate-600 shadow-sm" title="Attached Image">
-                                        {% endif %}
-                                        {% if is_curr and (sticker or day_image) %}
-                                        <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline opacity-0 group-hover/sticker:opacity-100 transition-opacity">
-                                            <input type="hidden" name="action" value="delete_day_sticker">
-                                            <input type="hidden" name="day" value="{{ d.day }}">
-                                            <button type="submit" class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors" title="Delete Day Emoji/Sticker">
-                                                <i class="fa-solid fa-xmark text-[9px]"></i>
-                                            </button>
-                                        </form>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <!-- Middle Section: Single Column List Table of Target Dates & Plans -->
-                                <div class="my-2 flex-1 space-y-1.5 overflow-y-auto max-h-[110px] pr-0.5">
-                                    {% if is_curr and items %}
-                                        {% for item in items %}
-                                            {% set badge_bg = 'bg-rose-500/15 border-rose-500/30 text-rose-300' if item.type == 'deadline' else ('bg-amber-500/15 border-amber-500/30 text-amber-300' if item.type == 'target' else 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300') %}
-                                            <div class="calendar-item-card p-1.5 rounded-xl border {{ badge_bg }} flex items-center justify-between text-xs group/item shadow-sm relative transition-all hover:scale-[1.02]"
-                                                 data-title="{{ item.text }}"
-                                                 data-type="{{ item.type }}"
-                                                 data-date="{{ month_name }} {{ d.day }}, {{ selected_year }}"
-                                                 data-sticker="{{ item.sticker or '' }}"
-                                                 data-image="{{ item.image_url or '' }}"
-                                                 onmouseenter="showItemCard(event, this)"
-                                                 onmousemove="positionItemCard(event)"
-                                                 onmouseleave="hideItemCard()">
-                                                <div class="flex items-center space-x-1.5 overflow-hidden flex-1 cursor-pointer" 
-                                                     onclick="openEditCalendarModal({{ d.day }}, '{{ item.id }}', '{{ item.text|escape }}', '{{ item.type }}', '{{ item.sticker|escape }}', '{{ item.image_url|escape }}')">
-                                                    {% if item.sticker %}
-                                                    <span class="text-sm leading-none flex-shrink-0">{{ item.sticker }}</span>
-                                                    {% endif %}
-                                                    {% if item.image_url %}
-                                                    <img src="{{ item.image_url }}" alt="Img" class="w-4 h-4 rounded object-cover flex-shrink-0 border border-slate-600">
-                                                    {% endif %}
-                                                    <span class="font-medium truncate text-[11px] leading-tight" title="{{ item.text }}">{{ item.text }}</span>
-                                                </div>
-
-                                                <!-- Item Actions: Edit & Delete -->
-                                                <div class="opacity-0 group-hover/item:opacity-100 transition-opacity ml-1 flex-shrink-0 flex items-center space-x-1">
-                                                    <button type="button" 
-                                                            onclick="openEditCalendarModal({{ d.day }}, '{{ item.id }}', '{{ item.text|escape }}', '{{ item.type }}', '{{ item.sticker|escape }}', '{{ item.image_url|escape }}')" 
-                                                            class="text-slate-400 hover:text-indigo-300 p-0.5 transition-colors" 
-                                                            title="Edit Plan">
-                                                        <i class="fa-solid fa-pen-to-square text-[10px]"></i>
-                                                    </button>
-                                                    <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline">
-                                                        <input type="hidden" name="action" value="delete_calendar_item">
-                                                        <input type="hidden" name="day" value="{{ d.day }}">
-                                                        <input type="hidden" name="item_id" value="{{ item.id }}">
-                                                        <button type="submit" class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors" title="Delete">
-                                                            <i class="fa-solid fa-xmark text-[10px]"></i>
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
+                                    </a>
+                                    {% if is_curr and is_today %}
+                                    <a href="{{ url_for('planner.daily', date=d.strftime('%Y-%m-%d')) }}"
+                                        class="text-[10px] font-bold text-brand-400 hover:text-brand-300 uppercase tracking-tight"
+                                        title="Open Today's Daily Planner">Today</a>
                                     {% endif %}
                                 </div>
 
-                                <!-- Bottom Row: Action Button to Add Target / Deadline / Sticker -->
-                                {% if is_curr %}
-                                <div class="pt-1 border-t border-slate-700/40 flex items-center justify-between opacity-80 group-hover:opacity-100 transition-opacity">
-                                    <button type="button" onclick="openCalendarModal({{ d.day }})" class="w-full text-center py-1 rounded-lg bg-slate-700/40 hover:bg-brand-600 hover:text-white text-[11px] font-medium text-slate-300 transition-colors flex items-center justify-center space-x-1">
-                                        <i class="fa-solid fa-plus text-[10px]"></i>
-                                        <span>Add Plan / Sticker</span>
+                                <!-- Day Sticker / Image Badge -->
+                                <div class="flex items-center space-x-1 group/sticker relative">
+                                    {% if sticker %}
+                                    <span class="text-base leading-none" title="Day Sticker">{{ sticker }}</span>
+                                    {% endif %}
+                                    {% if day_image %}
+                                    <img src="{{ day_image }}" alt="Sticker"
+                                        class="w-5 h-5 rounded object-cover border border-slate-600 shadow-sm"
+                                        title="Attached Image">
+                                    {% endif %}
+                                    {% if is_curr and (sticker or day_image) %}
+                                    <button type="button" onclick="handleDeleteDayStickerAJAX({{ d.day }}, {{ selected_year }}, {{ selected_month }}, this)"
+                                        class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors opacity-0 group-hover/sticker:opacity-100 transition-opacity"
+                                        title="Delete Day Emoji/Sticker">
+                                        <i class="fa-solid fa-xmark text-[9px]"></i>
                                     </button>
+                                    {% endif %}
                                 </div>
+                            </div>
+
+                            <!-- Middle Section: Single Column List Table of Target Dates & Plans -->
+                            <div class="calendar-day-items-container my-2 flex-1 space-y-1.5 overflow-y-auto max-h-[110px] pr-0.5">
+                                {% if is_curr and items %}
+                                {% for item in items %}
+                                {% set badge_bg = 'bg-rose-500/15 border-rose-500/30 text-rose-300' if item.type ==
+                                'deadline' else ('bg-amber-500/15 border-amber-500/30 text-amber-300' if item.type ==
+                                'target' else 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300') %}
+                                <div class="calendar-item-card p-1.5 rounded-xl border {{ badge_bg }} flex items-center justify-between text-xs group/item shadow-sm relative transition-all hover:scale-[1.02]"
+                                    data-title="{{ item.text }}" data-type="{{ item.type }}"
+                                    data-date="{{ month_name }} {{ d.day }}, {{ selected_year }}"
+                                    data-sticker="{{ item.sticker or '' }}" data-image="{{ item.image_url or '' }}"
+                                    onmouseenter="showItemCard(event, this)" onmousemove="positionItemCard(event)"
+                                    onmouseleave="hideItemCard()">
+                                    <div class="flex items-center space-x-1.5 overflow-hidden flex-1 cursor-pointer"
+                                        onclick="openEditCalendarModal({{ d.day }}, '{{ item.id }}', '{{ item.text|escape }}', '{{ item.type }}', '{{ item.sticker|escape }}', '{{ item.image_url|escape }}', {{ 'true' if item.get('remind_me') else 'false' }})">
+                                        {% if item.get('remind_me') %}
+                                        <span class="text-xs leading-none flex-shrink-0" title="Active Reminder">🔔</span>
+                                        {% endif %}
+                                        {% if item.sticker %}
+                                        <span class="text-sm leading-none flex-shrink-0">{{ item.sticker }}</span>
+                                        {% endif %}
+                                        {% if item.image_url %}
+                                        <img src="{{ item.image_url }}" alt="Img"
+                                            class="w-4 h-4 rounded object-cover flex-shrink-0 border border-slate-600">
+                                        {% endif %}
+                                        <span class="font-medium truncate text-[11px] leading-tight"
+                                            title="{{ item.text }}">{{ item.text }}</span>
+                                    </div>
+
+                                    <!-- Item Actions: Edit & Delete -->
+                                    <div
+                                        class="opacity-0 group-hover/item:opacity-100 transition-opacity ml-1 flex-shrink-0 flex items-center space-x-1">
+                                        <button type="button"
+                                            onclick="openEditCalendarModal({{ d.day }}, '{{ item.id }}', '{{ item.text|escape }}', '{{ item.type }}', '{{ item.sticker|escape }}', '{{ item.image_url|escape }}', {{ 'true' if item.get('remind_me') else 'false' }})"
+                                            class="text-slate-400 hover:text-indigo-300 p-0.5 transition-colors"
+                                            title="Edit Plan">
+                                            <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                                        </button>
+                                        <button type="button" onclick="handleDeleteCalendarItemAJAX({{ d.day }}, '{{ item.id }}', {{ selected_year }}, {{ selected_month }}, this)"
+                                            class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors"
+                                            title="Delete">
+                                            <i class="fa-solid fa-xmark text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endfor %}
                                 {% endif %}
                             </div>
+
+                            <!-- Bottom Row: Action Button to Add Target / Deadline / Sticker -->
+                            {% if is_curr %}
+                            <div
+                                class="pt-1 border-t border-slate-700/40 flex items-center justify-between opacity-80 group-hover:opacity-100 transition-opacity">
+                                <button type="button" onclick="openCalendarModal({{ d.day }})"
+                                    class="w-full text-center py-1 rounded-lg bg-slate-700/40 hover:bg-brand-600 hover:text-white text-[11px] font-medium text-slate-300 transition-colors flex items-center justify-center space-x-1">
+                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                    <span>Add Plan / Sticker</span>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
                         {% endfor %}
                     </div>
                     {% endfor %}
@@ -389,10 +448,13 @@
         </div>
 
         <!-- Add Habit Form -->
-        <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+        <form id="add-habit-form" onsubmit="handleAddHabitAJAX(event, {{ selected_year }}, {{ selected_month }})"
+            class="flex flex-col sm:flex-row gap-3">
             <input type="hidden" name="action" value="add_habit">
-            <input type="text" name="habit_name" required placeholder="Add a new habit (e.g. Read 20 mins, Workout)..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-indigo-500/20 transition-all flex items-center justify-center space-x-1.5 whitespace-nowrap">
+            <input type="text" id="habit-name-input" name="habit_name" required placeholder="Add a new habit (e.g. Read 20 mins, Workout)..."
+                class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <button type="submit"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-indigo-500/20 transition-all flex items-center justify-center space-x-1.5 whitespace-nowrap">
                 <i class="fa-solid fa-plus text-xs"></i>
                 <span>Add Habit</span>
             </button>
@@ -404,36 +466,39 @@
             <table class="w-full text-left habit-table">
                 <thead>
                     <tr>
-                        <th class="py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider min-w-[150px] sticky left-0 bg-slate-900/95 backdrop-blur z-10 border-r border-slate-800">Habit</th>
+                        <th
+                            class="py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider min-w-[150px] sticky left-0 bg-slate-900/95 backdrop-blur z-10 border-r border-slate-800">
+                            Habit</th>
                         {% for d in range(1, days_in_month + 1) %}
                         <th class="py-2 text-center text-[10px] font-bold text-slate-400 w-[26px]">{{ d }}</th>
                         {% endfor %}
-                        <th class="py-2 px-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider min-w-[70px]">Actions</th>
+                        <th
+                            class="py-2 px-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider min-w-[70px]">
+                            Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60">
+                <tbody id="habit-table-body" class="divide-y divide-slate-800/60">
                     {% for habit in habits %}
-                    <tr>
-                        <td class="py-2.5 px-3 text-sm font-medium text-slate-200 sticky left-0 bg-slate-900/95 backdrop-blur z-10 border-r border-slate-800">
+                    <tr id="monthly-habit-row-{{ habit.id }}">
+                        <td
+                            class="py-2.5 px-3 text-sm font-medium text-slate-200 sticky left-0 bg-slate-900/95 backdrop-blur z-10 border-r border-slate-800">
                             {{ habit.name }}
                         </td>
                         {% for d in range(1, days_in_month + 1) %}
-                            {% set is_done = d in habit.completed_days %}
-                            <td class="py-2 text-center">
-                                <div class="habit-cell {{ 'habit-cell-active' if is_done else 'habit-cell-inactive' }} mx-auto"
-                                     onclick="toggleHabitDay({{ selected_year }}, {{ selected_month }}, '{{ habit.id }}', {{ d }}, this)">
-                                    {{ d if is_done else '•' }}
-                                </div>
-                            </td>
+                        {% set is_done = d in habit.completed_days %}
+                        <td class="py-2 text-center">
+                            <div class="habit-cell {{ 'habit-cell-active' if is_done else 'habit-cell-inactive' }} mx-auto"
+                                onclick="toggleHabitDay({{ selected_year }}, {{ selected_month }}, '{{ habit.id }}', {{ d }}, this)">
+                                {{ d if is_done else '•' }}
+                            </div>
+                        </td>
                         {% endfor %}
                         <td class="py-2.5 px-3 text-right">
-                            <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="delete_habit">
-                                <input type="hidden" name="habit_id" value="{{ habit.id }}">
-                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Habit">
-                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                </button>
-                            </form>
+                            <button type="button" onclick="handleDeleteHabitAJAX('{{ habit.id }}', {{ selected_year }}, {{ selected_month }}, this)"
+                                class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors"
+                                title="Delete Habit">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -441,148 +506,180 @@
             </table>
         </div>
         {% else %}
-        <div class="text-center py-8 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
+        <div id="no-habits-msg" class="text-center py-8 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
             <p class="text-slate-400 text-sm">No habits created for {{ month_name }} yet.</p>
         </div>
         {% endif %}
     </div>
 
-<!-- Calendar Day Item & Sticker Modal -->
-<div id="calendar-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4">
-    <div class="glass-panel max-w-lg w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-5 animate-floatToastIn">
-        <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
-            <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-xl bg-brand-600/20 border border-brand-500/30 flex items-center justify-center text-brand-400">
-                    <i class="fa-solid fa-calendar-plus text-sm"></i>
+    <!-- Calendar Day Item & Sticker Modal -->
+    <div id="calendar-modal"
+        class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4">
+        <div
+            class="glass-panel max-w-lg w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-5 animate-floatToastIn">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+                <div class="flex items-center space-x-3">
+                    <div
+                        class="w-8 h-8 rounded-xl bg-brand-600/20 border border-brand-500/30 flex items-center justify-center text-brand-400">
+                        <i class="fa-solid fa-calendar-plus text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white" id="modal-title-text">Add Calendar Item / Sticker
+                        </h3>
+                        <p class="text-xs text-slate-400">Target day: <span id="modal-day-display"
+                                class="font-semibold text-brand-400">Day 1</span></p>
+                    </div>
                 </div>
+                <button type="button" onclick="closeCalendarModal()"
+                    class="text-slate-400 hover:text-white transition-colors p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="calendar-modal-form" onsubmit="handleSaveCalendarItemAJAX(event, {{ selected_year }}, {{ selected_month }})" method="POST"
+                class="space-y-4">
+                <input type="hidden" name="action" id="modal-action-input" value="add_calendar_item">
+                <input type="hidden" name="day" id="modal-day-input" value="1">
+                <input type="hidden" name="item_id" id="modal-item-id-input" value="">
+
+                <!-- Item Text -->
                 <div>
-                    <h3 class="text-base font-bold text-white" id="modal-title-text">Add Calendar Item / Sticker</h3>
-                    <p class="text-xs text-slate-400">Target day: <span id="modal-day-display" class="font-semibold text-brand-400">Day 1</span></p>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Plan /
+                        Deadline Description</label>
+                    <input type="text" name="item_text" id="modal-item-text" required
+                        placeholder="e.g. Q3 Financial Report Deadline..."
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 </div>
-            </div>
-            <button type="button" onclick="closeCalendarModal()" class="text-slate-400 hover:text-white transition-colors p-1">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-        </div>
 
-        <form action="{{ url_for('planner.monthly', year=selected_year, month=selected_month) }}" method="POST" class="space-y-4">
-            <input type="hidden" name="action" id="modal-action-input" value="add_calendar_item">
-            <input type="hidden" name="day" id="modal-day-input" value="1">
-            <input type="hidden" name="item_id" id="modal-item-id-input" value="">
+                <!-- Item Type Selection -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Category
+                        Type</label>
+                    <select name="item_type" id="modal-item-type"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="deadline">🚨 Deadline (Rose Alert)</option>
+                        <option value="target">🎯 Target Date (Amber Highlight)</option>
+                        <option value="plan">📝 Plan Item (Indigo Accent)</option>
+                    </select>
+                </div>
 
-            <!-- Item Text -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Plan / Deadline Description</label>
-                <input type="text" name="item_text" id="modal-item-text" required placeholder="e.g. Q3 Financial Report Deadline..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            </div>
+                <!-- Quick Sticker / Emoji Selection -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Sticker /
+                        Emoji</label>
+                    <div class="flex flex-wrap gap-2 mb-2" id="sticker-quick-select">
+                        {% for emoji in ['🚀', '🎯', '💡', '🔥', '⭐', '📌', '🎉', '📝', '🏆', '⏰', '⚡', '🏖️', '💻'] %}
+                        <button type="button" onclick="selectSticker('{{ emoji }}')"
+                            class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-brand-600/30 border border-slate-700 text-lg flex items-center justify-center transition-all hover:scale-110">
+                            {{ emoji }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <input type="text" name="sticker" id="modal-sticker-input" placeholder="Selected emoji sticker..."
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
 
-            <!-- Item Type Selection -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Category Type</label>
-                <select name="item_type" id="modal-item-type" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                    <option value="deadline">🚨 Deadline (Rose Alert)</option>
-                    <option value="target">🎯 Target Date (Amber Highlight)</option>
-                    <option value="plan">📝 Plan Item (Indigo Accent)</option>
-                </select>
-            </div>
+                <!-- Optional Image URL -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Image URL
+                        / Sticker Badge (Optional)</label>
+                    <input type="url" name="image_url" id="modal-image-input"
+                        placeholder="https://example.com/sticker.png"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
 
-            <!-- Quick Sticker / Emoji Selection -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Sticker / Emoji</label>
-                <div class="flex flex-wrap gap-2 mb-2" id="sticker-quick-select">
-                    {% for emoji in ['🚀', '🎯', '💡', '🔥', '⭐', '📌', '🎉', '📝', '🏆', '⏰', '⚡', '🏖️', '💻'] %}
-                    <button type="button" onclick="selectSticker('{{ emoji }}')" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-brand-600/30 border border-slate-700 text-lg flex items-center justify-center transition-all hover:scale-110">
-                        {{ emoji }}
+                <!-- Remind Me Checkbox Option -->
+                <div class="flex items-center space-x-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <input type="checkbox" name="remind_me" id="modal-remind-input" value="true" class="custom-checkbox flex-shrink-0">
+                    <label for="modal-remind-input" class="text-xs font-semibold text-slate-200 cursor-pointer flex items-center space-x-1.5 select-none">
+                        <span class="text-sm">🔔</span>
+                        <span>Remind Me (Shows in Active Reminders on Dashboard when date is today)</span>
+                    </label>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-700/60">
+                    <button type="button" onclick="closeCalendarModal()"
+                        class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white transition-colors">
+                        Cancel
                     </button>
-                    {% endfor %}
+                    <button type="submit"
+                        class="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-check text-xs"></i>
+                        <span>Save to Calendar</span>
+                    </button>
                 </div>
-                <input type="text" name="sticker" id="modal-sticker-input" placeholder="Selected emoji sticker..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            </div>
-
-            <!-- Optional Image URL -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Image URL / Sticker Badge (Optional)</label>
-                <input type="url" name="image_url" id="modal-image-input" placeholder="https://example.com/sticker.png" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            </div>
-
-            <!-- Actions -->
-            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-700/60">
-                <button type="button" onclick="closeCalendarModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white transition-colors">
-                    Cancel
-                </button>
-                <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1.5">
-                    <i class="fa-solid fa-check text-xs"></i>
-                    <span>Save to Calendar</span>
-                </button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
-</div>
 
-<!-- Floating Hover Item Detail Card -->
-<div id="item-hover-card" class="fixed z-[100] pointer-events-none opacity-0 scale-95 transition-all duration-200 ease-out glass-panel max-w-sm w-80 p-4 rounded-2xl border border-slate-700 shadow-2xl backdrop-blur-md bg-slate-900/95 space-y-2.5 text-slate-100">
-</div>
+    <!-- Floating Hover Item Detail Card -->
+    <div id="item-hover-card"
+        class="fixed z-[100] pointer-events-none opacity-0 scale-95 transition-all duration-200 ease-out glass-panel max-w-sm w-80 p-4 rounded-2xl border border-slate-700 shadow-2xl backdrop-blur-md bg-slate-900/95 space-y-2.5 text-slate-100">
+    </div>
 
-<script>
-function openCalendarModal(dayNum) {
-    document.getElementById('modal-action-input').value = 'add_calendar_item';
-    document.getElementById('modal-item-id-input').value = '';
-    document.getElementById('modal-title-text').innerText = 'Add Calendar Item / Sticker';
-    document.getElementById('modal-day-input').value = dayNum;
-    document.getElementById('modal-day-display').innerText = 'Day ' + dayNum;
-    document.getElementById('modal-item-text').value = '';
-    document.getElementById('modal-item-type').value = 'deadline';
-    document.getElementById('modal-sticker-input').value = '';
-    document.getElementById('modal-image-input').value = '';
-    document.getElementById('calendar-modal').classList.remove('hidden');
-}
+    <script>
+        function openCalendarModal(dayNum) {
+            document.getElementById('modal-action-input').value = 'add_calendar_item';
+            document.getElementById('modal-item-id-input').value = '';
+            document.getElementById('modal-title-text').innerText = 'Add Calendar Item / Sticker';
+            document.getElementById('modal-day-input').value = dayNum;
+            document.getElementById('modal-day-display').innerText = 'Day ' + dayNum;
+            document.getElementById('modal-item-text').value = '';
+            document.getElementById('modal-item-type').value = 'deadline';
+            document.getElementById('modal-sticker-input').value = '';
+            document.getElementById('modal-image-input').value = '';
+            document.getElementById('modal-remind-input').checked = false;
+            document.getElementById('calendar-modal').classList.remove('hidden');
+        }
 
-function openEditCalendarModal(dayNum, itemId, itemText, itemType, sticker, imageUrl) {
-    document.getElementById('modal-action-input').value = 'edit_calendar_item';
-    document.getElementById('modal-item-id-input').value = itemId;
-    document.getElementById('modal-title-text').innerText = 'Edit Calendar Item / Sticker';
-    document.getElementById('modal-day-input').value = dayNum;
-    document.getElementById('modal-day-display').innerText = 'Day ' + dayNum;
-    document.getElementById('modal-item-text').value = itemText;
-    document.getElementById('modal-item-type').value = itemType || 'plan';
-    document.getElementById('modal-sticker-input').value = sticker || '';
-    document.getElementById('modal-image-input').value = imageUrl || '';
-    document.getElementById('calendar-modal').classList.remove('hidden');
-}
+        function openEditCalendarModal(dayNum, itemId, itemText, itemType, sticker, imageUrl, remindMe) {
+            document.getElementById('modal-action-input').value = 'edit_calendar_item';
+            document.getElementById('modal-item-id-input').value = itemId;
+            document.getElementById('modal-title-text').innerText = 'Edit Calendar Item / Sticker';
+            document.getElementById('modal-day-input').value = dayNum;
+            document.getElementById('modal-day-display').innerText = 'Day ' + dayNum;
+            document.getElementById('modal-item-text').value = itemText;
+            document.getElementById('modal-item-type').value = itemType || 'plan';
+            document.getElementById('modal-sticker-input').value = sticker || '';
+            document.getElementById('modal-image-input').value = imageUrl || '';
+            document.getElementById('modal-remind-input').checked = (remindMe === true || remindMe === 'true' || remindMe === 1 || remindMe === '1');
+            document.getElementById('calendar-modal').classList.remove('hidden');
+        }
 
-function closeCalendarModal() {
-    document.getElementById('calendar-modal').classList.add('hidden');
-}
+        function closeCalendarModal() {
+            document.getElementById('calendar-modal').classList.add('hidden');
+        }
 
-function selectSticker(emoji) {
-    document.getElementById('modal-sticker-input').value = emoji;
-}
+        function selectSticker(emoji) {
+            document.getElementById('modal-sticker-input').value = emoji;
+        }
 
-function showItemCard(event, element) {
-    const card = document.getElementById('item-hover-card');
-    if (!card) return;
+        function showItemCard(event, element) {
+            const card = document.getElementById('item-hover-card');
+            if (!card) return;
 
-    const title = element.getAttribute('data-title') || '';
-    const type = element.getAttribute('data-type') || 'plan';
-    const dateStr = element.getAttribute('data-date') || '';
-    const sticker = element.getAttribute('data-sticker') || '';
-    const image = element.getAttribute('data-image') || '';
+            const title = element.getAttribute('data-title') || '';
+            const type = element.getAttribute('data-type') || 'plan';
+            const dateStr = element.getAttribute('data-date') || '';
+            const sticker = element.getAttribute('data-sticker') || '';
+            const image = element.getAttribute('data-image') || '';
 
-    let typeBadge = '';
-    if (type === 'deadline') {
-        typeBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/30">🚨 Deadline</span>';
-    } else if (type === 'target') {
-        typeBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">🎯 Target Date</span>';
-    } else {
-        typeBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">📝 Plan Item</span>';
-    }
+            let typeBadge = '';
+            if (type === 'deadline') {
+                typeBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/30">🚨 Deadline</span>';
+            } else if (type === 'target') {
+                typeBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">🎯 Target Date</span>';
+            } else {
+                typeBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">📝 Plan Item</span>';
+            }
 
-    let imageHtml = '';
-    if (image) {
-        imageHtml = `<img src="${image}" class="w-full max-h-40 rounded-xl object-cover border border-slate-700/80 shadow-md mt-2" alt="Attachment">`;
-    }
+            let imageHtml = '';
+            if (image) {
+                imageHtml = `<img src="${image}" class="w-full max-h-40 rounded-xl object-cover border border-slate-700/80 shadow-md mt-2" alt="Attachment">`;
+            }
 
-    card.innerHTML = `
+            card.innerHTML = `
         <div class="flex items-center justify-between gap-2 pb-2 border-b border-slate-700/60">
             <span class="text-xs font-semibold text-slate-300"><i class="fa-regular fa-calendar text-brand-400 mr-1.5"></i>${dateStr}</span>
             ${typeBadge}
@@ -596,36 +693,601 @@ function showItemCard(event, element) {
         ${imageHtml}
     `;
 
-    positionItemCard(event);
-    card.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
-    card.classList.add('opacity-100', 'scale-100');
-}
+            positionItemCard(event);
+            card.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+            card.classList.add('opacity-100', 'scale-100');
+        }
 
-function positionItemCard(event) {
-    const card = document.getElementById('item-hover-card');
-    if (!card) return;
+        function positionItemCard(event) {
+            const card = document.getElementById('item-hover-card');
+            if (!card) return;
 
-    const padding = 15;
-    let x = event.clientX + padding;
-    let y = event.clientY + padding;
+            const padding = 15;
+            let x = event.clientX + padding;
+            let y = event.clientY + padding;
 
-    const cardRect = card.getBoundingClientRect();
-    if (x + cardRect.width > window.innerWidth - padding) {
-        x = event.clientX - cardRect.width - padding;
-    }
-    if (y + cardRect.height > window.innerHeight - padding) {
-        y = event.clientY - cardRect.height - padding;
-    }
+            const cardRect = card.getBoundingClientRect();
+            if (x + cardRect.width > window.innerWidth - padding) {
+                x = event.clientX - cardRect.width - padding;
+            }
+            if (y + cardRect.height > window.innerHeight - padding) {
+                y = event.clientY - cardRect.height - padding;
+            }
 
-    card.style.left = `${Math.max(padding, x)}px`;
-    card.style.top = `${Math.max(padding, y)}px`;
-}
+            card.style.left = `${Math.max(padding, x)}px`;
+            card.style.top = `${Math.max(padding, y)}px`;
+        }
 
-function hideItemCard() {
-    const card = document.getElementById('item-hover-card');
-    if (!card) return;
-    card.classList.remove('opacity-100', 'scale-100');
-    card.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
-}
-</script>
-{% endblock %}
+        function hideItemCard() {
+            const card = document.getElementById('item-hover-card');
+            if (!card) return;
+            card.classList.remove('opacity-100', 'scale-100');
+            card.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+
+        function updateMonthlyGoalStats(data) {
+            if (data && data.completed_goals !== undefined && data.total_goals !== undefined) {
+                const counter = document.getElementById('monthly-goals-counter');
+                if (counter) counter.innerText = `${data.completed_goals}/${data.total_goals} Done`;
+            }
+        }
+
+        async function handleAddMonthlyGoalAJAX(e, year, month) {
+            e.preventDefault();
+            const input = document.getElementById('monthly-goal-input');
+            const catInput = document.getElementById('monthly-goal-category-input');
+            const title = input ? input.value.trim() : '';
+            const category = catInput ? catInput.value : 'Personal';
+            if (!title) return;
+
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'add_goal');
+                formData.append('goal_title', title);
+                formData.append('category', category);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success && data.goal) {
+                    input.value = '';
+                    const container = document.getElementById('monthly-goals-container');
+                    const noMsg = document.getElementById('no-monthly-goals-msg');
+                    if (noMsg) noMsg.remove();
+
+                    const g = data.goal;
+                    const newElem = document.createElement('div');
+                    newElem.id = `monthly-goal-item-${g.id}`;
+                    newElem.className = 'p-4 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between';
+                    newElem.innerHTML = `
+                        <div class="space-y-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-700 text-slate-300">
+                                    ${escapeHTML(g.category)}
+                                </span>
+                                <h3 class="goal-title-text text-sm font-semibold text-slate-100">
+                                    ${escapeHTML(g.title)}
+                                </h3>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button type="button" onclick="handleToggleMonthlyGoalAJAX('${g.id}', ${year}, ${month}, this)" class="goal-status-btn text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-slate-700 text-slate-300 hover:bg-slate-600">
+                                ${escapeHTML(g.status || 'In Progress')}
+                            </button>
+                            <button type="button" onclick="handleDeleteMonthlyGoalAJAX('${g.id}', ${year}, ${month}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Goal">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(newElem);
+                    updateMonthlyGoalStats(data);
+                    if (window.showToast) showToast(data.message || 'Goal added!', 'success');
+                } else {
+                    if (window.showToast) showToast(data.message || 'Failed to add goal', 'danger');
+                }
+            } catch (err) {
+                console.error('Error adding monthly goal:', err);
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+
+        async function handleToggleMonthlyGoalAJAX(goalId, year, month, btnElem) {
+            const parentDiv = btnElem.closest('.p-4') || btnElem.parentElement.parentElement;
+            const textSpan = parentDiv.querySelector('.goal-title-text');
+            const isCurrentlyCompleted = btnElem.innerText.trim() === 'Completed';
+
+            if (isCurrentlyCompleted) {
+                btnElem.innerText = 'In Progress';
+                btnElem.className = 'goal-status-btn text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-slate-700 text-slate-300 hover:bg-slate-600';
+                if (textSpan) textSpan.classList.remove('line-through-fade');
+            } else {
+                btnElem.innerText = 'Completed';
+                btnElem.className = 'goal-status-btn text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+                if (textSpan) textSpan.classList.add('line-through-fade');
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'toggle_goal_status');
+                formData.append('goal_id', goalId);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    updateMonthlyGoalStats(data);
+                } else {
+                    if (isCurrentlyCompleted) {
+                        btnElem.innerText = 'Completed';
+                        btnElem.className = 'goal-status-btn text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+                        if (textSpan) textSpan.classList.add('line-through-fade');
+                    } else {
+                        btnElem.innerText = 'In Progress';
+                        btnElem.className = 'goal-status-btn text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-slate-700 text-slate-300 hover:bg-slate-600';
+                        if (textSpan) textSpan.classList.remove('line-through-fade');
+                    }
+                }
+            } catch (err) {
+                console.error('Error toggling goal status:', err);
+            }
+        }
+
+        async function handleDeleteMonthlyGoalAJAX(goalId, year, month, btnElem) {
+            const itemElem = document.getElementById(`monthly-goal-item-${goalId}`) || btnElem.closest('.p-4');
+            if (itemElem) itemElem.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'delete_goal');
+                formData.append('goal_id', goalId);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    if (itemElem) itemElem.remove();
+                    const container = document.getElementById('monthly-goals-container');
+                    if (container && container.querySelectorAll('.p-4').length === 0) {
+                        const cascaded = container.querySelector('.bg-purple-950\\/20');
+                        if (!cascaded) {
+                            container.innerHTML = '<p id="no-monthly-goals-msg" class="text-sm text-slate-400 text-center py-6">No goals defined for this month.</p>';
+                        }
+                    }
+                    updateMonthlyGoalStats(data);
+                    if (window.showToast) showToast(data.message || 'Goal removed.', 'info');
+                } else {
+                    if (itemElem) itemElem.style.display = '';
+                }
+            } catch (err) {
+                if (itemElem) itemElem.style.display = '';
+                console.error('Error deleting goal:', err);
+            }
+        }
+
+        async function handleAddMilestoneAJAX(e, year, month) {
+            e.preventDefault();
+            const titleInput = document.getElementById('milestone-title-input');
+            const dayInput = document.getElementById('milestone-day-input');
+            const title = titleInput ? titleInput.value.trim() : '';
+            const day = dayInput ? dayInput.value.trim() : '';
+            if (!title) return;
+
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'add_milestone');
+                formData.append('milestone_title', title);
+                formData.append('target_day', day);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success && data.milestone) {
+                    titleInput.value = '';
+                    if (dayInput) dayInput.value = '';
+                    const container = document.getElementById('milestones-container');
+                    const noMsg = document.getElementById('no-milestones-msg');
+                    if (noMsg) noMsg.remove();
+
+                    const m = data.milestone;
+                    const newElem = document.createElement('div');
+                    newElem.id = `monthly-milestone-item-${m.id}`;
+                    newElem.className = 'p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between';
+                    newElem.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <button type="button" onclick="handleToggleMilestoneAJAX('${m.id}', ${year}, ${month}, this)" class="text-sm">
+                                <i class="fa-regular fa-square text-slate-500 text-lg"></i>
+                            </button>
+                            <span class="milestone-title-text text-sm font-medium text-slate-200">
+                                ${escapeHTML(m.title)}
+                            </span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                                Day ${escapeHTML(m.day)}
+                            </span>
+                            <button type="button" onclick="handleDeleteMilestoneAJAX('${m.id}', ${year}, ${month}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Milestone">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(newElem);
+                    if (window.showToast) showToast(data.message || 'Milestone added!', 'success');
+                } else {
+                    if (window.showToast) showToast(data.message || 'Failed to add milestone', 'danger');
+                }
+            } catch (err) {
+                console.error('Error adding milestone:', err);
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+
+        async function handleToggleMilestoneAJAX(msId, year, month, btnElem) {
+            const icon = btnElem.querySelector('i');
+            const parentDiv = btnElem.closest('.flex.items-center.space-x-3') || btnElem.parentElement;
+            const textSpan = parentDiv.querySelector('.milestone-title-text');
+            const isCurrentlyChecked = icon ? icon.classList.contains('fa-square-check') : false;
+
+            if (isCurrentlyChecked) {
+                if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+                if (textSpan) textSpan.classList.remove('line-through-fade');
+            } else {
+                if (icon) icon.className = 'fa-regular fa-square-check text-emerald-400 text-lg';
+                if (textSpan) textSpan.classList.add('line-through-fade');
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'toggle_milestone');
+                formData.append('milestone_id', msId);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (!data.success) {
+                    if (isCurrentlyChecked) {
+                        if (icon) icon.className = 'fa-regular fa-square-check text-emerald-400 text-lg';
+                        if (textSpan) textSpan.classList.add('line-through-fade');
+                    } else {
+                        if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+                        if (textSpan) textSpan.classList.remove('line-through-fade');
+                    }
+                }
+            } catch (err) {
+                console.error('Error toggling milestone:', err);
+            }
+        }
+
+        async function handleDeleteMilestoneAJAX(msId, year, month, btnElem) {
+            const itemElem = document.getElementById(`monthly-milestone-item-${msId}`) || btnElem.closest('.p-3\\.5');
+            if (itemElem) itemElem.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'delete_milestone');
+                formData.append('milestone_id', msId);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    if (itemElem) itemElem.remove();
+                    const container = document.getElementById('milestones-container');
+                    if (container && container.querySelectorAll('.p-3\\.5').length === 0) {
+                        container.innerHTML = '<p id="no-milestones-msg" class="text-sm text-slate-400 text-center py-6">No milestones scheduled.</p>';
+                    }
+                    if (window.showToast) showToast(data.message || 'Milestone deleted.', 'info');
+                } else {
+                    if (itemElem) itemElem.style.display = '';
+                }
+            } catch (err) {
+                if (itemElem) itemElem.style.display = '';
+                console.error('Error deleting milestone:', err);
+            }
+        }
+
+        async function handleSaveCalendarItemAJAX(e, year, month) {
+            e.preventDefault();
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
+            const formData = new FormData(form);
+            formData.append('is_ajax', 'true');
+
+            try {
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    closeCalendarModal();
+                    renderCalendarDayItems(data.day, data.day_entry, year, month);
+                    if (window.showToast) showToast(data.message || 'Plan item saved!', 'success');
+                } else {
+                    if (window.showToast) showToast(data.message || 'Failed to save calendar plan', 'danger');
+                }
+            } catch (err) {
+                console.error('Error saving calendar plan:', err);
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+
+        function renderCalendarDayItems(dayNum, dayEntry, year, month) {
+            const dayCell = document.getElementById(`calendar-day-cell-${dayNum}`);
+            if (!dayCell) return;
+
+            const items = dayEntry ? (dayEntry.items || []) : [];
+            const sticker = dayEntry ? (dayEntry.sticker || '') : '';
+            const image_url = dayEntry ? (dayEntry.image_url || '') : '';
+
+            const stickerBadgeDiv = dayCell.querySelector('.group\\/sticker');
+            if (stickerBadgeDiv) {
+                stickerBadgeDiv.innerHTML = `
+                    ${sticker ? `<span class="text-base leading-none" title="Day Sticker">${escapeHTML(sticker)}</span>` : ''}
+                    ${image_url ? `<img src="${escapeHTML(image_url)}" alt="Sticker" class="w-5 h-5 rounded object-cover border border-slate-600 shadow-sm" title="Attached Image">` : ''}
+                    ${(sticker || image_url) ? `
+                    <button type="button" onclick="handleDeleteDayStickerAJAX(${dayNum}, ${year}, ${month}, this)" class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors opacity-0 group-hover/sticker:opacity-100 transition-opacity" title="Delete Day Emoji/Sticker">
+                        <i class="fa-solid fa-xmark text-[9px]"></i>
+                    </button>` : ''}
+                `;
+            }
+
+            const itemsContainer = dayCell.querySelector('.calendar-day-items-container');
+            if (itemsContainer) {
+                itemsContainer.innerHTML = items.map(item => {
+                    const badgeBg = item.type === 'deadline' ? 'bg-rose-500/15 border-rose-500/30 text-rose-300' : (item.type === 'target' ? 'bg-amber-500/15 border-amber-500/30 text-amber-300' : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300');
+                    const remindBell = item.remind_me ? '<span class="text-xs leading-none flex-shrink-0" title="Active Reminder">🔔</span>' : '';
+                    const itemSticker = item.sticker ? `<span class="text-sm leading-none flex-shrink-0">${escapeHTML(item.sticker)}</span>` : '';
+                    const itemImage = item.image_url ? `<img src="${escapeHTML(item.image_url)}" alt="Img" class="w-4 h-4 rounded object-cover flex-shrink-0 border border-slate-600">` : '';
+
+                    return `
+                        <div class="calendar-item-card p-1.5 rounded-xl border ${badgeBg} flex items-center justify-between text-xs group/item shadow-sm relative transition-all hover:scale-[1.02]"
+                            data-title="${escapeHTML(item.text)}" data-type="${escapeHTML(item.type)}"
+                            data-date="Day ${dayNum}"
+                            data-sticker="${escapeHTML(item.sticker || '')}" data-image="${escapeHTML(item.image_url || '')}"
+                            onmouseenter="showItemCard(event, this)" onmousemove="positionItemCard(event)" onmouseleave="hideItemCard()">
+                            <div class="flex items-center space-x-1.5 overflow-hidden flex-1 cursor-pointer"
+                                onclick="openEditCalendarModal(${dayNum}, '${item.id}', '${escapeHTML(item.text)}', '${item.type}', '${escapeHTML(item.sticker || '')}', '${escapeHTML(item.image_url || '')}', ${item.remind_me ? 'true' : 'false'})">
+                                ${remindBell}
+                                ${itemSticker}
+                                ${itemImage}
+                                <span class="font-medium truncate text-[11px] leading-tight" title="${escapeHTML(item.text)}">${escapeHTML(item.text)}</span>
+                            </div>
+                            <div class="opacity-0 group-hover/item:opacity-100 transition-opacity ml-1 flex-shrink-0 flex items-center space-x-1">
+                                <button type="button" onclick="openEditCalendarModal(${dayNum}, '${item.id}', '${escapeHTML(item.text)}', '${item.type}', '${escapeHTML(item.sticker || '')}', '${escapeHTML(item.image_url || '')}', ${item.remind_me ? 'true' : 'false'})" class="text-slate-400 hover:text-indigo-300 p-0.5 transition-colors" title="Edit Plan">
+                                    <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                                </button>
+                                <button type="button" onclick="handleDeleteCalendarItemAJAX(${dayNum}, '${item.id}', ${year}, ${month}, this)" class="text-slate-400 hover:text-rose-400 p-0.5 transition-colors" title="Delete">
+                                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        async function handleDeleteCalendarItemAJAX(dayNum, itemId, year, month, btnElem) {
+            const cardElem = btnElem.closest('.calendar-item-card');
+            if (cardElem) cardElem.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'delete_calendar_item');
+                formData.append('day', dayNum);
+                formData.append('item_id', itemId);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    renderCalendarDayItems(dayNum, data.day_entry, year, month);
+                    if (window.showToast) showToast(data.message || 'Calendar item removed.', 'info');
+                } else {
+                    if (cardElem) cardElem.style.display = '';
+                }
+            } catch (err) {
+                if (cardElem) cardElem.style.display = '';
+                console.error('Error deleting calendar item:', err);
+            }
+        }
+
+        async function handleDeleteDayStickerAJAX(dayNum, year, month, btnElem) {
+            try {
+                const formData = new FormData();
+                formData.append('action', 'delete_day_sticker');
+                formData.append('day', dayNum);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    const dayCell = document.getElementById(`calendar-day-cell-${dayNum}`);
+                    if (dayCell) {
+                        const stickerBadgeDiv = dayCell.querySelector('.group\\/sticker');
+                        if (stickerBadgeDiv) stickerBadgeDiv.innerHTML = '';
+                    }
+                    if (window.showToast) showToast(data.message || 'Day sticker cleared.', 'info');
+                }
+            } catch (err) {
+                console.error('Error deleting day sticker:', err);
+            }
+        }
+
+        async function handleAddHabitAJAX(e, year, month) {
+            e.preventDefault();
+            const input = document.getElementById('habit-name-input');
+            const name = input ? input.value.trim() : '';
+            if (!name) return;
+
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'add_habit');
+                formData.append('habit_name', name);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success && data.habit) {
+                    input.value = '';
+                    const habit = data.habit;
+                    const daysInMonth = data.days_in_month || 30;
+
+                    const tbody = document.getElementById('habit-table-body');
+                    const noMsg = document.getElementById('no-habits-msg');
+                    if (noMsg) noMsg.remove();
+
+                    if (tbody) {
+                        const tr = document.createElement('tr');
+                        tr.id = `monthly-habit-row-${habit.id}`;
+                        let cellsHtml = '';
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            cellsHtml += `
+                                <td class="py-2 text-center">
+                                    <div class="habit-cell habit-cell-inactive mx-auto" onclick="toggleHabitDay(${year}, ${month}, '${habit.id}', ${d}, this)">
+                                        •
+                                    </div>
+                                </td>
+                            `;
+                        }
+
+                        tr.innerHTML = `
+                            <td class="py-2.5 px-3 text-sm font-medium text-slate-200 sticky left-0 bg-slate-900/95 backdrop-blur z-10 border-r border-slate-800">
+                                ${escapeHTML(habit.name)}
+                            </td>
+                            ${cellsHtml}
+                            <td class="py-2.5 px-3 text-right">
+                                <button type="button" onclick="handleDeleteHabitAJAX('${habit.id}', ${year}, ${month}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Habit">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    }
+                    if (window.showToast) showToast(data.message || 'Habit added!', 'success');
+                } else {
+                    if (window.showToast) showToast(data.message || 'Failed to add habit', 'danger');
+                }
+            } catch (err) {
+                console.error('Error adding habit:', err);
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+
+        async function handleDeleteHabitAJAX(habitId, year, month, btnElem) {
+            const rowElem = document.getElementById(`monthly-habit-row-${habitId}`) || btnElem.closest('tr');
+            if (rowElem) rowElem.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'delete_habit');
+                formData.append('habit_id', habitId);
+                formData.append('is_ajax', 'true');
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    if (rowElem) rowElem.remove();
+                    const tbody = document.getElementById('habit-table-body');
+                    if (tbody && tbody.children.length === 0) {
+                        const habitCard = tbody.closest('.glass-panel');
+                        if (habitCard) {
+                            const tableContainer = habitCard.querySelector('.overflow-x-auto');
+                            if (tableContainer) {
+                                tableContainer.innerHTML = '<div id="no-habits-msg" class="text-center py-8 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80"><p class="text-slate-400 text-sm">No habits created for this month yet.</p></div>';
+                            }
+                        }
+                    }
+                    if (window.showToast) showToast(data.message || 'Habit deleted.', 'info');
+                } else {
+                    if (rowElem) rowElem.style.display = '';
+                }
+            } catch (err) {
+                if (rowElem) rowElem.style.display = '';
+                console.error('Error deleting habit:', err);
+            }
+        }
+    </script>
+    {% endblock %}

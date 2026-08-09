@@ -53,7 +53,15 @@ def create_app(config_class=Config):
         try:
             from sqlalchemy import inspect, text
             inspector = inspect(db.engine)
-            if 'daily_plan' in inspector.get_table_names():
+            tables = inspector.get_table_names()
+            
+            if 'user' in tables:
+                columns = [c['name'] for c in inspector.get_columns('user')]
+                if 'custom_tags' not in columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN custom_tags JSON DEFAULT \'[]\''))
+
+            if 'daily_plan' in tables:
                 columns = [c['name'] for c in inspector.get_columns('daily_plan')]
                 if 'memory_logs' not in columns:
                     with db.engine.begin() as conn:
@@ -61,8 +69,14 @@ def create_app(config_class=Config):
                 if 'sleep_log' not in columns:
                     with db.engine.begin() as conn:
                         conn.execute(text("ALTER TABLE daily_plan ADD COLUMN sleep_log JSON DEFAULT '{}'"))
-        except Exception:
-            pass
+
+            if 'yearly_plan' in tables:
+                columns = [c['name'] for c in inspector.get_columns('yearly_plan')]
+                if 'events' not in columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE yearly_plan ADD COLUMN events JSON DEFAULT '[]'"))
+        except Exception as e:
+            app.logger.error(f"Auto-migration check notice: {e}")
 
     return app
 

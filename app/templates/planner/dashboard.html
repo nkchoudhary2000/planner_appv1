@@ -411,14 +411,78 @@
             </div>
         </div>
 
-        <!-- Right Sidebar Column (Span 1): Planner Views & Resolutions -->
+        <!-- Right Sidebar Column (Span 1): Reminders, Planner Views & Resolutions -->
         <div class="space-y-6">
+            <!-- Active Reminders & Alerts Carousel Card -->
+            <div class="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-slate-900/90 relative overflow-hidden shadow-xl shadow-amber-500/5 space-y-3" id="reminder-carousel-container">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                            <i class="fa-solid fa-bullhorn text-xs animate-pulse"></i>
+                        </div>
+                        <h2 class="text-sm font-bold uppercase tracking-wider text-white">Active Reminders</h2>
+                    </div>
+
+                    {% if marquee_alerts %}
+                    <div class="flex items-center space-x-1.5">
+                        <!-- Carousel Counter -->
+                        <span class="text-xs text-slate-400 font-mono font-medium px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">
+                            <span id="reminder-current-slide">1</span>/<span id="reminder-total-slides">{{ marquee_alerts|length }}</span>
+                        </span>
+                        <!-- Carousel Navigation Controls -->
+                        <button type="button" onclick="slideReminderCarousel(-1)" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Previous Reminder">
+                            <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                        </button>
+                        <button type="button" onclick="slideReminderCarousel(1)" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Next Reminder">
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Carousel Slide Track (No Duplicate Entries) -->
+                <div class="relative overflow-hidden min-h-[60px] flex items-center" id="reminder-carousel-wrapper">
+                    {% if marquee_alerts %}
+                        <div class="w-full transition-transform duration-500 ease-in-out flex" id="reminder-carousel-track">
+                            {% for alert in marquee_alerts %}
+                            <div class="w-full flex-shrink-0 space-y-2 p-3 rounded-xl bg-slate-800/70 border border-slate-700/50">
+                                <div class="flex items-center justify-between">
+                                    <span class="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider border {{ alert.badge_color }} flex items-center space-x-1">
+                                        <i class="{{ alert.icon }} text-[9px]"></i>
+                                        <span>{{ alert.badge }}</span>
+                                    </span>
+                                </div>
+                                <p class="text-xs font-semibold text-slate-100 break-words leading-relaxed">{{ alert.text }}</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="w-full p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-center space-x-2.5 text-slate-300 text-xs">
+                            <i class="fa-solid fa-circle-check text-emerald-400 text-base flex-shrink-0"></i>
+                            <div>
+                                <span class="font-bold text-emerald-300">All Caught Up!</span>
+                                <p class="text-[11px] text-slate-400">No active alerts for today.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Dots Bar -->
+                {% if marquee_alerts and marquee_alerts|length > 1 %}
+                <div class="flex items-center justify-center space-x-1.5 pt-1" id="reminder-dots-bar">
+                    {% for alert in marquee_alerts %}
+                    <button type="button" onclick="goToReminderSlide({{ loop.index0 }})" class="reminder-dot w-2 h-2 rounded-full transition-all bg-slate-600 hover:bg-slate-400 cursor-pointer" data-slide-index="{{ loop.index0 }}"></button>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
             <!-- Planner Navigation Cards -->
             <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-3">
                 <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-2">Planner Views</h2>
 
                 <div class="space-y-3">
-                    <a href="{{ url_for('planner.daily') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                    <a href="{{ url_for('planner.daily') }}" data-tab-link="true" data-tab-key="/daily" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
                         <div class="flex items-center space-x-3">
                             <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
                                 <i class="fa-solid fa-sun"></i>
@@ -431,7 +495,7 @@
                         <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
                     </a>
 
-                    <a href="{{ url_for('planner.weekly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                    <a href="{{ url_for('planner.weekly') }}" data-tab-link="true" data-tab-key="/weekly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
                         <div class="flex items-center space-x-3">
                             <div class="w-9 h-9 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center">
                                 <i class="fa-solid fa-calendar-week"></i>
@@ -444,7 +508,7 @@
                         <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
                     </a>
 
-                    <a href="{{ url_for('planner.monthly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                    <a href="{{ url_for('planner.monthly') }}" data-tab-link="true" data-tab-key="/monthly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
                         <div class="flex items-center space-x-3">
                             <div class="w-9 h-9 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
                                 <i class="fa-solid fa-calendar-days"></i>
@@ -457,7 +521,7 @@
                         <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
                     </a>
 
-                    <a href="{{ url_for('planner.yearly') }}" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                    <a href="{{ url_for('planner.yearly') }}" data-tab-link="true" data-tab-key="/yearly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
                         <div class="flex items-center space-x-3">
                             <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                                 <i class="fa-solid fa-bullseye"></i>
@@ -495,6 +559,72 @@
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    let currentSlide = 0;
+    const totalSlides = {{ marquee_alerts|length if marquee_alerts else 0 }};
+    let autoSlideInterval = null;
+
+    if (totalSlides <= 1) return;
+
+    function updateCarouselState() {
+        const track = document.getElementById('reminder-carousel-track');
+        const slideCounter = document.getElementById('reminder-current-slide');
+        const dots = document.querySelectorAll('.reminder-dot');
+
+        if (track) {
+            track.style.transform = `translateX(-${currentSlide * 100}%)`;
+        }
+        if (slideCounter) {
+            slideCounter.innerText = currentSlide + 1;
+        }
+
+        dots.forEach((dot, idx) => {
+            if (idx === currentSlide) {
+                dot.className = 'reminder-dot w-5 h-2 rounded-full transition-all bg-amber-400 cursor-pointer';
+            } else {
+                dot.className = 'reminder-dot w-2 h-2 rounded-full transition-all bg-slate-600 hover:bg-slate-400 cursor-pointer';
+            }
+        });
+    }
+
+    window.slideReminderCarousel = function(direction) {
+        currentSlide = (currentSlide + direction + totalSlides) % totalSlides;
+        updateCarouselState();
+    };
+
+    window.goToReminderSlide = function(index) {
+        currentSlide = index;
+        updateCarouselState();
+    };
+
+    function startAutoSlide() {
+        stopAutoSlide();
+        autoSlideInterval = setInterval(() => {
+            slideReminderCarousel(1);
+        }, 4000);
+    }
+
+    function stopAutoSlide() {
+        if (autoSlideInterval) {
+            clearInterval(autoSlideInterval);
+            autoSlideInterval = null;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateCarouselState();
+        startAutoSlide();
+
+        const container = document.getElementById('reminder-carousel-container');
+        if (container) {
+            container.addEventListener('mouseenter', stopAutoSlide);
+            container.addEventListener('mouseleave', startAutoSlide);
+        }
+    });
+})();
+</script>
 {% endblock %}
 
 

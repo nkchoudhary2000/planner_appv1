@@ -87,6 +87,90 @@
             </div>
             {% endfor %}
         </div>
+    <!-- Annual Key Events & Calendar Goals Card (Yearly Planner Entries) -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-calendar-plus text-brand-400"></i>
+                <h2 class="text-lg font-bold text-white">Annual Events, Birthdays &amp; Calendar Goals</h2>
+            </div>
+            <span id="yearly-events-counter" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                {{ events|length }} Scheduled
+            </span>
+        </div>
+
+        <!-- Add Yearly Event Form -->
+        <form id="add-yearly-event-form" onsubmit="handleAddYearlyEventAJAX(event, {{ selected_year }})" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+            <input type="hidden" name="action" value="add_yearly_event">
+            <div class="lg:col-span-4">
+                <input type="text" id="yearly-event-title-input" name="event_title" required placeholder="Event, Birthday, or Goal title..." class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            </div>
+            <div class="lg:col-span-2">
+                <select id="yearly-event-type-input" name="event_type" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <option value="goal">🎯 Goal</option>
+                    <option value="birthday">🎂 Birthday</option>
+                    <option value="anniversary">💍 Anniversary</option>
+                    <option value="event">📅 Date Event</option>
+                </select>
+            </div>
+            <div class="lg:col-span-3">
+                <input type="date" id="yearly-event-date-input" name="event_date" required value="{{ selected_year }}-01-01" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            </div>
+            <div class="lg:col-span-3 flex items-center space-x-2">
+                <input type="text" id="yearly-event-notes-input" name="notes" placeholder="Notes (optional)..." class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-1 whitespace-nowrap">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Add</span>
+                </button>
+            </div>
+        </form>
+
+        <!-- Yearly Events List -->
+        <div id="yearly-events-container" class="space-y-3">
+            {% if events %}
+                {% for ev in events|sort(attribute='date') %}
+                <div id="yearly-event-item-{{ ev.id }}" class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3 flex-1 min-w-0">
+                        <button type="button" onclick="handleToggleYearlyEventAJAX('{{ ev.id }}', {{ selected_year }}, this)" class="text-sm pt-0.5">
+                            <i class="fa-regular {{ 'fa-square-check text-emerald-400' if ev.completed else 'fa-square text-slate-500' }} text-lg"></i>
+                        </button>
+
+                        <div>
+                            <div class="flex items-center space-x-2 flex-wrap gap-1">
+                                <span class="event-title-text text-sm font-semibold text-slate-100 {{ 'line-through-fade' if ev.completed }}">
+                                    {{ ev.title }}
+                                </span>
+                                {% if ev.event_type == 'birthday' %}
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">🎂 Birthday</span>
+                                {% elif ev.event_type == 'anniversary' %}
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">💍 Anniversary</span>
+                                {% elif ev.event_type == 'goal' %}
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🎯 Goal</span>
+                                {% else %}
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">📅 Event</span>
+                                {% endif %}
+                            </div>
+                            {% if ev.notes %}
+                                <p class="text-xs text-slate-400 mt-0.5">{{ ev.notes }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-3 flex-shrink-0 self-end sm:self-center">
+                        <span class="text-xs font-mono text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-lg border border-slate-700/50">
+                            <i class="fa-regular fa-calendar text-[10px] mr-1 text-slate-500"></i>{{ ev.date }}
+                        </span>
+
+                        <button type="button" onclick="handleDeleteYearlyEventAJAX('{{ ev.id }}', {{ selected_year }}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Event">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p id="no-yearly-events-msg" class="text-sm text-slate-400 text-center py-6">No specific events, birthdays, or date goals added for {{ selected_year }}.</p>
+            {% endif %}
+        </div>
     </div>
 
     <!-- Main Dual Layout: Resolutions & High Level Objectives -->
@@ -99,17 +183,17 @@
                     <i class="fa-solid fa-star text-amber-400"></i>
                     <h2 class="text-lg font-bold text-white">Annual Resolutions</h2>
                 </div>
-                <span class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                <span id="yearly-resolutions-counter" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
                     {{ resolutions|selectattr('completed')|list|length }}/{{ resolutions|length }} Accomplished
                 </span>
             </div>
 
             <!-- Add Resolution Form -->
-            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <form id="add-resolution-form" onsubmit="handleAddResolutionAJAX(event, {{ selected_year }})" class="flex flex-col sm:flex-row gap-3">
                 <input type="hidden" name="action" value="add_resolution">
-                <input type="text" name="resolution_text" required placeholder="New annual resolution..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <input type="text" id="resolution-text-input" name="resolution_text" required placeholder="New annual resolution..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <div class="flex items-center space-x-2">
-                    <select name="category" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <select id="resolution-category-input" name="category" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
                         <option value="Personal">Personal</option>
                         <option value="Career">Career</option>
                         <option value="Health">Health</option>
@@ -123,19 +207,15 @@
             </form>
 
             <!-- Resolutions List -->
-            <div class="space-y-3">
+            <div id="resolutions-container" class="space-y-3">
                 {% if resolutions %}
                     {% for r in resolutions %}
-                    <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                    <div id="yearly-resolution-item-{{ r.id }}" class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
                         <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
-                            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="toggle_resolution">
-                                <input type="hidden" name="resolution_id" value="{{ r.id }}">
-                                <button type="submit" class="text-sm">
-                                    <i class="fa-regular {{ 'fa-square-check text-emerald-400' if r.completed else 'fa-square text-slate-500' }} text-lg"></i>
-                                </button>
-                            </form>
-                            <span class="text-sm font-medium text-slate-200 truncate {{ 'line-through-fade' if r.completed }}">
+                            <button type="button" onclick="handleToggleResolutionAJAX('{{ r.id }}', {{ selected_year }}, this)" class="text-sm">
+                                <i class="fa-regular {{ 'fa-square-check text-emerald-400' if r.completed else 'fa-square text-slate-500' }} text-lg"></i>
+                            </button>
+                            <span class="resolution-title-text text-sm font-medium text-slate-200 truncate {{ 'line-through-fade' if r.completed }}">
                                 {{ r.text }}
                             </span>
                         </div>
@@ -144,18 +224,14 @@
                             <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-700 text-slate-300">
                                 {{ r.category }}
                             </span>
-                            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="delete_resolution">
-                                <input type="hidden" name="resolution_id" value="{{ r.id }}">
-                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
-                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                </button>
-                            </form>
+                            <button type="button" onclick="handleDeleteResolutionAJAX('{{ r.id }}', {{ selected_year }}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Resolution">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
                         </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                    <p class="text-sm text-slate-400 text-center py-8">No resolutions set for {{ selected_year }}.</p>
+                    <p id="no-resolutions-msg" class="text-sm text-slate-400 text-center py-8">No resolutions set for {{ selected_year }}.</p>
                 {% endif %}
             </div>
         </div>
@@ -171,11 +247,11 @@
             </div>
 
             <!-- Add Objective Form -->
-            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <form id="add-objective-form" onsubmit="handleAddObjectiveAJAX(event, {{ selected_year }})" class="flex flex-col sm:flex-row gap-3">
                 <input type="hidden" name="action" value="add_objective">
-                <input type="text" name="objective_title" required placeholder="High level objective..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <input type="text" id="objective-title-input" name="objective_title" required placeholder="High level objective..." class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <div class="flex items-center space-x-2">
-                    <select name="quarter" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <select id="objective-quarter-input" name="quarter" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
                         <option value="Q1">Q1</option>
                         <option value="Q2">Q2</option>
                         <option value="Q3">Q3</option>
@@ -190,10 +266,10 @@
             </form>
 
             <!-- Objectives List -->
-            <div class="space-y-3">
+            <div id="objectives-container" class="space-y-3">
                 {% if objectives %}
                     {% for o in objectives %}
-                    <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
+                    <div id="yearly-objective-item-{{ o.id }}" class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between">
                         <div class="space-y-1">
                             <div class="flex items-center space-x-2">
                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
@@ -206,29 +282,21 @@
                         </div>
 
                         <div class="flex items-center space-x-2">
-                            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="update_objective_status">
-                                <input type="hidden" name="objective_id" value="{{ o.id }}">
-                                <select name="status" onchange="this.form.submit()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none">
-                                    <option value="In Progress" {{ 'selected' if o.status == 'In Progress' }}>In Progress</option>
-                                    <option value="On Track" {{ 'selected' if o.status == 'On Track' }}>On Track</option>
-                                    <option value="Completed" {{ 'selected' if o.status == 'Completed' }}>Completed</option>
-                                    <option value="Behind" {{ 'selected' if o.status == 'Behind' }}>Behind</option>
-                                </select>
-                            </form>
+                            <select onchange="handleUpdateObjectiveStatusAJAX('{{ o.id }}', {{ selected_year }}, this)" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none">
+                                <option value="In Progress" {{ 'selected' if o.status == 'In Progress' }}>In Progress</option>
+                                <option value="On Track" {{ 'selected' if o.status == 'On Track' }}>On Track</option>
+                                <option value="Completed" {{ 'selected' if o.status == 'Completed' }}>Completed</option>
+                                <option value="Behind" {{ 'selected' if o.status == 'Behind' }}>Behind</option>
+                            </select>
 
-                            <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="inline">
-                                <input type="hidden" name="action" value="delete_objective">
-                                <input type="hidden" name="objective_id" value="{{ o.id }}">
-                                <button type="submit" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors">
-                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                </button>
-                            </form>
+                            <button type="button" onclick="handleDeleteObjectiveAJAX('{{ o.id }}', {{ selected_year }}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Objective">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
                         </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                    <p class="text-sm text-slate-400 text-center py-8">No objectives created for {{ selected_year }}.</p>
+                    <p id="no-objectives-msg" class="text-sm text-slate-400 text-center py-8">No objectives created for {{ selected_year }}.</p>
                 {% endif %}
             </div>
         </div>
@@ -241,7 +309,7 @@
             <h2 class="text-lg font-bold text-white">{{ selected_year }} Year-in-Review Reflection Journal</h2>
         </div>
 
-        <form action="{{ url_for('planner.yearly', year=selected_year) }}" method="POST" class="space-y-3">
+        <form id="save-reflections-form" onsubmit="handleSaveReflectionsAJAX(event, {{ selected_year }})" method="POST" class="space-y-3">
             <input type="hidden" name="action" value="save_reflections">
             <textarea name="reflections" rows="5" placeholder="Reflect on your major achievements, lessons learned, and memorable moments from {{ selected_year }}..." class="w-full bg-slate-800/80 border border-slate-700 rounded-xl p-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">{{ reflections }}</textarea>
             <div class="flex justify-end">
@@ -253,4 +321,501 @@
         </form>
     </div>
 </div>
+
+<script>
+    function escapeHTML(str) {
+        if (!str) return '';
+        return str.replace(/[&<>'"]/g, 
+            tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag] || tag)
+        );
+    }
+
+    function updateYearlyStats(data) {
+        if (data) {
+            if (data.total_events !== undefined) {
+                const evCounter = document.getElementById('yearly-events-counter');
+                if (evCounter) evCounter.innerText = `${data.total_events} Scheduled`;
+            }
+            if (data.accomplished_resolutions !== undefined && data.total_resolutions !== undefined) {
+                const resCounter = document.getElementById('yearly-resolutions-counter');
+                if (resCounter) resCounter.innerText = `${data.accomplished_resolutions}/${data.total_resolutions} Accomplished`;
+            }
+        }
+    }
+
+    async function handleAddYearlyEventAJAX(e, year) {
+        e.preventDefault();
+        const titleInput = document.getElementById('yearly-event-title-input');
+        const typeInput = document.getElementById('yearly-event-type-input');
+        const dateInput = document.getElementById('yearly-event-date-input');
+        const notesInput = document.getElementById('yearly-event-notes-input');
+
+        const title = titleInput ? titleInput.value.trim() : '';
+        const eventType = typeInput ? typeInput.value : 'goal';
+        const eventDate = dateInput ? dateInput.value : '';
+        const notes = notesInput ? notesInput.value.trim() : '';
+
+        if (!title || !eventDate) return;
+
+        const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'add_yearly_event');
+            formData.append('event_title', title);
+            formData.append('event_type', eventType);
+            formData.append('event_date', eventDate);
+            formData.append('notes', notes);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success && data.event) {
+                titleInput.value = '';
+                if (notesInput) notesInput.value = '';
+                const container = document.getElementById('yearly-events-container');
+                const noMsg = document.getElementById('no-yearly-events-msg');
+                if (noMsg) noMsg.remove();
+
+                const ev = data.event;
+                let badgeHtml = '';
+                if (ev.event_type === 'birthday') {
+                    badgeHtml = '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">🎂 Birthday</span>';
+                } else if (ev.event_type === 'anniversary') {
+                    badgeHtml = '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">💍 Anniversary</span>';
+                } else if (ev.event_type === 'goal') {
+                    badgeHtml = '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🎯 Goal</span>';
+                } else {
+                    badgeHtml = '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">📅 Event</span>';
+                }
+
+                const newElem = document.createElement('div');
+                newElem.id = `yearly-event-item-${ev.id}`;
+                newElem.className = 'p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3';
+                newElem.innerHTML = `
+                    <div class="flex items-center space-x-3 flex-1 min-w-0">
+                        <button type="button" onclick="handleToggleYearlyEventAJAX('${ev.id}', ${year}, this)" class="text-sm pt-0.5">
+                            <i class="fa-regular fa-square text-slate-500 text-lg"></i>
+                        </button>
+                        <div>
+                            <div class="flex items-center space-x-2 flex-wrap gap-1">
+                                <span class="event-title-text text-sm font-semibold text-slate-100">
+                                    ${escapeHTML(ev.title)}
+                                </span>
+                                ${badgeHtml}
+                            </div>
+                            ${ev.notes ? `<p class="text-xs text-slate-400 mt-0.5">${escapeHTML(ev.notes)}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3 flex-shrink-0 self-end sm:self-center">
+                        <span class="text-xs font-mono text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-lg border border-slate-700/50">
+                            <i class="fa-regular fa-calendar text-[10px] mr-1 text-slate-500"></i>${escapeHTML(ev.date)}
+                        </span>
+                        <button type="button" onclick="handleDeleteYearlyEventAJAX('${ev.id}', ${year}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Event">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(newElem);
+                updateYearlyStats(data);
+                if (window.showToast) showToast(data.message || 'Yearly event/goal added!', 'success');
+            } else {
+                if (window.showToast) showToast(data.message || 'Failed to add event', 'danger');
+            }
+        } catch (err) {
+            console.error('Error adding yearly event:', err);
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    }
+
+    async function handleToggleYearlyEventAJAX(eventId, year, btnElem) {
+        const icon = btnElem.querySelector('i');
+        const parentDiv = btnElem.closest('.flex.items-center.space-x-3') || btnElem.parentElement;
+        const textSpan = parentDiv.querySelector('.event-title-text');
+        const isCurrentlyChecked = icon ? icon.classList.contains('fa-square-check') : false;
+
+        if (isCurrentlyChecked) {
+            if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+            if (textSpan) textSpan.classList.remove('line-through-fade');
+        } else {
+            if (icon) icon.className = 'fa-regular fa-square-check text-emerald-400 text-lg';
+            if (textSpan) textSpan.classList.add('line-through-fade');
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'toggle_yearly_event');
+            formData.append('event_id', eventId);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                updateYearlyStats(data);
+            } else {
+                if (isCurrentlyChecked) {
+                    if (icon) icon.className = 'fa-regular fa-square-check text-emerald-400 text-lg';
+                    if (textSpan) textSpan.classList.add('line-through-fade');
+                } else {
+                    if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+                    if (textSpan) textSpan.classList.remove('line-through-fade');
+                }
+            }
+        } catch (err) {
+            console.error('Error toggling yearly event:', err);
+        }
+    }
+
+    async function handleDeleteYearlyEventAJAX(eventId, year, btnElem) {
+        const itemElem = document.getElementById(`yearly-event-item-${eventId}`) || btnElem.closest('.p-3\\.5');
+        if (itemElem) itemElem.style.display = 'none';
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'delete_yearly_event');
+            formData.append('event_id', eventId);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                if (itemElem) itemElem.remove();
+                const container = document.getElementById('yearly-events-container');
+                if (container && container.querySelectorAll('.p-3\\.5').length === 0) {
+                    container.innerHTML = `<p id="no-yearly-events-msg" class="text-sm text-slate-400 text-center py-6">No specific events, birthdays, or date goals added for ${year}.</p>`;
+                }
+                updateYearlyStats(data);
+                if (window.showToast) showToast(data.message || 'Yearly event removed.', 'info');
+            } else {
+                if (itemElem) itemElem.style.display = '';
+            }
+        } catch (err) {
+            if (itemElem) itemElem.style.display = '';
+            console.error('Error deleting yearly event:', err);
+        }
+    }
+
+    async function handleAddResolutionAJAX(e, year) {
+        e.preventDefault();
+        const input = document.getElementById('resolution-text-input');
+        const catInput = document.getElementById('resolution-category-input');
+        const text = input ? input.value.trim() : '';
+        const category = catInput ? catInput.value : 'Personal';
+        if (!text) return;
+
+        const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'add_resolution');
+            formData.append('resolution_text', text);
+            formData.append('category', category);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success && data.resolution) {
+                input.value = '';
+                const container = document.getElementById('resolutions-container');
+                const noMsg = document.getElementById('no-resolutions-msg');
+                if (noMsg) noMsg.remove();
+
+                const r = data.resolution;
+                const newElem = document.createElement('div');
+                newElem.id = `yearly-resolution-item-${r.id}`;
+                newElem.className = 'p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between';
+                newElem.innerHTML = `
+                    <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
+                        <button type="button" onclick="handleToggleResolutionAJAX('${r.id}', ${year}, this)" class="text-sm">
+                            <i class="fa-regular fa-square text-slate-500 text-lg"></i>
+                        </button>
+                        <span class="resolution-title-text text-sm font-medium text-slate-200 truncate">
+                            ${escapeHTML(r.text)}
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-2 flex-shrink-0">
+                        <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-700 text-slate-300">
+                            ${escapeHTML(r.category)}
+                        </span>
+                        <button type="button" onclick="handleDeleteResolutionAJAX('${r.id}', ${year}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Resolution">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(newElem);
+                updateYearlyStats(data);
+                if (window.showToast) showToast(data.message || 'Resolution added!', 'success');
+            } else {
+                if (window.showToast) showToast(data.message || 'Failed to add resolution', 'danger');
+            }
+        } catch (err) {
+            console.error('Error adding resolution:', err);
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    }
+
+    async function handleToggleResolutionAJAX(resId, year, btnElem) {
+        const icon = btnElem.querySelector('i');
+        const parentDiv = btnElem.closest('.flex.items-center.space-x-3') || btnElem.parentElement;
+        const textSpan = parentDiv.querySelector('.resolution-title-text');
+        const isCurrentlyChecked = icon ? icon.classList.contains('fa-square-check') : false;
+
+        if (isCurrentlyChecked) {
+            if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+            if (textSpan) textSpan.classList.remove('line-through-fade');
+        } else {
+            if (icon) icon.className = 'fa-regular fa-square-check text-emerald-400 text-lg';
+            if (textSpan) textSpan.classList.add('line-through-fade');
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'toggle_resolution');
+            formData.append('resolution_id', resId);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                updateYearlyStats(data);
+            } else {
+                if (isCurrentlyChecked) {
+                    if (icon) icon.className = 'fa-regular fa-square-check text-emerald-400 text-lg';
+                    if (textSpan) textSpan.classList.add('line-through-fade');
+                } else {
+                    if (icon) icon.className = 'fa-regular fa-square text-slate-500 text-lg';
+                    if (textSpan) textSpan.classList.remove('line-through-fade');
+                }
+            }
+        } catch (err) {
+            console.error('Error toggling resolution:', err);
+        }
+    }
+
+    async function handleDeleteResolutionAJAX(resId, year, btnElem) {
+        const itemElem = document.getElementById(`yearly-resolution-item-${resId}`) || btnElem.closest('.p-3\\.5');
+        if (itemElem) itemElem.style.display = 'none';
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'delete_resolution');
+            formData.append('resolution_id', resId);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                if (itemElem) itemElem.remove();
+                const container = document.getElementById('resolutions-container');
+                if (container && container.querySelectorAll('.p-3\\.5').length === 0) {
+                    container.innerHTML = `<p id="no-resolutions-msg" class="text-sm text-slate-400 text-center py-8">No resolutions set for ${year}.</p>`;
+                }
+                updateYearlyStats(data);
+                if (window.showToast) showToast(data.message || 'Resolution removed.', 'info');
+            } else {
+                if (itemElem) itemElem.style.display = '';
+            }
+        } catch (err) {
+            if (itemElem) itemElem.style.display = '';
+            console.error('Error deleting resolution:', err);
+        }
+    }
+
+    async function handleAddObjectiveAJAX(e, year) {
+        e.preventDefault();
+        const titleInput = document.getElementById('objective-title-input');
+        const quarterInput = document.getElementById('objective-quarter-input');
+        const title = titleInput ? titleInput.value.trim() : '';
+        const quarter = quarterInput ? quarterInput.value : 'Q1';
+        if (!title) return;
+
+        const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'add_objective');
+            formData.append('objective_title', title);
+            formData.append('quarter', quarter);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success && data.objective) {
+                titleInput.value = '';
+                const container = document.getElementById('objectives-container');
+                const noMsg = document.getElementById('no-objectives-msg');
+                if (noMsg) noMsg.remove();
+
+                const o = data.objective;
+                const newElem = document.createElement('div');
+                newElem.id = `yearly-objective-item-${o.id}`;
+                newElem.className = 'p-4 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-between';
+                newElem.innerHTML = `
+                    <div class="space-y-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                                ${escapeHTML(o.quarter)}
+                            </span>
+                            <h3 class="text-sm font-semibold text-slate-100">
+                                ${escapeHTML(o.title)}
+                            </h3>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select onchange="handleUpdateObjectiveStatusAJAX('${o.id}', ${year}, this)" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none">
+                            <option value="In Progress" ${o.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="On Track" ${o.status === 'On Track' ? 'selected' : ''}>On Track</option>
+                            <option value="Completed" ${o.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                            <option value="Behind" ${o.status === 'Behind' ? 'selected' : ''}>Behind</option>
+                        </select>
+                        <button type="button" onclick="handleDeleteObjectiveAJAX('${o.id}', ${year}, this)" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Delete Objective">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(newElem);
+                if (window.showToast) showToast(data.message || 'Objective added!', 'success');
+            } else {
+                if (window.showToast) showToast(data.message || 'Failed to add objective', 'danger');
+            }
+        } catch (err) {
+            console.error('Error adding objective:', err);
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    }
+
+    async function handleUpdateObjectiveStatusAJAX(objId, year, selectElem) {
+        const newStatus = selectElem.value;
+        try {
+            const formData = new FormData();
+            formData.append('action', 'update_objective_status');
+            formData.append('objective_id', objId);
+            formData.append('status', newStatus);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                if (window.showToast) showToast(data.message || 'Objective status updated!', 'success');
+            }
+        } catch (err) {
+            console.error('Error updating objective status:', err);
+        }
+    }
+
+    async function handleDeleteObjectiveAJAX(objId, year, btnElem) {
+        const itemElem = document.getElementById(`yearly-objective-item-${objId}`) || btnElem.closest('.p-4');
+        if (itemElem) itemElem.style.display = 'none';
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'delete_objective');
+            formData.append('objective_id', objId);
+            formData.append('is_ajax', 'true');
+
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                if (itemElem) itemElem.remove();
+                const container = document.getElementById('objectives-container');
+                if (container && container.querySelectorAll('.p-4').length === 0) {
+                    container.innerHTML = `<p id="no-objectives-msg" class="text-sm text-slate-400 text-center py-8">No objectives created for ${year}.</p>`;
+                }
+                if (window.showToast) showToast(data.message || 'Objective deleted.', 'info');
+            } else {
+                if (itemElem) itemElem.style.display = '';
+            }
+        } catch (err) {
+            if (itemElem) itemElem.style.display = '';
+            console.error('Error deleting objective:', err);
+        }
+    }
+
+    async function handleSaveReflectionsAJAX(e, year) {
+        e.preventDefault();
+        const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+        formData.append('is_ajax', 'true');
+
+        try {
+            const response = await fetch(`/yearly?year=${year}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                if (window.showToast) showToast(data.message || 'Annual reflections saved!', 'success');
+            }
+        } catch (err) {
+            console.error('Error saving reflections:', err);
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    }
+</script>
 {% endblock %}

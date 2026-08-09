@@ -13,7 +13,26 @@ from flask_login import login_required, current_user
 from sqlalchemy.orm.attributes import flag_modified
 from app import db
 from app.planner import planner
-from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan
+from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, User
+from app.services.cascade_service import (
+    get_yearly_events_for_month,
+    get_monthly_items_for_date,
+    get_weekly_todos_for_date,
+    get_all_cascaded_items_for_daily
+)
+
+DEFAULT_TAGS = [
+    {'id': 'tag_work', 'name': 'Work', 'color': '#3b82f6'},
+    {'id': 'tag_personal', 'name': 'Personal', 'color': '#10b981'},
+    {'id': 'tag_health', 'name': 'Health', 'color': '#ec4899'},
+    {'id': 'tag_finance', 'name': 'Finance', 'color': '#f59e0b'},
+    {'id': 'tag_urgent', 'name': 'Urgent', 'color': '#ef4444'}
+]
+
+def get_user_tags(user):
+    if user and hasattr(user, 'custom_tags') and user.custom_tags:
+        return user.custom_tags
+    return DEFAULT_TAGS
 
 def get_today_date():
     """Return current date in configured timezone (default Asia/Kolkata / IST UTC+5:30)."""
@@ -262,7 +281,9 @@ def dashboard():
 
     # Get or create today's daily plan
     daily_plan = DailyPlan.query.filter_by(user_id=current_user.id, date=today).first()
-    today_tasks = daily_plan.tasks if daily_plan and daily_plan.tasks else []
+    today_tasks = list(daily_plan.tasks or []) if daily_plan else []
+    today_tasks.sort(key=lambda t: (1 if t.get('completed') else 0, 0 if t.get('priority') == 'High' else (1 if t.get('priority') == 'Medium' else 2)))
+
     completed_today = sum(1 for t in today_tasks if t.get('completed'))
     total_today = len(today_tasks)
     today_completion_pct = int((completed_today / total_today * 100)) if total_today > 0 else 0
@@ -364,6 +385,121 @@ def dashboard():
     avg_sleep_hours = round(total_sleep_hours_sum / sleep_days_count, 1) if sleep_days_count > 0 else 0
     avg_sleep_quality = round(sleep_quality_sum / sleep_days_count, 1) if sleep_days_count > 0 else 0
 
+    # 5. Dashboard Reminder Panel (Marquee Alerts)
+    marquee_alerts = []
+
+    # 1) Unchecked Shopping List Items (Pending for X days)
+    recent_weekly_plans = WeeklyPlan.query.filter_by(user_id=current_user.id).order_by(WeeklyPlan.start_date.desc()).limit(8).all()
+    for wp in recent_weekly_plans:
+        if wp.shopping_list:
+            for item in wp.shopping_list:
+                if not item.get('bought'):
+                    added_str = item.get('added_date')
+                    item_name = item.get('item', 'Item')
+                    if added_str:
+                        try:
+                            a_date = datetime.strptime(added_str, '%Y-%m-%d').date()
+                            days_pending = (today - a_date).days
+                        except ValueError:
+                            days_pending = 0
+                    else:
+                        days_pending = 0
+
+                    if days_pending < 0:
+                        days_pending = 0
+
+                    marquee_alerts.append({
+                        'type': 'shopping',
+                        'icon': 'fa-solid fa-cart-shopping',
+                        'badge': '🛒 Shopping Alert',
+                        'badge_color': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                        'text': f'"{item_name}" is pending in your Shopping List for {days_pending} day{"s" if days_pending != 1 else ""}'
+                    })
+
+    # 2) Today's Birthdays and Anniversaries
+    if yearly_plan and yearly_plan.events:
+        for ev in yearly_plan.events:
+            ev_date_str = ev.get('date', '')
+            ev_type = ev.get('event_type', 'event')
+            title = ev.get('title', 'Event')
+            
+            is_today = False
+            if ev_date_str:
+                try:
+                    ev_date = datetime.strptime(ev_date_str, '%Y-%m-%d').date()
+                    if ev_date.month == today.month and ev_date.day == today.day:
+                        is_today = True
+                except ValueError:
+                    try:
+                        parts = [p.strip() for p in ev_date_str.split('-') if p.strip()]
+                        if len(parts) == 3 and int(parts[1]) == today.month and int(parts[2]) == today.day:
+                            is_today = True
+                        elif len(parts) == 2 and int(parts[0]) == today.month and int(parts[1]) == today.day:
+                            is_today = True
+                    except Exception:
+                        pass
+                
+                if is_today:
+                    if ev_type == 'birthday':
+                        marquee_alerts.append({
+                            'type': 'birthday',
+                            'icon': 'fa-solid fa-cake-candles',
+                            'badge': '🎂 Birthday Today',
+                            'badge_color': 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+                            'text': f'Wish {title} a Happy Birthday today!'
+                        })
+                    elif ev_type == 'anniversary':
+                        marquee_alerts.append({
+                            'type': 'anniversary',
+                            'icon': 'fa-solid fa-ring',
+                            'badge': '💍 Anniversary Today',
+                            'badge_color': 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+                            'text': f'Celebration: {title} is today!'
+                        })
+                    else:
+                        marquee_alerts.append({
+                            'type': 'annual_event',
+                            'icon': 'fa-solid fa-calendar-day',
+                            'badge': 'Annual Event',
+                            'badge_color': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                            'text': f'Annual Event Today: "{title}"'
+                        })
+
+    # 3) Today's High Priority Events / Tasks / Deadlines
+    for t in today_tasks:
+        if t.get('priority') == 'High' and not t.get('completed'):
+            marquee_alerts.append({
+                'type': 'high_priority',
+                'icon': 'fa-solid fa-fire',
+                'badge': '🔥 High Priority',
+                'badge_color': 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+                'text': f'High priority task for today: "{t.get("text")}"'
+            })
+
+    if monthly_plan and monthly_plan.calendar_days:
+        today_day_str = str(today.day)
+        for d_key, d_data in monthly_plan.calendar_days.items():
+            if str(d_key).lstrip('0') == today_day_str:
+                if isinstance(d_data, dict):
+                    for citem in d_data.get('items', []):
+                        is_remind = citem.get('remind_me') in [True, 'true', 'True', '1', 1, 'on']
+                        if is_remind:
+                            marquee_alerts.append({
+                                'type': 'reminder',
+                                'icon': 'fa-solid fa-bell',
+                                'badge': 'Remind Me',
+                                'badge_color': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                                'text': f'Reminder for today: "{citem.get("text")}"'
+                            })
+                        elif citem.get('type') == 'deadline' or 'interview' in citem.get('text', '').lower() or 'deadline' in citem.get('text', '').lower():
+                            marquee_alerts.append({
+                                'type': 'deadline',
+                                'icon': 'fa-solid fa-calendar-check',
+                                'badge': '⏰ Today\'s Deadline',
+                                'badge_color': 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+                                'text': f'Deadline / Event scheduled today: "{citem.get("text")}"'
+                            })
+
     return render_template(
         'planner/dashboard.html',
         today=today,
@@ -394,7 +530,8 @@ def dashboard():
         recent_sleep_logs=recent_sleep_logs[:5],
         avg_sleep_hours=avg_sleep_hours,
         avg_sleep_quality=avg_sleep_quality,
-        sleep_days_count=sleep_days_count
+        sleep_days_count=sleep_days_count,
+        marquee_alerts=marquee_alerts
     )
 
 
@@ -414,18 +551,8 @@ def weekly():
     start_of_week = first_day_of_year + timedelta(weeks=week_param - 1) - timedelta(days=first_day_of_year.weekday())
     end_of_week = start_of_week + timedelta(days=6)
 
-    days_of_week = []
     day_abbrs = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    for i in range(7):
-        d = start_of_week + timedelta(days=i)
-        days_of_week.append({
-            'abbr': day_abbrs[i],
-            'name': d.strftime('%A'),
-            'date_str': d.strftime('%b %d'),
-            'full_date': d.strftime('%Y-%m-%d'),
-            'date_obj': d
-        })
-
+    days_of_week = []
     plan = WeeklyPlan.query.filter_by(user_id=current_user.id, year=year_param, week_number=week_param).first()
 
     if request.method == 'POST':
@@ -524,7 +651,8 @@ def weekly():
                     'id': str(int(datetime.utcnow().timestamp() * 1000)),
                     'item': item_name,
                     'category': category,
-                    'bought': False
+                    'bought': False,
+                    'added_date': get_today_date().strftime('%Y-%m-%d')
                 })
                 plan.shopping_list = shopping_list
                 flag_modified(plan, 'shopping_list')
@@ -566,8 +694,101 @@ def weekly():
             flash('Weekly notes updated!', 'success')
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
-            return jsonify({'success': True, 'action': action, 'message': 'Operation completed successfully'})
+            tot_todos = sum(len(daily_todos.get(abbr, [])) for abbr in day_abbrs)
+            comp_todos = sum(sum(1 for t in daily_todos.get(abbr, []) if t.get('completed')) for abbr in day_abbrs)
+            todo_pct = int((comp_todos / tot_todos * 100)) if tot_todos > 0 else 0
+
+            tot_goals = len(goals)
+            comp_goals = sum(1 for g in goals if g.get('completed'))
+
+            tot_shopping = len(shopping_list)
+            bought_shop = sum(1 for s in shopping_list if s.get('bought'))
+
+            meals_p = sum(sum(1 for m_type in ['breakfast', 'lunch', 'dinner'] if meals_menu.get(abbr, {}).get(m_type)) for abbr in day_abbrs)
+            meal_pct = int((meals_p / 21 * 100))
+
+            s_comps = []
+            if tot_todos > 0:
+                s_comps.append(todo_pct)
+            if tot_goals > 0:
+                s_comps.append(int(comp_goals / tot_goals * 100))
+            if meals_p > 0:
+                s_comps.append(meal_pct)
+            w_score = int(sum(s_comps) / len(s_comps)) if s_comps else (100 if comp_todos > 0 or comp_goals > 0 else 0)
+
+            resp_data = {
+                'success': True,
+                'action': action,
+                'completed_goals': comp_goals,
+                'total_goals': tot_goals,
+                'bought_shopping': bought_shop,
+                'total_shopping': tot_shopping,
+                'completed_todos': comp_todos,
+                'total_todos': tot_todos,
+                'todo_completion_pct': todo_pct,
+                'weekly_score': w_score,
+                'message': 'Operation completed successfully'
+            }
+
+            if action == 'add_weekly_goal' and goals:
+                resp_data['goal'] = goals[-1]
+                resp_data['message'] = 'Weekly goal added!'
+            elif action == 'toggle_weekly_goal':
+                goal_id = request.form.get('goal_id')
+                g_comp = next((g.get('completed') for g in goals if g.get('id') == goal_id), False)
+                resp_data['completed'] = g_comp
+                resp_data['goal_id'] = goal_id
+                resp_data['message'] = 'Weekly goal updated!'
+            elif action == 'delete_weekly_goal':
+                resp_data['goal_id'] = request.form.get('goal_id')
+                resp_data['message'] = 'Weekly goal removed.'
+            elif action == 'add_shopping_item' and shopping_list:
+                resp_data['item'] = shopping_list[-1]
+                resp_data['message'] = 'Shopping item added!'
+            elif action == 'toggle_shopping_item':
+                item_id = request.form.get('item_id')
+                s_b = next((s.get('bought') for s in shopping_list if s.get('id') == item_id), False)
+                resp_data['bought'] = s_b
+                resp_data['item_id'] = item_id
+                resp_data['message'] = 'Shopping item updated!'
+            elif action == 'delete_shopping_item':
+                resp_data['item_id'] = request.form.get('item_id')
+                resp_data['message'] = 'Shopping item deleted.'
+            elif action == 'add_daily_todo':
+                day_abbr = request.form.get('day_abbr')
+                if day_abbr in daily_todos and daily_todos[day_abbr]:
+                    resp_data['todo'] = daily_todos[day_abbr][-1]
+                resp_data['day_abbr'] = day_abbr
+                resp_data['message'] = f'To-do added to {day_abbr}!'
+            elif action == 'toggle_daily_todo':
+                day_abbr = request.form.get('day_abbr')
+                todo_id = request.form.get('todo_id')
+                t_comp = False
+                if day_abbr in daily_todos:
+                    t_comp = next((t.get('completed') for t in daily_todos[day_abbr] if t.get('id') == todo_id), False)
+                resp_data['completed'] = t_comp
+                resp_data['todo_id'] = todo_id
+                resp_data['day_abbr'] = day_abbr
+                resp_data['message'] = 'To-do updated!'
+            elif action == 'delete_daily_todo':
+                resp_data['todo_id'] = request.form.get('todo_id')
+                resp_data['day_abbr'] = request.form.get('day_abbr')
+                resp_data['message'] = 'To-do item deleted.'
+
+            return jsonify(resp_data)
         return redirect(url_for('planner.weekly', year=year_param, week=week_param))
+
+    days_of_week = []
+    for i in range(7):
+        d = start_of_week + timedelta(days=i)
+        days_of_week.append({
+            'abbr': day_abbrs[i],
+            'name': d.strftime('%A'),
+            'date_str': d.strftime('%b %d'),
+            'full_date': d.strftime('%Y-%m-%d'),
+            'date_obj': d,
+            'cascaded_items': get_all_cascaded_items_for_daily(current_user.id, d)
+        })
 
     goals = plan.goals if plan and plan.goals else []
     daily_todos = plan.daily_todos if plan and plan.daily_todos else {abbr: [] for abbr in day_abbrs}
@@ -708,11 +929,15 @@ def daily():
             task_text = request.form.get('task_text', '').strip()
             priority = request.form.get('priority', 'Medium')
             is_default = bool(request.form.get('is_default'))
+            task_tags = request.form.getlist('tags') or (request.form.get('tags', '').split(',') if request.form.get('tags') else [])
+            task_tags = [t.strip() for t in task_tags if t.strip()]
+
             if task_text:
                 new_task = {
                     'id': str(int(datetime.utcnow().timestamp() * 1000)),
                     'text': task_text,
                     'priority': priority,
+                    'tags': task_tags,
                     'completed': False,
                     'is_default': is_default,
                     'is_spillover': False,
@@ -805,13 +1030,15 @@ def daily():
             plan.schedule = new_schedule
             flag_modified(plan, 'schedule')
             db.session.commit()
-            flash('Hourly activity & mood tracker saved successfully!', 'success')
+            if not (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true'):
+                flash('Hourly activity & mood tracker saved successfully!', 'success')
 
         elif action == 'save_notes':
             notes = request.form.get('notes', '').strip()
             plan.notes = notes
             db.session.commit()
-            flash('Notes updated!', 'success')
+            if not (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true'):
+                flash('Notes updated!', 'success')
 
         elif action == 'add_depression_episode':
             start_time = request.form.get('start_time', '').strip() or 'N/A'
@@ -955,18 +1182,26 @@ def daily():
         else:
             normalized_schedule[slot] = {'activity': '', 'mood': ''}
     
+    cascaded_items = get_all_cascaded_items_for_daily(current_user.id, selected_date)
+    user_tags = get_user_tags(current_user)
+
+    raw_tasks = plan.tasks if plan and plan.tasks else []
+    sorted_tasks = sorted(raw_tasks, key=lambda t: 1 if (isinstance(t, dict) and t.get('completed')) else 0)
+
     return render_template(
         'planner/daily.html',
         selected_date=selected_date,
         today=today,
         plan=plan,
-        tasks=plan.tasks if plan else [],
+        tasks=sorted_tasks,
         schedule=normalized_schedule,
         notes=plan.notes if plan else '',
         depression_episodes=plan.depression_episodes if plan and plan.depression_episodes else [],
         memory_logs=plan.memory_logs if plan and plan.memory_logs else [],
         sleep_log=plan.sleep_log if plan and plan.sleep_log else {},
-        default_slots=default_slots
+        default_slots=default_slots,
+        cascaded_items=cascaded_items,
+        user_tags=user_tags
     )
 
 
@@ -1088,6 +1323,7 @@ def monthly():
             item_type = request.form.get('item_type', 'deadline')
             sticker = request.form.get('sticker', '').strip()
             image_url = request.form.get('image_url', '').strip()
+            remind_me = request.form.get('remind_me') in ['true', 'True', '1', 'on', True]
 
             if day_str and item_text:
                 if day_str not in calendar_days:
@@ -1100,7 +1336,8 @@ def monthly():
                     'text': item_text,
                     'type': item_type,
                     'sticker': sticker,
-                    'image_url': image_url
+                    'image_url': image_url,
+                    'remind_me': remind_me
                 })
                 day_entry['items'] = items
                 if sticker:
@@ -1121,6 +1358,7 @@ def monthly():
             item_type = request.form.get('item_type', 'deadline')
             sticker = request.form.get('sticker', '').strip()
             image_url = request.form.get('image_url', '').strip()
+            remind_me = request.form.get('remind_me') in ['true', 'True', '1', 'on', True]
 
             if day_str in calendar_days and item_id and item_text:
                 day_entry = calendar_days[day_str]
@@ -1131,6 +1369,7 @@ def monthly():
                         item['type'] = item_type
                         item['sticker'] = sticker
                         item['image_url'] = image_url
+                        item['remind_me'] = remind_me
                         break
                 day_entry['items'] = items
 
@@ -1195,7 +1434,66 @@ def monthly():
             flash('Monthly notes updated!', 'success')
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
-            return jsonify({'success': True, 'action': action, 'message': 'Operation completed successfully'})
+            tot_goals = len(goals)
+            comp_goals = sum(1 for g in goals if g.get('status') == 'Completed')
+
+            resp_data = {
+                'success': True,
+                'action': action,
+                'completed_goals': comp_goals,
+                'total_goals': tot_goals,
+                'message': 'Operation completed successfully'
+            }
+
+            if action == 'add_goal' and goals:
+                resp_data['goal'] = goals[-1]
+                resp_data['message'] = 'Goal added!'
+            elif action == 'toggle_goal_status':
+                goal_id = request.form.get('goal_id')
+                g_status = next((g.get('status') for g in goals if g.get('id') == goal_id), 'In Progress')
+                resp_data['goal_id'] = goal_id
+                resp_data['status'] = g_status
+                resp_data['message'] = 'Goal status updated!'
+            elif action == 'delete_goal':
+                resp_data['goal_id'] = request.form.get('goal_id')
+                resp_data['message'] = 'Goal removed.'
+            elif action == 'add_milestone' and milestones:
+                resp_data['milestone'] = milestones[-1]
+                resp_data['message'] = 'Milestone added!'
+            elif action == 'toggle_milestone':
+                ms_id = request.form.get('milestone_id')
+                ms_comp = next((m.get('completed') for m in milestones if m.get('id') == ms_id), False)
+                resp_data['milestone_id'] = ms_id
+                resp_data['completed'] = ms_comp
+                resp_data['message'] = 'Milestone updated!'
+            elif action == 'delete_milestone':
+                resp_data['milestone_id'] = request.form.get('milestone_id')
+                resp_data['message'] = 'Milestone deleted.'
+            elif action in ['add_calendar_item', 'edit_calendar_item']:
+                day_str = str(request.form.get('day', '')).strip()
+                resp_data['day'] = day_str
+                resp_data['day_entry'] = calendar_days.get(day_str, {'items': [], 'sticker': '', 'image_url': ''})
+                resp_data['message'] = 'Calendar plan saved!'
+            elif action == 'delete_calendar_item':
+                day_str = str(request.form.get('day', '')).strip()
+                resp_data['day'] = day_str
+                resp_data['item_id'] = request.form.get('item_id')
+                resp_data['day_entry'] = calendar_days.get(day_str, {'items': [], 'sticker': '', 'image_url': ''})
+                resp_data['message'] = 'Calendar item removed.'
+            elif action == 'delete_day_sticker':
+                day_str = str(request.form.get('day', '')).strip()
+                resp_data['day'] = day_str
+                resp_data['message'] = f'Day sticker cleared for Day {day_str}.'
+            elif action == 'add_habit' and habits:
+                days_in_m = calendar.monthrange(selected_year, selected_month)[1]
+                resp_data['habit'] = habits[-1]
+                resp_data['days_in_month'] = days_in_m
+                resp_data['message'] = 'Habit added!'
+            elif action == 'delete_habit':
+                resp_data['habit_id'] = request.form.get('habit_id')
+                resp_data['message'] = 'Habit deleted.'
+
+            return jsonify(resp_data)
         return redirect(url_for('planner.monthly', year=selected_year, month=selected_month))
 
     days_in_month = calendar.monthrange(selected_year, selected_month)[1]
@@ -1230,6 +1528,8 @@ def monthly():
             'notes': wp.notes or ''
         })
 
+    cascaded_yearly_events = get_yearly_events_for_month(current_user.id, selected_year, selected_month)
+
     return render_template(
         'planner/monthly.html',
         selected_year=selected_year,
@@ -1245,6 +1545,7 @@ def monthly():
         calendar_days=plan.calendar_days if (plan and plan.calendar_days) else {},
         notes=plan.notes if plan else '',
         weekly_summaries_list=weekly_summaries_list,
+        cascaded_yearly_events=cascaded_yearly_events,
         calendar=calendar
     )
 
@@ -1264,11 +1565,12 @@ def yearly():
         action = request.form.get('action')
         
         if not plan:
-            plan = YearlyPlan(user_id=current_user.id, year=selected_year, resolutions=[], objectives=[], reflections='')
+            plan = YearlyPlan(user_id=current_user.id, year=selected_year, resolutions=[], objectives=[], events=[], reflections='')
             db.session.add(plan)
 
         resolutions = plan.resolutions or []
         objectives = plan.objectives or []
+        events = plan.events or []
 
         if action == 'add_resolution':
             text = request.form.get('resolution_text', '').strip()
@@ -1333,6 +1635,42 @@ def yearly():
             flag_modified(plan, 'objectives')
             db.session.commit()
 
+        elif action == 'add_yearly_event':
+            title = request.form.get('event_title', '').strip()
+            event_type = request.form.get('event_type', 'goal')
+            event_date = request.form.get('event_date', '').strip()
+            notes = request.form.get('notes', '').strip()
+            if title and event_date:
+                new_event = {
+                    'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                    'title': title,
+                    'event_type': event_type,
+                    'date': event_date,
+                    'notes': notes,
+                    'completed': False
+                }
+                events.append(new_event)
+                plan.events = events
+                flag_modified(plan, 'events')
+                db.session.commit()
+                flash('Yearly event/goal added!', 'success')
+
+        elif action == 'toggle_yearly_event':
+            event_id = request.form.get('event_id')
+            for ev in events:
+                if ev.get('id') == event_id:
+                    ev['completed'] = not ev.get('completed', False)
+            plan.events = events
+            flag_modified(plan, 'events')
+            db.session.commit()
+
+        elif action == 'delete_yearly_event':
+            event_id = request.form.get('event_id')
+            plan.events = [ev for ev in events if ev.get('id') != event_id]
+            flag_modified(plan, 'events')
+            db.session.commit()
+            flash('Yearly event removed.', 'info')
+
         elif action == 'save_reflections':
             reflections = request.form.get('reflections', '').strip()
             plan.reflections = reflections
@@ -1340,7 +1678,59 @@ def yearly():
             flash('Yearly reflections saved!', 'success')
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
-            return jsonify({'success': True, 'action': action, 'message': 'Operation completed successfully'})
+            tot_events = len(events)
+            tot_res = len(resolutions)
+            acc_res = sum(1 for r in resolutions if r.get('completed'))
+
+            resp_data = {
+                'success': True,
+                'action': action,
+                'total_events': tot_events,
+                'total_resolutions': tot_res,
+                'accomplished_resolutions': acc_res,
+                'message': 'Operation completed successfully'
+            }
+
+            if action == 'add_yearly_event' and events:
+                resp_data['event'] = events[-1]
+                resp_data['message'] = 'Yearly event/goal added!'
+            elif action == 'toggle_yearly_event':
+                event_id = request.form.get('event_id')
+                ev_comp = next((ev.get('completed') for ev in events if ev.get('id') == event_id), False)
+                resp_data['event_id'] = event_id
+                resp_data['completed'] = ev_comp
+                resp_data['message'] = 'Yearly event updated!'
+            elif action == 'delete_yearly_event':
+                resp_data['event_id'] = request.form.get('event_id')
+                resp_data['message'] = 'Yearly event removed.'
+            elif action == 'add_resolution' and resolutions:
+                resp_data['resolution'] = resolutions[-1]
+                resp_data['message'] = 'Resolution added!'
+            elif action == 'toggle_resolution':
+                res_id = request.form.get('resolution_id')
+                res_comp = next((r.get('completed') for r in resolutions if r.get('id') == res_id), False)
+                resp_data['resolution_id'] = res_id
+                resp_data['completed'] = res_comp
+                resp_data['message'] = 'Resolution updated!'
+            elif action == 'delete_resolution':
+                resp_data['resolution_id'] = request.form.get('resolution_id')
+                resp_data['message'] = 'Resolution removed.'
+            elif action == 'add_objective' and objectives:
+                resp_data['objective'] = objectives[-1]
+                resp_data['message'] = 'Objective added!'
+            elif action == 'update_objective_status':
+                obj_id = request.form.get('objective_id')
+                obj_stat = request.form.get('status', 'In Progress')
+                resp_data['objective_id'] = obj_id
+                resp_data['status'] = obj_stat
+                resp_data['message'] = 'Objective status updated!'
+            elif action == 'delete_objective':
+                resp_data['objective_id'] = request.form.get('objective_id')
+                resp_data['message'] = 'Objective deleted.'
+            elif action == 'save_reflections':
+                resp_data['message'] = 'Annual reflections saved!'
+
+            return jsonify(resp_data)
         return redirect(url_for('planner.yearly', year=selected_year))
 
     # 12-Month Achievement Grid Summary Cascade (Monthly -> Yearly)
@@ -1390,6 +1780,7 @@ def yearly():
         plan=plan,
         resolutions=plan.resolutions if plan else [],
         objectives=plan.objectives if plan else [],
+        events=plan.events if (plan and plan.events) else [],
         reflections=plan.reflections if plan else '',
         months_achievement_grid=months_achievement_grid
     )
@@ -1482,6 +1873,7 @@ def api_edit_task():
     new_text = data.get('text', '').strip()
     new_priority = data.get('priority', 'Medium')
     is_default = bool(data.get('is_default'))
+    new_tags = data.get('tags')
 
     if not date_str or not task_id or not new_text:
         return jsonify({'success': False, 'message': 'Missing required fields'}), 400
@@ -1506,6 +1898,10 @@ def api_edit_task():
             t['text'] = new_text
             t['priority'] = new_priority
             t['is_default'] = is_default
+            if new_tags is not None:
+                if isinstance(new_tags, str):
+                    new_tags = [x.strip() for x in new_tags.split(',') if x.strip()]
+                t['tags'] = new_tags
             updated = True
 
             if old_is_default and not is_default:
@@ -1549,6 +1945,9 @@ def api_add_task():
     task_text = data.get('text', '').strip()
     priority = data.get('priority', 'Medium')
     is_default = bool(data.get('is_default'))
+    tags = data.get('tags', [])
+    if isinstance(tags, str):
+        tags = [x.strip() for x in tags.split(',') if x.strip()]
 
     if not date_str or not task_text:
         return jsonify({'success': False, 'message': 'Task text is required'}), 400
@@ -1568,6 +1967,7 @@ def api_add_task():
         'id': str(int(datetime.utcnow().timestamp() * 1000)),
         'text': task_text,
         'priority': priority,
+        'tags': tags,
         'completed': False,
         'is_default': is_default,
         'is_spillover': False,
@@ -1650,6 +2050,60 @@ def api_delete_task():
     db.session.commit()
 
     return jsonify({'success': True})
+
+
+# AJAX Endpoint for Custom Tag Management
+@planner.route('/api/tags', methods=['GET', 'POST'])
+@login_required
+def api_user_tags():
+    if request.method == 'GET':
+        return jsonify({'success': True, 'tags': get_user_tags(current_user)})
+
+    data = request.get_json() or {}
+    action = data.get('action', 'add')
+    user_tags = list(get_user_tags(current_user))
+
+    if action == 'add':
+        name = data.get('name', '').strip()
+        color = data.get('color', '#3b82f6').strip()
+        if name:
+            new_tag = {
+                'id': f'tag_{int(datetime.utcnow().timestamp() * 1000)}',
+                'name': name,
+                'color': color
+            }
+            user_tags.append(new_tag)
+            current_user.custom_tags = user_tags
+            flag_modified(current_user, 'custom_tags')
+            db.session.commit()
+            return jsonify({'success': True, 'tag': new_tag, 'tags': user_tags})
+        return jsonify({'success': False, 'message': 'Tag name is required'}), 400
+
+    elif action == 'delete':
+        tag_id = data.get('tag_id')
+        user_tags = [t for t in user_tags if t.get('id') != tag_id]
+        current_user.custom_tags = user_tags
+        flag_modified(current_user, 'custom_tags')
+        db.session.commit()
+        return jsonify({'success': True, 'tags': user_tags})
+
+    elif action == 'edit':
+        tag_id = data.get('tag_id')
+        name = data.get('name', '').strip()
+        color = data.get('color', '#3b82f6').strip()
+        for t in user_tags:
+            if t.get('id') == tag_id:
+                if name:
+                    t['name'] = name
+                if color:
+                    t['color'] = color
+                break
+        current_user.custom_tags = user_tags
+        flag_modified(current_user, 'custom_tags')
+        db.session.commit()
+        return jsonify({'success': True, 'tags': user_tags})
+
+    return jsonify({'success': False, 'message': 'Invalid tag action'}), 400
 
 
 # AJAX Endpoint for real-time background schedule & mood slot updates

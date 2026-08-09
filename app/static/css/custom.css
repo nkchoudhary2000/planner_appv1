@@ -147,3 +147,36 @@ body {
     transition: opacity 0.3s ease, transform 0.3s ease !important;
 }
 
+/* Marquee Animation Ticker */
+.marquee-wrapper:hover .marquee-track {
+    animation-play-state: paused;
+}
+
+.marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marqueeScroll 25s linear infinite;
+}
+
+@keyframes marqueeScroll {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* Dynamic Task Tag Badges & Custom Accent Borders */
+.task-tag-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+

@@ -23,6 +23,9 @@ class User(UserMixin, db.Model):
     google_drive_folder_name = db.Column(db.String(255), nullable=True)
     google_drive_folder_path = db.Column(db.String(512), nullable=True)
 
+    # Dynamic User Tags
+    custom_tags = db.Column(db.JSON, default=list)
+
 
     daily_plans = db.relationship('DailyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     monthly_plans = db.relationship('MonthlyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
@@ -84,6 +87,7 @@ class YearlyPlan(db.Model):
     year = db.Column(db.Integer, nullable=False)
     resolutions = db.Column(db.JSON, default=list)  # e.g. [{"id": "r1", "text": "Read 20 books", "category": "Personal"}]
     objectives = db.Column(db.JSON, default=list)   # e.g. [{"id": "o1", "title": "Master Python", "quarter": "Q1-Q4", "status": "On Track"}]
+    events = db.Column(db.JSON, default=list)       # e.g. [{"id": "e1", "title": "John's Birthday", "event_type": "birthday", "date": "2026-08-15", "notes": "", "completed": False}]
     reflections = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

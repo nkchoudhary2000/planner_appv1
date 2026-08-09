@@ -658,5 +658,270 @@ class PlannerTestCase(unittest.TestCase):
         self.assertEqual(plan.sleep_log.get('quality'), 9)
         self.assertEqual(plan.sleep_log.get('disruptions'), 'Woke up once at 3 AM')
 
+    def test_monthly_remind_me_dashboard_integration(self):
+        self.register_and_login()
+        today = date.today()
+
+        # Add a monthly plan item for today's day with remind_me=true
+        res = self.client.post(f'/monthly?year={today.year}&month={today.month}', data={
+            'action': 'add_calendar_item',
+            'day': str(today.day),
+            'item_text': 'Project Presentation Review',
+            'item_type': 'plan',
+            'sticker': '🚀',
+            'remind_me': 'true'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        # Check DB persistence
+        user = User.query.filter_by(username='testuser').first()
+        m_plan = MonthlyPlan.query.filter_by(user_id=user.id, year=today.year, month=today.month).first()
+        self.assertIsNotNone(m_plan)
+        day_items = m_plan.calendar_days.get(str(today.day), {}).get('items', [])
+        self.assertTrue(len(day_items) > 0)
+        self.assertTrue(day_items[0].get('remind_me'))
+
+        # Check Dashboard view includes the reminder in active panel
+        dash_res = self.client.get('/dashboard')
+        self.assertEqual(dash_res.status_code, 200)
+        self.assertIn('Project Presentation Review', dash_res.get_data(as_text=True))
+        self.assertIn('Remind Me', dash_res.get_data(as_text=True))
+
+    def test_yearly_annual_event_dashboard_reminder(self):
+        self.register_and_login()
+        today = date.today()
+        today_str = today.strftime('%Y-%m-%d')
+
+        # Add a yearly event scheduled for today
+        res = self.client.post(f'/yearly?year={today.year}', data={
+            'action': 'add_yearly_event',
+            'event_title': 'Annual Company Summit',
+            'event_type': 'conference',
+            'event_date': today_str,
+            'notes': 'Keynote presentation'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        # Check Dashboard shows Annual Event reminder
+        dash_res = self.client.get('/dashboard')
+        self.assertEqual(dash_res.status_code, 200)
+        self.assertIn('Annual Company Summit', dash_res.get_data(as_text=True))
+        self.assertIn('Annual Event', dash_res.get_data(as_text=True))
+
+    def test_weekly_goals_and_shopping_ajax(self):
+        self.register_and_login()
+        today = date.today()
+        current_year, current_week, _ = today.isocalendar()
+
+        # 1. Add Weekly Goal via AJAX
+        res = self.client.post(f'/weekly?year={current_year}&week={current_week}', data={
+            'action': 'add_weekly_goal',
+            'goal_title': 'Master Flask AJAX',
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['action'], 'add_weekly_goal')
+        self.assertIn('goal', data)
+        self.assertEqual(data['goal']['title'], 'Master Flask AJAX')
+        goal_id = data['goal']['id']
+
+        # 2. Toggle Weekly Goal via AJAX
+        t_res = self.client.post(f'/weekly?year={current_year}&week={current_week}', data={
+            'action': 'toggle_weekly_goal',
+            'goal_id': goal_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(t_res.status_code, 200)
+        t_data = t_res.get_json()
+        self.assertTrue(t_data['success'])
+        self.assertTrue(t_data['completed'])
+
+        # 3. Add Shopping Item via AJAX
+        s_res = self.client.post(f'/weekly?year={current_year}&week={current_week}', data={
+            'action': 'add_shopping_item',
+            'item_name': 'Organic Apples',
+            'category': 'Groceries',
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(s_res.status_code, 200)
+        s_data = s_res.get_json()
+        self.assertTrue(s_data['success'])
+        self.assertEqual(s_data['item']['item'], 'Organic Apples')
+        item_id = s_data['item']['id']
+
+        # 4. Toggle Shopping Item via AJAX
+        st_res = self.client.post(f'/weekly?year={current_year}&week={current_week}', data={
+            'action': 'toggle_shopping_item',
+            'item_id': item_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(st_res.status_code, 200)
+        st_data = st_res.get_json()
+        self.assertTrue(st_data['success'])
+        self.assertTrue(st_data['bought'])
+
+        # 5. Delete Weekly Goal and Shopping Item via AJAX
+        d1 = self.client.post(f'/weekly?year={current_year}&week={current_week}', data={
+            'action': 'delete_weekly_goal',
+            'goal_id': goal_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertTrue(d1.get_json()['success'])
+
+        d2 = self.client.post(f'/weekly?year={current_year}&week={current_week}', data={
+            'action': 'delete_shopping_item',
+            'item_id': item_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertTrue(d2.get_json()['success'])
+
+    def test_monthly_goals_milestones_and_calendar_ajax(self):
+        """Test adding, toggling, and deleting monthly goals, milestones, and calendar plans via AJAX."""
+        self.register_and_login()
+        today = date.today()
+
+        # 1. Add Monthly Goal via AJAX
+        res = self.client.post(f'/monthly?year={today.year}&month={today.month}', data={
+            'action': 'add_goal',
+            'goal_title': 'Launch Product V2',
+            'category': 'Career',
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['goal']['title'], 'Launch Product V2')
+        goal_id = data['goal']['id']
+
+        # 2. Toggle Monthly Goal via AJAX
+        t_res = self.client.post(f'/monthly?year={today.year}&month={today.month}', data={
+            'action': 'toggle_goal_status',
+            'goal_id': goal_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(t_res.status_code, 200)
+        t_data = t_res.get_json()
+        self.assertTrue(t_data['success'])
+        self.assertEqual(t_data['status'], 'Completed')
+
+        # 3. Add Milestone via AJAX
+        m_res = self.client.post(f'/monthly?year={today.year}&month={today.month}', data={
+            'action': 'add_milestone',
+            'milestone_title': 'Code Review Passed',
+            'target_day': '15',
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(m_res.status_code, 200)
+        m_data = m_res.get_json()
+        self.assertTrue(m_data['success'])
+        self.assertEqual(m_data['milestone']['title'], 'Code Review Passed')
+        ms_id = m_data['milestone']['id']
+
+        # 4. Add Calendar Item via AJAX
+        c_res = self.client.post(f'/monthly?year={today.year}&month={today.month}', data={
+            'action': 'add_calendar_item',
+            'day': '15',
+            'item_text': 'Release Build 1.0',
+            'item_type': 'deadline',
+            'sticker': '🚀',
+            'remind_me': 'true',
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(c_res.status_code, 200)
+        c_data = c_res.get_json()
+        self.assertTrue(c_data['success'])
+
+        # 5. Delete Goal & Milestone via AJAX
+        d1 = self.client.post(f'/monthly?year={today.year}&month={today.month}', data={
+            'action': 'delete_goal',
+            'goal_id': goal_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertTrue(d1.get_json()['success'])
+
+        d2 = self.client.post(f'/monthly?year={today.year}&month={today.month}', data={
+            'action': 'delete_milestone',
+            'milestone_id': ms_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertTrue(d2.get_json()['success'])
+
+    def test_yearly_events_resolutions_and_objectives_ajax(self):
+        """Test adding, toggling, updating, and deleting yearly events, resolutions, and objectives via AJAX."""
+        self.register_and_login()
+        today = date.today()
+
+        # 1. Add Yearly Event via AJAX
+        res = self.client.post(f'/yearly?year={today.year}', data={
+            'action': 'add_yearly_event',
+            'event_title': 'Annual Gala 2026',
+            'event_type': 'event',
+            'event_date': f'{today.year}-12-25',
+            'notes': 'Dress code black tie',
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['event']['title'], 'Annual Gala 2026')
+        ev_id = data['event']['id']
+
+        # 2. Toggle Yearly Event via AJAX
+        t_res = self.client.post(f'/yearly?year={today.year}', data={
+            'action': 'toggle_yearly_event',
+            'event_id': ev_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(t_res.status_code, 200)
+        self.assertTrue(t_res.get_json()['success'])
+
+        # 3. Add Resolution via AJAX
+        r_res = self.client.post(f'/yearly?year={today.year}', data={
+            'action': 'add_resolution',
+            'resolution_text': 'Run Half Marathon',
+            'category': 'Health',
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(r_res.status_code, 200)
+        r_data = r_res.get_json()
+        self.assertTrue(r_data['success'])
+        res_id = r_data['resolution']['id']
+
+        # 4. Add Objective via AJAX
+        o_res = self.client.post(f'/yearly?year={today.year}', data={
+            'action': 'add_objective',
+            'objective_title': 'Expand Market to EU',
+            'quarter': 'Q2',
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(o_res.status_code, 200)
+        o_data = o_res.get_json()
+        self.assertTrue(o_data['success'])
+        obj_id = o_data['objective']['id']
+
+        # 5. Delete Event, Resolution, and Objective via AJAX
+        d1 = self.client.post(f'/yearly?year={today.year}', data={
+            'action': 'delete_yearly_event',
+            'event_id': ev_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertTrue(d1.get_json()['success'])
+
+        d2 = self.client.post(f'/yearly?year={today.year}', data={
+            'action': 'delete_resolution',
+            'resolution_id': res_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertTrue(d2.get_json()['success'])
+
+        d3 = self.client.post(f'/yearly?year={today.year}', data={
+            'action': 'delete_objective',
+            'objective_id': obj_id,
+            'is_ajax': 'true'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertTrue(d3.get_json()['success'])
+
 if __name__ == '__main__':
     unittest.main()
