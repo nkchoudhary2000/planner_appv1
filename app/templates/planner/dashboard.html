@@ -12,7 +12,7 @@
                 <span>Live Dashboard</span>
             </div>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-white">
-                Good day, {{ current_user.username }}!
+                Good day, <span id="dashboard-welcome-name">{{ current_user.name }}</span>!
             </h1>
             <p class="text-slate-400 text-sm">
                 Today is <span class="text-slate-200 font-medium">{{ today.strftime('%A, %B %d, %Y') }}</span>. Here is your productivity overview.

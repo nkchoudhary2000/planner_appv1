@@ -77,6 +77,14 @@ def process_task_spillovers(user_id, target_date):
     if not past_plans:
         return
 
+    # Quick check: if no past plan contains uncompleted non-default tasks, return immediately!
+    has_uncompleted = any(
+        any(isinstance(t, dict) and not t.get('completed') and not t.get('is_default') for t in (p.tasks or []))
+        for p in past_plans
+    )
+    if not has_uncompleted:
+        return
+
     plan_map = {p.date: p for p in past_plans}
     earliest_date = past_plans[0].date
 
@@ -535,6 +543,80 @@ def dashboard():
     )
 
 
+def carry_forward_unbought_shopping_items(user_id, target_year, target_week):
+    """
+    Moves unbought shopping list items (bought: False) from prior weekly plans
+    to the target week's shopping list, and removes them from prior weekly plans.
+    """
+    first_day_of_year = date(target_year, 1, 4)
+    start_of_target_week = first_day_of_year + timedelta(weeks=target_week - 1) - timedelta(days=first_day_of_year.weekday())
+
+    target_plan = WeeklyPlan.query.filter_by(
+        user_id=user_id,
+        year=target_year,
+        week_number=target_week
+    ).first()
+
+    prior_plans = WeeklyPlan.query.filter(
+        WeeklyPlan.user_id == user_id,
+        WeeklyPlan.start_date < start_of_target_week
+    ).order_by(WeeklyPlan.start_date.asc()).all()
+
+    items_to_move = []
+    modified_priors = False
+
+    for prior_plan in prior_plans:
+        p_list = prior_plan.shopping_list or []
+        if not p_list:
+            continue
+        
+        bought_items = []
+        unbought_items = []
+
+        for item in p_list:
+            if isinstance(item, dict):
+                if item.get('bought'):
+                    bought_items.append(item)
+                else:
+                    unbought_items.append(item)
+
+        if unbought_items:
+            items_to_move.extend(unbought_items)
+            prior_plan.shopping_list = bought_items
+            flag_modified(prior_plan, 'shopping_list')
+            modified_priors = True
+
+    if items_to_move:
+        if not target_plan:
+            target_plan = WeeklyPlan(
+                user_id=user_id,
+                year=target_year,
+                week_number=target_week,
+                start_date=start_of_target_week,
+                goals=[],
+                daily_todos={abbr: [] for abbr in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']},
+                shopping_list=[],
+                meals_menu={abbr: {'breakfast': '', 'lunch': '', 'dinner': ''} for abbr in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']},
+                notes=''
+            )
+            db.session.add(target_plan)
+
+        target_list = list(target_plan.shopping_list or [])
+        existing_ids = {s.get('id') for s in target_list if isinstance(s, dict) and s.get('id')}
+
+        for item in items_to_move:
+            if item.get('id') not in existing_ids:
+                target_list.append(item)
+
+        target_plan.shopping_list = target_list
+        flag_modified(target_plan, 'shopping_list')
+        db.session.commit()
+    elif modified_priors:
+        db.session.commit()
+
+    return target_plan
+
+
 @planner.route('/weekly', methods=['GET', 'POST'])
 @login_required
 def weekly():
@@ -553,7 +635,11 @@ def weekly():
 
     day_abbrs = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     days_of_week = []
-    plan = WeeklyPlan.query.filter_by(user_id=current_user.id, year=year_param, week_number=week_param).first()
+    
+    # Automatically move unbought shopping list items from prior weeks to target week
+    plan = carry_forward_unbought_shopping_items(current_user.id, year_param, week_param)
+    if not plan:
+        plan = WeeklyPlan.query.filter_by(user_id=current_user.id, year=year_param, week_number=week_param).first()
 
     if request.method == 'POST':
         action = request.form.get('action')
@@ -778,16 +864,31 @@ def weekly():
             return jsonify(resp_data)
         return redirect(url_for('planner.weekly', year=year_param, week=week_param))
 
+    start_year = start_of_week.year
+    end_year = end_of_week.year
+
+    yearly_plans = YearlyPlan.query.filter(YearlyPlan.user_id == current_user.id, YearlyPlan.year.in_([start_year, end_year])).all()
+    yearly_map = {yp.year: yp for yp in yearly_plans}
+
+    month_keys = list({(start_of_week.year, start_of_week.month), (end_of_week.year, end_of_week.month)})
+    monthly_plans = MonthlyPlan.query.filter(
+        MonthlyPlan.user_id == current_user.id,
+        db.or_(*[db.and_(MonthlyPlan.year == y, MonthlyPlan.month == m) for y, m in month_keys])
+    ).all()
+    monthly_map = {(mp.year, mp.month): mp for mp in monthly_plans}
+
     days_of_week = []
     for i in range(7):
         d = start_of_week + timedelta(days=i)
+        yp = yearly_map.get(d.year)
+        mp = monthly_map.get((d.year, d.month))
         days_of_week.append({
             'abbr': day_abbrs[i],
             'name': d.strftime('%A'),
             'date_str': d.strftime('%b %d'),
             'full_date': d.strftime('%Y-%m-%d'),
             'date_obj': d,
-            'cascaded_items': get_all_cascaded_items_for_daily(current_user.id, d)
+            'cascaded_items': get_all_cascaded_items_for_daily(current_user.id, d, yearly_plan=yp, monthly_plan=mp, weekly_plan=plan)
         })
 
     goals = plan.goals if plan and plan.goals else []
@@ -1870,12 +1971,14 @@ def api_edit_task():
     data = request.get_json() or {}
     date_str = data.get('date')
     task_id = data.get('task_id')
-    new_text = data.get('text', '').strip()
-    new_priority = data.get('priority', 'Medium')
-    is_default = bool(data.get('is_default'))
+    new_text = data.get('text', '').strip() if 'text' in data else None
+    new_priority = data.get('priority')
+    is_default = bool(data.get('is_default')) if 'is_default' in data else None
     new_tags = data.get('tags')
+    new_status = data.get('status')
+    new_note = data.get('note')
 
-    if not date_str or not task_id or not new_text:
+    if not date_str or not task_id:
         return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
     try:
@@ -1895,37 +1998,48 @@ def api_edit_task():
             old_text = t.get('text', '').strip().lower()
             old_is_default = t.get('is_default', False)
 
-            t['text'] = new_text
-            t['priority'] = new_priority
-            t['is_default'] = is_default
+            if new_text is not None:
+                t['text'] = new_text
+            if new_priority is not None:
+                t['priority'] = new_priority
+            if is_default is not None:
+                t['is_default'] = is_default
+                if old_is_default and not is_default:
+                    raw_sched = plan.schedule or {}
+                    if not isinstance(raw_sched, dict):
+                        raw_sched = {}
+                    deleted_defs = list(raw_sched.get('_deleted_defaults', []))
+                    if old_text and old_text not in deleted_defs:
+                        deleted_defs.append(old_text)
+                    if task_id not in deleted_defs:
+                        deleted_defs.append(task_id)
+                    raw_sched['_deleted_defaults'] = deleted_defs
+                    plan.schedule = raw_sched
+                    flag_modified(plan, 'schedule')
+                elif is_default:
+                    raw_sched = plan.schedule or {}
+                    if isinstance(raw_sched, dict):
+                        t_key = (new_text or t.get('text', '')).lower()
+                        deleted_defs = [d for d in raw_sched.get('_deleted_defaults', []) if str(d).lower() != t_key and str(d) != task_id]
+                        dismissed = [d for d in raw_sched.get('_dismissed_tasks', []) if str(d).lower() != t_key and str(d) != task_id]
+                        raw_sched['_deleted_defaults'] = deleted_defs
+                        raw_sched['_dismissed_tasks'] = dismissed
+                        plan.schedule = raw_sched
+                        flag_modified(plan, 'schedule')
             if new_tags is not None:
                 if isinstance(new_tags, str):
                     new_tags = [x.strip() for x in new_tags.split(',') if x.strip()]
                 t['tags'] = new_tags
+            if new_status is not None:
+                st = str(new_status).strip()
+                t['status'] = st
+                if st == 'Completed':
+                    t['completed'] = True
+                elif st in ['To Do', 'In Progress', 'Undone']:
+                    t['completed'] = False
+            if new_note is not None:
+                t['note'] = str(new_note).strip()
             updated = True
-
-            if old_is_default and not is_default:
-                raw_sched = plan.schedule or {}
-                if not isinstance(raw_sched, dict):
-                    raw_sched = {}
-                deleted_defs = list(raw_sched.get('_deleted_defaults', []))
-                if old_text and old_text not in deleted_defs:
-                    deleted_defs.append(old_text)
-                if task_id not in deleted_defs:
-                    deleted_defs.append(task_id)
-                raw_sched['_deleted_defaults'] = deleted_defs
-                plan.schedule = raw_sched
-                flag_modified(plan, 'schedule')
-            elif is_default:
-                raw_sched = plan.schedule or {}
-                if isinstance(raw_sched, dict):
-                    t_key = new_text.lower()
-                    deleted_defs = [d for d in raw_sched.get('_deleted_defaults', []) if str(d).lower() != t_key and str(d) != task_id]
-                    dismissed = [d for d in raw_sched.get('_dismissed_tasks', []) if str(d).lower() != t_key and str(d) != task_id]
-                    raw_sched['_deleted_defaults'] = deleted_defs
-                    raw_sched['_dismissed_tasks'] = dismissed
-                    plan.schedule = raw_sched
-                    flag_modified(plan, 'schedule')
             break
 
     if updated:
@@ -1946,6 +2060,8 @@ def api_add_task():
     priority = data.get('priority', 'Medium')
     is_default = bool(data.get('is_default'))
     tags = data.get('tags', [])
+    note = data.get('note', '').strip()
+    status = data.get('status', 'To Do')
     if isinstance(tags, str):
         tags = [x.strip() for x in tags.split(',') if x.strip()]
 
@@ -1968,6 +2084,8 @@ def api_add_task():
         'text': task_text,
         'priority': priority,
         'tags': tags,
+        'status': status,
+        'note': note,
         'completed': False,
         'is_default': is_default,
         'is_spillover': False,
@@ -1991,6 +2109,49 @@ def api_add_task():
             flag_modified(plan, 'schedule')
 
     db.session.commit()
+    return jsonify({'success': True, 'task': new_task})
+
+
+# AJAX Endpoint for dynamic task duplication
+@planner.route('/api/daily/task/duplicate', methods=['POST'])
+@login_required
+def api_duplicate_task():
+    data = request.get_json() or {}
+    date_str = data.get('date')
+    task_id = data.get('task_id')
+
+    if not date_str or not task_id:
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+    if not plan:
+        return jsonify({'success': False, 'message': 'Plan not found'}), 404
+
+    tasks = plan.tasks or []
+    source_task = None
+    for t in tasks:
+        if isinstance(t, dict) and t.get('id') == task_id:
+            source_task = t
+            break
+
+    if not source_task:
+        return jsonify({'success': False, 'message': 'Source task not found'}), 404
+
+    new_task = dict(source_task)
+    new_task['id'] = str(int(datetime.utcnow().timestamp() * 1000))
+    new_task['completed'] = False
+    new_task['status'] = 'To Do'
+    
+    tasks.append(new_task)
+    plan.tasks = tasks
+    flag_modified(plan, 'tasks')
+    db.session.commit()
+
     return jsonify({'success': True, 'task': new_task})
 
 

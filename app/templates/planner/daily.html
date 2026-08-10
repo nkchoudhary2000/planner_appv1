@@ -54,14 +54,31 @@
         <!-- Left Column: Task Checklist -->
         <div class="lg:col-span-5 space-y-6">
             <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-700/50 gap-2">
                     <div class="flex items-center space-x-2">
                         <i class="fa-solid fa-list-check text-brand-400"></i>
                         <h2 class="text-lg font-bold text-white">Daily Tasks Checklist</h2>
                     </div>
-                    <span id="task-done-counter" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full font-medium border border-slate-700">
-                        {{ tasks|selectattr('completed')|list|length }}/{{ tasks|length }} Done
-                    </span>
+                    <div class="flex items-center space-x-2 flex-wrap gap-2">
+                        <!-- View Selector Buttons: Status & Tag / Tag / Flat -->
+                        <div class="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 text-xs">
+                            <button type="button" id="btn-view-status_tag" onclick="setTaskViewMode('status_tag')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-brand-600 text-white shadow-sm flex items-center space-x-1" title="Group by Status (To Do / Done) then Tag">
+                                <i class="fa-solid fa-layer-group text-[10px]"></i>
+                                <span class="hidden sm:inline">Status &amp; Tag</span>
+                            </button>
+                            <button type="button" id="btn-view-tag" onclick="setTaskViewMode('tag')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition-all flex items-center space-x-1" title="Group by Tag then Status">
+                                <i class="fa-solid fa-tags text-[10px]"></i>
+                                <span class="hidden sm:inline">Tag</span>
+                            </button>
+                            <button type="button" id="btn-view-flat" onclick="setTaskViewMode('flat')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition-all flex items-center space-x-1" title="Flat list without grouping">
+                                <i class="fa-solid fa-bars text-[10px]"></i>
+                                <span class="hidden sm:inline">Flat</span>
+                            </button>
+                        </div>
+                        <span id="task-done-counter" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full font-medium border border-slate-700">
+                            {{ tasks|selectattr('completed')|list|length }}/{{ tasks|length }} Done
+                        </span>
+                    </div>
                 </div>
 
                 <!-- Add Task Form (Instant AJAX) -->
@@ -145,19 +162,18 @@
 
                 <!-- Spillover Tasks Alert Banner -->
                 {% set spillover_tasks = tasks|selectattr('is_spillover')|list %}
-                {% if spillover_tasks %}
-                <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
+                {% set uncompleted_spillover = spillover_tasks|rejectattr('completed')|list %}
+                <div id="spillover-banner" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300 {{ 'hidden' if not uncompleted_spillover }}">
                     <div class="flex items-center space-x-2.5">
                         <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0">
                             <i class="fa-solid fa-triangle-exclamation text-xs"></i>
                         </div>
                         <div>
-                            <span class="font-bold text-amber-200">{{ spillover_tasks|length }} Spillover Task(s) Carried Forward</span>
+                            <span id="spillover-banner-text" class="font-bold text-amber-200">{{ uncompleted_spillover|length }} Spillover Task(s) Carried Forward</span>
                             <p class="text-[11px] text-amber-300/80">Uncompleted tasks from previous days have automatically rolled over with escalated severity.</p>
                         </div>
                     </div>
                 </div>
-                {% endif %}
 
                 <!-- Task List Items (Drag & Drop Re-orderable, Swipable Action Bar, Color Graded) -->
                 <div id="tasks-container" class="space-y-3 pt-2">
@@ -169,6 +185,7 @@
                         {% set task_tag_ids = task.get('tags', []) %}
                         {% set first_tag = (user_tags|selectattr('id', 'in', task_tag_ids)|first) if (task_tag_ids and user_tags) else None %}
                         {% set card_accent_style = ('border-left: 4px solid ' ~ first_tag.color ~ ';') if first_tag else '' %}
+                        {% set task_status = task.get('status', 'Completed' if task.completed else 'To Do') %}
 
                         <div class="task-card-wrapper relative rounded-xl border {{ 'bg-indigo-950/30 border-indigo-500/40 hover:border-indigo-400 text-indigo-100 shadow-sm shadow-indigo-500/10' if is_def else ('bg-rose-950/30 border-rose-500/50 hover:border-rose-400 shadow-sm shadow-rose-500/10' if (is_spill and task.priority == 'High') else ('bg-amber-950/20 border-amber-500/35 hover:border-amber-400' if is_spill else 'bg-slate-800/60 border-slate-700/40 hover:border-slate-600')) }} transition-all"
                              style="{{ card_accent_style }}"
@@ -176,13 +193,16 @@
                              data-task-text="{{ task.text }}"
                              data-task-priority="{{ task.priority }}"
                              data-task-tag="{{ task_tag_ids[0] if task_tag_ids else '' }}"
-                             data-task-default="{{ 'true' if is_def else 'false' }}">
+                             data-task-default="{{ 'true' if is_def else 'false' }}"
+                             data-task-spillover="{{ 'true' if is_spill else 'false' }}"
+                             data-task-spillover-count="{{ spill_count }}"
+                             data-task-status="{{ task_status }}">
                             <!-- Main Task Card Header/Content -->
-                            <div class="task-item flex items-center justify-between p-2.5 sm:p-3.5 gap-2">
+                            <div class="task-item flex items-start justify-between p-3 gap-2 sm:gap-3">
                                 
-                                <div class="flex items-center space-x-1.5 sm:space-x-2 flex-1 min-w-0 pr-1">
-                                    <!-- Drag Handle (Just left of text) -->
-                                    <i class="fa-solid fa-grip-vertical text-slate-500 hover:text-slate-200 cursor-grab active:cursor-grabbing px-0.5 text-sm flex-shrink-0 drag-handle" 
+                                <div class="flex items-start space-x-2.5 flex-1 min-w-0">
+                                    <!-- Drag Handle -->
+                                    <i class="fa-solid fa-grip-vertical text-slate-500 hover:text-slate-200 cursor-grab active:cursor-grabbing px-0.5 pt-1 text-sm flex-shrink-0 drag-handle" 
                                        draggable="true" 
                                        title="Click and drag to re-order task"></i>
 
@@ -190,95 +210,80 @@
                                     <input type="checkbox" 
                                            {{ 'checked' if task.completed }} 
                                            onchange="toggleTask('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)"
-                                           class="custom-checkbox flex-shrink-0">
+                                           class="custom-checkbox flex-shrink-0 mt-0.5">
 
-                                    <!-- Task Text (Max Priority & Visibility) -->
-                                    <span class="task-text text-xs sm:text-sm font-medium break-words flex-1 {{ 'line-through-fade text-slate-400' if task.completed else ('text-indigo-200 font-medium' if is_def else 'text-slate-200') }}">
-                                        {{ task.text }}
-                                    </span>
+                                    <!-- Task Content Container (Text gets FULL width, Badges in separate row below) -->
+                                    <div class="flex-1 min-w-0 space-y-1.5">
+                                        <span class="task-text block text-xs sm:text-sm font-medium break-words w-full leading-relaxed {{ 'line-through-fade text-slate-400' if task.completed else ('text-indigo-200 font-medium' if is_def else 'text-slate-200') }}">
+                                            {{ task.text }}
+                                        </span>
+
+                                        <!-- Dedicated Separate Row for Badges -->
+                                        <div class="task-badges-row flex items-center flex-wrap gap-1.5 pt-0.5">
+                                            {% if task_status == 'In Progress' %}
+                                            <!-- In Progress Status Badge -->
+                                            <span class="task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center space-x-1 shadow-sm">
+                                                <i class="fa-solid fa-spinner text-indigo-400 text-[10px] animate-spin"></i>
+                                                <span>In Progress</span>
+                                            </span>
+                                            {% elif task_status == 'Duplicate' %}
+                                            <!-- Duplicate Status Badge -->
+                                            <span class="task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center space-x-1 shadow-sm" title="Task marked as duplicate">
+                                                <i class="fa-solid fa-copy text-purple-400 text-[10px]"></i>
+                                                <span>Duplicate</span>
+                                            </span>
+                                            {% elif task_status == 'Undone' %}
+                                            <!-- Undone Status Badge -->
+                                            <span class="task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-700/80 text-slate-300 border border-slate-600 flex items-center space-x-1 shadow-sm">
+                                                <i class="fa-solid fa-pause text-slate-400 text-[10px]"></i>
+                                                <span>Undone</span>
+                                            </span>
+                                            {% endif %}
+
+                                            {% if is_spill %}
+                                            <!-- Spillover Badge -->
+                                            <span class="task-spillover-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1 shadow-sm" title="Carried forward from {{ task.original_date or 'previous day' }}">
+                                                <i class="fa-solid fa-fire text-amber-400 text-[10px]"></i>
+                                                <span>Spillover{{ (' ' ~ spill_count ~ 'd') if spill_count > 1 else '' }}</span>
+                                            </span>
+                                            {% endif %}
+
+                                            <!-- Severity / Priority Badge -->
+                                            <span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider {{ 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' if task.priority == 'High' else ('bg-amber-500/20 text-amber-300 border border-amber-500/30' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300 border border-slate-600') }}">
+                                                {{ task.priority }}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                <div class="flex items-center space-x-1.5 flex-shrink-0 flex-wrap gap-1">
-                                    <!-- Dynamic Tag Badges -->
-                                    {% if task_tag_ids %}
-                                        {% for t_id in task_tag_ids %}
-                                            {% set tag_match = (user_tags|selectattr('id', 'equalto', t_id)|first) if user_tags else None %}
-                                            {% if tag_match %}
-                                                <span class="task-tag-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-white shadow-sm" style="background-color: {{ tag_match.color }}; border-color: {{ tag_match.color }};">
-                                                    {{ tag_match.name }}
-                                                </span>
-                                            {% endif %}
-                                        {% endfor %}
-                                    {% endif %}
-
-                                    <!-- Severity / Priority Badge -->
-                                    <span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider {{ 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' if task.priority == 'High' else ('bg-amber-500/20 text-amber-300 border border-amber-500/30' if task.priority == 'Medium' else 'bg-slate-700 text-slate-300 border border-slate-600') }}">
-                                        {{ task.priority }}
-                                    </span>
-
-                                    <!-- Single Action Menu Toggle Button (Ellipsis) -->
-                                    <button type="button" 
-                                            onclick="toggleTaskActions('{{ task.id }}')" 
-                                            class="p-1.5 rounded-lg bg-slate-900/80 hover:bg-indigo-600/40 text-slate-300 hover:text-indigo-200 border border-slate-700/80 transition-all cursor-pointer flex-shrink-0" 
-                                            title="Task Actions & Options">
-                                        <i class="fa-solid fa-ellipsis-vertical text-xs pointer-events-none"></i>
-                                    </button>
-                                </div>
+                                <!-- Single Action Menu Toggle Button (Ellipsis) -->
+                                <button type="button" 
+                                        onclick="toggleTaskActions('{{ task.id }}')" 
+                                        class="p-1.5 rounded-lg bg-slate-900/80 hover:bg-indigo-600/40 text-slate-300 hover:text-indigo-200 border border-slate-700/80 transition-all cursor-pointer flex-shrink-0 self-start mt-0.5" 
+                                        title="Task Actions & Options">
+                                    <i class="fa-solid fa-ellipsis-vertical text-xs pointer-events-none"></i>
+                                </button>
                             </div>
 
-                            <!-- Animated Smooth Sliding Action Drawer (Opens on click of ⋮ button - Pure Icon Actions) -->
+                            <!-- Animated Smooth Sliding Action Drawer (Opens on click of ⋮ button) -->
                             <div id="action-drawer-{{ task.id }}" 
                                  class="task-action-drawer hidden bg-slate-900/95 border-t border-slate-700/60 rounded-b-xl p-2.5 transition-all duration-300">
                                 <div class="flex items-center justify-between gap-2">
-                                    <!-- Icon Badges Summary -->
-                                    <div class="flex items-center space-x-1.5">
-                                        {% if is_def %}
-                                        <span class="px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-xs font-medium flex items-center space-x-1" title="Everyday Default Task">
-                                            <i class="fa-solid fa-rotate text-indigo-400 text-xs"></i>
-                                            <span class="text-[10px]">Default</span>
-                                        </span>
-                                        {% endif %}
-                                        {% if is_spill %}
-                                        <span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1" title="Carried forward from {{ task.original_date or 'previous day' }}">
-                                            <i class="fa-solid fa-fire text-amber-400 text-xs"></i>
-                                            <span class="text-[10px]">{{ spill_count }}d</span>
-                                        </span>
-                                        {% endif %}
-                                    </div>
+                                    <!-- Status Selector Dropdown -->
+                                    <select onchange="changeTaskStatus('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ task.id }}', this.value)" class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer">
+                                        <option value="To Do" {{ 'selected' if task_status == 'To Do' }}>📌 To Do</option>
+                                        <option value="In Progress" {{ 'selected' if task_status == 'In Progress' }}>🔄 In Progress</option>
+                                        <option value="Undone" {{ 'selected' if task_status == 'Undone' }}>⏸️ Undone</option>
+                                        <option value="Completed" {{ 'selected' if task_status == 'Completed' }}>✅ Completed</option>
+                                        <option value="Duplicate" {{ 'selected' if task_status == 'Duplicate' }}>📄 Duplicate</option>
+                                    </select>
 
-                                    <!-- Action Icon Buttons (Move Up, Move Down, Edit, Delete) -->
+                                    <!-- Action Icon Buttons -->
                                     <div class="flex items-center space-x-1.5 ml-auto">
-                                        <!-- Move Up Icon Button -->
-                                        <button type="button" 
-                                                onclick="moveTask(this, 'up')" 
-                                                class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer" 
-                                                title="Move Up">
-                                            <i class="fa-solid fa-chevron-up text-xs pointer-events-none"></i>
-                                        </button>
-
-                                        <!-- Move Down Icon Button -->
-                                        <button type="button" 
-                                                onclick="moveTask(this, 'down')" 
-                                                class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer" 
-                                                title="Move Down">
-                                            <i class="fa-solid fa-chevron-down text-xs pointer-events-none"></i>
-                                        </button>
-
-                                        <!-- Edit Task Icon Button -->
-                                        <button type="button" 
-                                                onclick="openEditTaskModal('{{ task.id }}')" 
-                                                class="w-8 h-8 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" 
-                                                title="Edit Task">
-                                            <i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i>
-                                        </button>
-
-                                        <!-- Delete Task Icon Button -->
-                                        <button type="button" 
-                                                onclick="deleteTaskAJAX('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)" 
-                                                class="w-8 h-8 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" 
-                                                title="Delete Task">
-                                            <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
-                                        </button>
+                                        <button type="button" onclick="moveTask(this, 'up')" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer" title="Move Up"><i class="fa-solid fa-chevron-up text-xs pointer-events-none"></i></button>
+                                        <button type="button" onclick="moveTask(this, 'down')" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer" title="Move Down"><i class="fa-solid fa-chevron-down text-xs pointer-events-none"></i></button>
+                                        <button type="button" onclick="openEditTaskModal('{{ task.id }}')" class="w-8 h-8 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" title="Edit Task Details"><i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i></button>
+                                        <button type="button" onclick="deleteTaskAJAX('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ task.id }}', this)" class="w-8 h-8 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" title="Delete Task"><i class="fa-solid fa-trash-can text-xs pointer-events-none"></i></button>
                                     </div>
                                 </div>
                             </div>
@@ -982,7 +987,7 @@
     padding-bottom: 0;
 }
 .task-action-drawer.is-open {
-    max-height: 80px;
+    max-height: 70px;
     opacity: 1;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
@@ -1177,6 +1182,10 @@ async function deleteUserTag(tagId) {
 }
 
 function updateTagDropdowns(tags) {
+    userTagsMap = {};
+    tags.forEach(t => {
+        userTagsMap[t.id] = { id: t.id, name: t.name, color: t.color };
+    });
     const selects = [document.getElementById('new-task-tag'), document.getElementById('edit-task-tag')];
     selects.forEach(select => {
         if (!select) return;
@@ -1192,6 +1201,7 @@ function updateTagDropdowns(tags) {
             select.appendChild(opt);
         });
     });
+    renderGroupedTasks();
 }
 
 function renderTagManagerList(tags) {
@@ -1284,6 +1294,7 @@ function appendTaskToDOM(task, dateStr) {
     const isDef = task.is_default;
     const isSpill = task.is_spillover || task.spillover_count;
     const taskTags = task.tags || [];
+    const taskStatus = task.status || (task.completed ? 'Completed' : 'To Do');
 
     let borderClass = 'bg-slate-800/60 border-slate-700/40 hover:border-slate-600';
     if (isDef) {
@@ -1303,7 +1314,22 @@ function appendTaskToDOM(task, dateStr) {
         priorityBadge = '<span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">Medium</span>';
     }
 
-    let tagBadges = '';
+    let statusBadge = '';
+    if (taskStatus === 'In Progress') {
+        statusBadge = '<span class="task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center space-x-1 shadow-sm"><i class="fa-solid fa-spinner text-indigo-400 text-[10px] animate-spin"></i><span>In Progress</span></span>';
+    } else if (taskStatus === 'Duplicate') {
+        statusBadge = '<span class="task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center space-x-1 shadow-sm" title="Task marked as duplicate"><i class="fa-solid fa-copy text-purple-400 text-[10px]"></i><span>Duplicate</span></span>';
+    } else if (taskStatus === 'Undone') {
+        statusBadge = '<span class="task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-700/80 text-slate-300 border border-slate-600 flex items-center space-x-1 shadow-sm"><i class="fa-solid fa-pause text-slate-400 text-[10px]"></i><span>Undone</span></span>';
+    }
+
+    let spilloverBadge = '';
+    if (isSpill) {
+        const spillCount = task.spillover_count || 1;
+        const spillDaysStr = spillCount > 1 ? ` ${spillCount}d` : '';
+        spilloverBadge = `<span class="task-spillover-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1 shadow-sm" title="Carried forward"><i class="fa-solid fa-fire text-amber-400 text-[10px]"></i><span>Spillover${spillDaysStr}</span></span>`;
+    }
+
     let accentStyle = '';
     if (taskTags.length > 0) {
         const tagSelect = document.getElementById('new-task-tag');
@@ -1311,9 +1337,7 @@ function appendTaskToDOM(task, dateStr) {
             const opt = tagSelect.querySelector(`option[value="${taskTags[0]}"]`);
             if (opt) {
                 const color = opt.getAttribute('data-color') || '#8b5cf6';
-                const name = opt.getAttribute('data-name') || 'Tag';
                 accentStyle = `border-left: 4px solid ${color};`;
-                tagBadges = `<span class="task-tag-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-white shadow-sm" style="background-color: ${color}; border-color: ${color};">${escapeHTML(name)}</span>`;
             }
         }
     }
@@ -1326,32 +1350,42 @@ function appendTaskToDOM(task, dateStr) {
     wrapper.setAttribute('data-task-priority', task.priority);
     wrapper.setAttribute('data-task-tag', taskTags.length > 0 ? taskTags[0] : '');
     wrapper.setAttribute('data-task-default', isDef ? 'true' : 'false');
+    wrapper.setAttribute('data-task-spillover', isSpill ? 'true' : 'false');
+    wrapper.setAttribute('data-task-spillover-count', task.spillover_count || '1');
+    wrapper.setAttribute('data-task-status', taskStatus);
     wrapper.setAttribute('draggable', 'true');
 
     wrapper.innerHTML = `
-        <div class="task-item flex items-center justify-between p-2.5 sm:p-3.5 gap-2">
-            <div class="flex items-center space-x-1.5 sm:space-x-2 flex-1 min-w-0 pr-1">
-                <i class="fa-solid fa-grip-vertical text-slate-500 hover:text-slate-200 cursor-grab active:cursor-grabbing px-0.5 text-sm flex-shrink-0 drag-handle" draggable="true" title="Click and drag to re-order task"></i>
-                <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask('${dateStr}', '${task.id}', this)" class="custom-checkbox flex-shrink-0">
-                <span class="task-text text-xs sm:text-sm font-medium break-words flex-1 ${task.completed ? 'line-through-fade text-slate-400' : (isDef ? 'text-indigo-200 font-medium' : 'text-slate-200')}">${escapeHTML(task.text)}</span>
+        <div class="task-item flex items-start justify-between p-3 gap-2 sm:gap-3">
+            <div class="flex items-start space-x-2.5 flex-1 min-w-0">
+                <i class="fa-solid fa-grip-vertical text-slate-500 hover:text-slate-200 cursor-grab active:cursor-grabbing px-0.5 pt-1 text-sm flex-shrink-0 drag-handle" draggable="true" title="Click and drag to re-order task"></i>
+                <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask('${dateStr}', '${task.id}', this)" class="custom-checkbox flex-shrink-0 mt-0.5">
+                <div class="flex-1 min-w-0 space-y-1.5">
+                    <span class="task-text block text-xs sm:text-sm font-medium break-words w-full leading-relaxed ${task.completed ? 'line-through-fade text-slate-400' : (isDef ? 'text-indigo-200 font-medium' : 'text-slate-200')}">${escapeHTML(task.text)}</span>
+                    <div class="task-badges-row flex items-center flex-wrap gap-1.5 pt-0.5">
+                        ${statusBadge}
+                        ${spilloverBadge}
+                        ${priorityBadge}
+                    </div>
+                </div>
             </div>
-            <div class="flex items-center space-x-1.5 flex-shrink-0 flex-wrap gap-1">
-                ${tagBadges}
-                ${priorityBadge}
-                <button type="button" onclick="toggleTaskActions('${task.id}')" class="p-1.5 rounded-lg bg-slate-900/80 hover:bg-indigo-600/40 text-slate-300 hover:text-indigo-200 border border-slate-700/80 transition-all cursor-pointer flex-shrink-0" title="Task Actions & Options">
-                    <i class="fa-solid fa-ellipsis-vertical text-xs pointer-events-none"></i>
-                </button>
-            </div>
+            <button type="button" onclick="toggleTaskActions('${task.id}')" class="p-1.5 rounded-lg bg-slate-900/80 hover:bg-indigo-600/40 text-slate-300 hover:text-indigo-200 border border-slate-700/80 transition-all cursor-pointer flex-shrink-0 self-start mt-0.5" title="Task Actions & Options">
+                <i class="fa-solid fa-ellipsis-vertical text-xs pointer-events-none"></i>
+            </button>
         </div>
         <div id="action-drawer-${task.id}" class="task-action-drawer hidden bg-slate-900/95 border-t border-slate-700/60 rounded-b-xl p-2.5 transition-all duration-300">
             <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center space-x-1.5">
-                    ${isDef ? `<span class="px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-xs font-medium flex items-center space-x-1" title="Everyday Default Task"><i class="fa-solid fa-rotate text-indigo-400 text-xs"></i><span class="text-[10px]">Default</span></span>` : ''}
-                </div>
+                <select onchange="changeTaskStatus('${dateStr}', '${task.id}', this.value)" class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer">
+                    <option value="To Do" ${taskStatus === 'To Do' ? 'selected' : ''}>📌 To Do</option>
+                    <option value="In Progress" ${taskStatus === 'In Progress' ? 'selected' : ''}>🔄 In Progress</option>
+                    <option value="Undone" ${taskStatus === 'Undone' ? 'selected' : ''}>⏸️ Undone</option>
+                    <option value="Completed" ${taskStatus === 'Completed' ? 'selected' : ''}>✅ Completed</option>
+                    <option value="Duplicate" ${taskStatus === 'Duplicate' ? 'selected' : ''}>📄 Duplicate</option>
+                </select>
                 <div class="flex items-center space-x-1.5 ml-auto">
                     <button type="button" onclick="moveTask(this, 'up')" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer" title="Move Up"><i class="fa-solid fa-chevron-up text-xs pointer-events-none"></i></button>
                     <button type="button" onclick="moveTask(this, 'down')" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer" title="Move Down"><i class="fa-solid fa-chevron-down text-xs pointer-events-none"></i></button>
-                    <button type="button" onclick="openEditTaskModal('${task.id}')" class="w-8 h-8 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" title="Edit Task"><i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i></button>
+                    <button type="button" onclick="openEditTaskModal('${task.id}')" class="w-8 h-8 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" title="Edit Task Details"><i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i></button>
                     <button type="button" onclick="deleteTaskAJAX('${dateStr}', '${task.id}', this)" class="w-8 h-8 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center justify-center transition-colors shadow-sm cursor-pointer" title="Delete Task"><i class="fa-solid fa-trash-can text-xs pointer-events-none"></i></button>
                 </div>
             </div>
@@ -1363,20 +1397,325 @@ function appendTaskToDOM(task, dateStr) {
     sortTasksInDOM();
 }
 
-// Automatically move completed (checked) tasks to the bottom of the list
-function sortTasksInDOM(skipSave = false) {
+async function changeTaskStatus(dateStr, taskId, status) {
+    const card = document.querySelector(`.task-card-wrapper[data-task-id="${taskId}"]`);
+    if (!card) return;
+
+    try {
+        const response = await fetch('/api/daily/task/edit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: dateStr, task_id: taskId, status: status })
+        });
+        const data = await response.json();
+        if (data.success) {
+            card.setAttribute('data-task-status', status);
+            const checkbox = card.querySelector('.task-item input[type="checkbox"]');
+            const textSpan = card.querySelector('.task-item .task-text');
+            const rightBadgeContainer = card.querySelector('.task-badges-row');
+
+            if (status === 'Completed') {
+                if (checkbox) checkbox.checked = true;
+                if (textSpan) textSpan.classList.add('line-through-fade');
+            } else {
+                if (checkbox) checkbox.checked = false;
+                if (textSpan) textSpan.classList.remove('line-through-fade');
+            }
+
+            // Update or toggle status badge (In Progress / Duplicate / Undone)
+            let statusBadge = card.querySelector('.task-status-badge');
+            if (status === 'In Progress') {
+                if (!statusBadge && rightBadgeContainer) {
+                    statusBadge = document.createElement('span');
+                    statusBadge.className = 'task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center space-x-1 shadow-sm';
+                    statusBadge.innerHTML = '<i class="fa-solid fa-spinner text-indigo-400 text-[10px] animate-spin"></i><span>In Progress</span>';
+                    rightBadgeContainer.insertBefore(statusBadge, rightBadgeContainer.firstChild);
+                } else if (statusBadge) {
+                    statusBadge.className = 'task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center space-x-1 shadow-sm';
+                    statusBadge.innerHTML = '<i class="fa-solid fa-spinner text-indigo-400 text-[10px] animate-spin"></i><span>In Progress</span>';
+                }
+            } else if (status === 'Duplicate') {
+                if (!statusBadge && rightBadgeContainer) {
+                    statusBadge = document.createElement('span');
+                    statusBadge.className = 'task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center space-x-1 shadow-sm';
+                    statusBadge.setAttribute('title', 'Task marked as duplicate');
+                    statusBadge.innerHTML = '<i class="fa-solid fa-copy text-purple-400 text-[10px]"></i><span>Duplicate</span>';
+                    rightBadgeContainer.insertBefore(statusBadge, rightBadgeContainer.firstChild);
+                } else if (statusBadge) {
+                    statusBadge.className = 'task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center space-x-1 shadow-sm';
+                    statusBadge.setAttribute('title', 'Task marked as duplicate');
+                    statusBadge.innerHTML = '<i class="fa-solid fa-copy text-purple-400 text-[10px]"></i><span>Duplicate</span>';
+                }
+            } else if (status === 'Undone') {
+                if (!statusBadge && rightBadgeContainer) {
+                    statusBadge = document.createElement('span');
+                    statusBadge.className = 'task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-700/80 text-slate-300 border border-slate-600 flex items-center space-x-1 shadow-sm';
+                    statusBadge.innerHTML = '<i class="fa-solid fa-pause text-slate-400 text-[10px]"></i><span>Undone</span>';
+                    rightBadgeContainer.insertBefore(statusBadge, rightBadgeContainer.firstChild);
+                } else if (statusBadge) {
+                    statusBadge.className = 'task-status-badge text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-700/80 text-slate-300 border border-slate-600 flex items-center space-x-1 shadow-sm';
+                    statusBadge.innerHTML = '<i class="fa-solid fa-pause text-slate-400 text-[10px]"></i><span>Undone</span>';
+                }
+            } else if (statusBadge) {
+                statusBadge.remove();
+            }
+
+            renderGroupedTasks();
+            showToast(`Task status set to "${status}"`, 'info');
+        } else {
+            showToast(data.message || 'Failed to update status', 'danger');
+        }
+    } catch (err) {
+        console.error('Error updating task status:', err);
+        showToast('Server error updating status', 'danger');
+    }
+}
+
+// Dynamic Custom Tags Metadata Map
+let userTagsMap = {
+    {% for tag in user_tags %}
+    "{{ tag.id }}": { id: "{{ tag.id }}", name: {{ tag.name|tojson }}, color: "{{ tag.color }}" },
+    {% endfor %}
+};
+
+let currentTaskViewMode = localStorage.getItem('daily_planner_task_view_mode') || 'status_tag';
+let collapsedTaskGroups = new Set();
+
+function setTaskViewMode(mode) {
+    currentTaskViewMode = mode;
+    localStorage.setItem('daily_planner_task_view_mode', mode);
+    
+    ['status_tag', 'tag', 'flat'].forEach(m => {
+        const btn = document.getElementById(`btn-view-${m}`);
+        if (btn) {
+            if (m === mode) {
+                btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-brand-600 text-white shadow-sm flex items-center space-x-1';
+            } else {
+                btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition-all flex items-center space-x-1';
+            }
+        }
+    });
+    
+    renderGroupedTasks();
+}
+
+function toggleGroupCollapse(groupId) {
+    if (collapsedTaskGroups.has(groupId)) {
+        collapsedTaskGroups.delete(groupId);
+    } else {
+        collapsedTaskGroups.add(groupId);
+    }
+    renderGroupedTasks();
+}
+
+// Master Task Grouping & Rendering Function (Status -> Tag, Tag -> Status, or Flat)
+function renderGroupedTasks() {
     const container = document.getElementById('tasks-container');
     if (!container) return;
+
+    // Harvest all task card elements currently in container
     const wrappers = Array.from(container.querySelectorAll('.task-card-wrapper'));
-    if (wrappers.length <= 1) return;
+    
+    if (wrappers.length === 0) {
+        const emptyState = container.querySelector('.text-center');
+        if (!emptyState) {
+            container.innerHTML = `
+                <div class="text-center py-10 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
+                    <p class="text-slate-400 text-sm">No tasks added for this day yet.</p>
+                </div>
+            `;
+        }
+        updateTaskDoneCounter();
+        return;
+    }
 
-    wrappers.sort((a, b) => {
-        const aChecked = a.querySelector('.task-item input[type="checkbox"]')?.checked ? 1 : 0;
-        const bChecked = b.querySelector('.task-item input[type="checkbox"]')?.checked ? 1 : 0;
-        return aChecked - bChecked;
-    });
+    updateTaskDoneCounter();
 
-    wrappers.forEach(w => container.appendChild(w));
+    if (currentTaskViewMode === 'flat') {
+        wrappers.sort((a, b) => {
+            const aChecked = a.querySelector('.task-item input[type="checkbox"]')?.checked ? 1 : 0;
+            const bChecked = b.querySelector('.task-item input[type="checkbox"]')?.checked ? 1 : 0;
+            return aChecked - bChecked;
+        });
+        container.replaceChildren(...wrappers);
+        return;
+    }
+
+    if (currentTaskViewMode === 'status_tag') {
+        const pendingTasks = [];
+        const completedTasks = [];
+
+        wrappers.forEach(w => {
+            const isChecked = w.querySelector('.task-item input[type="checkbox"]')?.checked;
+            if (isChecked) {
+                completedTasks.push(w);
+            } else {
+                pendingTasks.push(w);
+            }
+        });
+
+        const fragment = document.createDocumentFragment();
+
+        const renderStatusGroup = (statusKey, statusTitle, statusIcon, headerBadgeClass, tasksList) => {
+            if (tasksList.length === 0) return;
+
+            const statusGroupId = `status-${statusKey}`;
+            const isStatusCollapsed = collapsedTaskGroups.has(statusGroupId);
+
+            // Group tasks in this status by tag
+            const tagGroups = {};
+            tasksList.forEach(w => {
+                const tagId = w.getAttribute('data-task-tag') || 'untagged';
+                if (!tagGroups[tagId]) tagGroups[tagId] = [];
+                tagGroups[tagId].push(w);
+            });
+
+            const statusSection = document.createElement('div');
+            statusSection.className = 'status-group-section space-y-2 mb-3';
+
+            const statusHeader = document.createElement('div');
+            statusHeader.className = `flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 cursor-pointer select-none hover:border-slate-600 transition-all`;
+            statusHeader.onclick = () => toggleGroupCollapse(statusGroupId);
+            statusHeader.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid ${isStatusCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'} text-xs text-slate-400"></i>
+                    <i class="${statusIcon} text-xs"></i>
+                    <span class="font-bold text-xs uppercase tracking-wider ${headerBadgeClass}">${statusTitle}</span>
+                </div>
+                <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    ${tasksList.length} ${tasksList.length === 1 ? 'Task' : 'Tasks'}
+                </span>
+            `;
+            statusSection.appendChild(statusHeader);
+
+            const statusBody = document.createElement('div');
+            statusBody.className = `status-group-body space-y-2.5 pl-1 sm:pl-2 pt-1 ${isStatusCollapsed ? 'hidden' : ''}`;
+
+            const tagKeys = Object.keys(tagGroups).sort((a, b) => {
+                if (a === 'untagged') return 1;
+                if (b === 'untagged') return -1;
+                const tagA = userTagsMap[a] ? userTagsMap[a].name : a;
+                const tagB = userTagsMap[b] ? userTagsMap[b].name : b;
+                return tagA.localeCompare(tagB);
+            });
+
+            tagKeys.forEach(tagId => {
+                const tagTasks = tagGroups[tagId];
+                const tagMeta = userTagsMap[tagId];
+                const tagGroupId = `${statusGroupId}-tag-${tagId}`;
+                const isTagCollapsed = collapsedTaskGroups.has(tagGroupId);
+
+                const tagName = tagMeta ? tagMeta.name : (tagId === 'untagged' ? 'General / Untagged' : 'Tag');
+                const tagColor = tagMeta ? tagMeta.color : '#64748b';
+
+                const tagSubGroup = document.createElement('div');
+                tagSubGroup.className = 'tag-subgroup space-y-2';
+
+                const tagHeader = document.createElement('div');
+                tagHeader.className = 'flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/80 cursor-pointer select-none hover:border-slate-700 transition-all';
+                tagHeader.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleGroupCollapse(tagGroupId);
+                };
+                tagHeader.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid ${isTagCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'} text-[10px] text-slate-400"></i>
+                        <span class="w-2.5 h-2.5 rounded-full border border-white/20" style="background-color: ${tagColor}"></span>
+                        <span class="text-xs font-semibold text-slate-200">${escapeHTML(tagName)}</span>
+                    </div>
+                    <span class="text-[10px] font-semibold text-slate-400 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700">
+                        ${tagTasks.length}
+                    </span>
+                `;
+                tagSubGroup.appendChild(tagHeader);
+
+                const tagBody = document.createElement('div');
+                tagBody.className = `tag-subgroup-body space-y-2 pl-2 ${isTagCollapsed ? 'hidden' : ''}`;
+                tagTasks.forEach(w => tagBody.appendChild(w));
+                tagSubGroup.appendChild(tagBody);
+
+                statusBody.appendChild(tagSubGroup);
+            });
+
+            statusSection.appendChild(statusBody);
+            fragment.appendChild(statusSection);
+        };
+
+        renderStatusGroup('todo', 'To Do / Pending Tasks', 'fa-regular fa-clock text-amber-400', 'text-amber-300', pendingTasks);
+        renderStatusGroup('done', 'Completed Tasks', 'fa-solid fa-circle-check text-emerald-400', 'text-emerald-300', completedTasks);
+
+        container.replaceChildren(fragment);
+        return;
+    }
+
+    if (currentTaskViewMode === 'tag') {
+        const tagGroups = {};
+        wrappers.forEach(w => {
+            const tagId = w.getAttribute('data-task-tag') || 'untagged';
+            if (!tagGroups[tagId]) tagGroups[tagId] = [];
+            tagGroups[tagId].push(w);
+        });
+
+        const fragment = document.createDocumentFragment();
+
+        const tagKeys = Object.keys(tagGroups).sort((a, b) => {
+            if (a === 'untagged') return 1;
+            if (b === 'untagged') return -1;
+            const tagA = userTagsMap[a] ? userTagsMap[a].name : a;
+            const tagB = userTagsMap[b] ? userTagsMap[b].name : b;
+            return tagA.localeCompare(tagB);
+        });
+
+        tagKeys.forEach(tagId => {
+            const tagTasks = tagGroups[tagId];
+            const tagMeta = userTagsMap[tagId];
+            const tagGroupId = `tagonly-${tagId}`;
+            const isTagCollapsed = collapsedTaskGroups.has(tagGroupId);
+
+            const tagName = tagMeta ? tagMeta.name : (tagId === 'untagged' ? 'General / Untagged' : 'Tag');
+            const tagColor = tagMeta ? tagMeta.color : '#64748b';
+            const doneInTag = tagTasks.filter(w => w.querySelector('.task-item input[type="checkbox"]')?.checked).length;
+
+            const tagSection = document.createElement('div');
+            tagSection.className = 'tag-group-section space-y-2 mb-3';
+
+            const tagHeader = document.createElement('div');
+            tagHeader.className = 'flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 cursor-pointer select-none hover:border-slate-600 transition-all';
+            tagHeader.onclick = () => toggleGroupCollapse(tagGroupId);
+            tagHeader.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid ${isTagCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'} text-xs text-slate-400"></i>
+                    <span class="w-3 h-3 rounded-full border border-white/20" style="background-color: ${tagColor}"></span>
+                    <span class="font-bold text-xs text-slate-100 uppercase tracking-wider">${escapeHTML(tagName)}</span>
+                </div>
+                <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    ${doneInTag}/${tagTasks.length} Done
+                </span>
+            `;
+            tagSection.appendChild(tagHeader);
+
+            const tagBody = document.createElement('div');
+            tagBody.className = `tag-group-body space-y-2 pl-2 pt-1 ${isTagCollapsed ? 'hidden' : ''}`;
+
+            tagTasks.sort((a, b) => {
+                const aChecked = a.querySelector('.task-item input[type="checkbox"]')?.checked ? 1 : 0;
+                const bChecked = b.querySelector('.task-item input[type="checkbox"]')?.checked ? 1 : 0;
+                return aChecked - bChecked;
+            });
+
+            tagTasks.forEach(w => tagBody.appendChild(w));
+            tagSection.appendChild(tagBody);
+
+            fragment.appendChild(tagSection);
+        });
+
+        container.replaceChildren(fragment);
+    }
+}
+
+// Automatically move completed (checked) tasks to the bottom or re-group
+function sortTasksInDOM(skipSave = false) {
+    renderGroupedTasks();
     if (!skipSave && typeof saveTaskOrder === 'function') {
         saveTaskOrder();
     }
@@ -1399,15 +1738,7 @@ async function deleteTaskAJAX(dateStr, taskId, element) {
                 card.style.transition = 'all 0.3s ease';
                 setTimeout(() => {
                     card.remove();
-                    updateTaskDoneCounter();
-                    const container = document.getElementById('tasks-container');
-                    if (container && container.children.length === 0) {
-                        container.innerHTML = `
-                            <div class="text-center py-10 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
-                                <p class="text-slate-400 text-sm">No tasks added for this day yet.</p>
-                            </div>
-                        `;
-                    }
+                    renderGroupedTasks();
                 }, 300);
             }
             showToast('Task deleted.', 'info');
@@ -1430,6 +1761,8 @@ function updateTaskDoneCounter() {
         counterEl.innerText = `${completed}/${total} Done`;
     }
 
+    updateSpilloverBanner();
+
     const countEl = document.getElementById('dash-task-count');
     const pctEl = document.getElementById('dash-task-pct');
     const barEl = document.getElementById('dash-task-bar');
@@ -1438,6 +1771,23 @@ function updateTaskDoneCounter() {
         countEl.innerText = `${completed}/${total}`;
         pctEl.innerText = `(${pct}%)`;
         barEl.style.width = `${pct}%`;
+    }
+}
+
+// Dynamic Spillover Alert Banner Manager
+function updateSpilloverBanner() {
+    const banner = document.getElementById('spillover-banner');
+    const bannerText = document.getElementById('spillover-banner-text');
+    if (!banner || !bannerText) return;
+
+    const spilloverWrappers = Array.from(document.querySelectorAll('.task-card-wrapper[data-task-spillover="true"]'));
+    const uncompletedSpillover = spilloverWrappers.filter(w => !w.querySelector('.task-item input[type="checkbox"]')?.checked);
+
+    if (uncompletedSpillover.length > 0) {
+        bannerText.innerText = `${uncompletedSpillover.length} Spillover Task(s) Carried Forward`;
+        banner.classList.remove('hidden');
+    } else {
+        banner.classList.add('hidden');
     }
 }
 
@@ -1472,6 +1822,8 @@ function bindTaskDragEvents(wrapper) {
 
 // Drag & Drop and Touch Swipe Initialization
 document.addEventListener('DOMContentLoaded', function() {
+    setTaskViewMode(currentTaskViewMode);
+    
     const container = document.getElementById('tasks-container');
     if (!container) return;
 

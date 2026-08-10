@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy import func
 from app import db
@@ -140,6 +140,73 @@ def set_password():
     db.session.commit()
 
     flash('Local login password saved successfully! You can now log in with either Google or local password.', 'success')
+    return redirect(request.referrer or url_for('planner.dashboard'))
+
+
+@auth.route('/update-profile', methods=['POST'])
+@login_required
+def update_profile():
+    """Allows logged-in users to update display_name, username, email, and password."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
+    data = request.get_json() if request.is_json else request.form
+
+    display_name = (data.get('display_name') or '').strip()
+    username = (data.get('username') or '').strip()
+    email = (data.get('email') or '').strip()
+    new_password = (data.get('new_password') or '').strip()
+    confirm_password = (data.get('confirm_password') or '').strip()
+
+    errors = []
+
+    if username and username.lower() != current_user.username.lower():
+        if len(username) < 3:
+            errors.append('Username must be at least 3 characters long.')
+        else:
+            existing = User.query.filter(func.lower(User.username) == username.lower(), User.id != current_user.id).first()
+            if existing:
+                errors.append('Username is already taken by another user.')
+            else:
+                current_user.username = username
+
+    if email and email.lower() != current_user.email.lower():
+        existing = User.query.filter(func.lower(User.email) == email.lower(), User.id != current_user.id).first()
+        if existing:
+            errors.append('Email address is already registered to another account.')
+        else:
+            current_user.email = email
+
+    current_user.display_name = display_name if display_name else None
+
+    if new_password:
+        if new_password != confirm_password:
+            errors.append('Passwords do not match.')
+        elif len(new_password) < 6:
+            errors.append('Password must be at least 6 characters long.')
+        else:
+            current_user.set_password(new_password)
+
+    if errors:
+        msg = ' '.join(errors)
+        if is_ajax:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, 'danger')
+        return redirect(request.referrer or url_for('planner.dashboard'))
+
+    db.session.commit()
+
+    if is_ajax:
+        return jsonify({
+            'success': True,
+            'message': 'Profile updated successfully!',
+            'user': {
+                'username': current_user.username,
+                'email': current_user.email,
+                'display_name': current_user.display_name or '',
+                'name': current_user.name
+            }
+        })
+
+    flash('Profile updated successfully!', 'success')
     return redirect(request.referrer or url_for('planner.dashboard'))
 
 

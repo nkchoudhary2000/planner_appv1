@@ -34,7 +34,7 @@ def get_yearly_events_for_month(user_id, year, month):
     return month_events
 
 
-def get_monthly_items_for_date(user_id, date_obj):
+def get_monthly_items_for_date(user_id, date_obj, monthly_plan=None):
     """
     Monthly -> Weekly/Daily Cascade
     Retrieves calendar items and milestones from MonthlyPlan for a specific date.
@@ -43,7 +43,9 @@ def get_monthly_items_for_date(user_id, date_obj):
     month = date_obj.month
     day_str = str(date_obj.day)
 
-    monthly_plan = MonthlyPlan.query.filter_by(user_id=user_id, year=year, month=month).first()
+    if monthly_plan is None:
+        monthly_plan = MonthlyPlan.query.filter_by(user_id=user_id, year=year, month=month).first()
+
     if not monthly_plan:
         return []
 
@@ -72,7 +74,7 @@ def get_monthly_items_for_date(user_id, date_obj):
     return cascaded_items
 
 
-def get_weekly_todos_for_date(user_id, date_obj):
+def get_weekly_todos_for_date(user_id, date_obj, weekly_plan=None):
     """
     Weekly -> Daily Cascade
     Retrieves to-do items from WeeklyPlan daily_todos grid matching the specific date.
@@ -81,7 +83,9 @@ def get_weekly_todos_for_date(user_id, date_obj):
     day_abbrs = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     day_abbr = day_abbrs[weekday - 1]
 
-    weekly_plan = WeeklyPlan.query.filter_by(user_id=user_id, year=year, week_number=week_num).first()
+    if weekly_plan is None:
+        weekly_plan = WeeklyPlan.query.filter_by(user_id=user_id, year=year, week_number=week_num).first()
+
     if not weekly_plan or not weekly_plan.daily_todos:
         return []
 
@@ -96,15 +100,17 @@ def get_weekly_todos_for_date(user_id, date_obj):
     return cascaded_todos
 
 
-def get_all_cascaded_items_for_daily(user_id, date_obj):
+def get_all_cascaded_items_for_daily(user_id, date_obj, yearly_plan=None, monthly_plan=None, weekly_plan=None):
     """
     Combines all cascaded items (Yearly -> Daily, Monthly -> Daily, Weekly -> Daily)
-    for rendering within the Daily Planner.
+    for rendering within the Daily Planner. Accepts pre-fetched plans for maximum performance.
     """
     cascaded_items = []
 
     # 1. Yearly Events for this date
-    yearly_plan = YearlyPlan.query.filter_by(user_id=user_id, year=date_obj.year).first()
+    if yearly_plan is None:
+        yearly_plan = YearlyPlan.query.filter_by(user_id=user_id, year=date_obj.year).first()
+
     if yearly_plan and yearly_plan.events:
         for ev in yearly_plan.events:
             ev_date_str = ev.get('date', '')
@@ -130,9 +136,9 @@ def get_all_cascaded_items_for_daily(user_id, date_obj):
                 cascaded_items.append(c_ev)
 
     # 2. Monthly items for this date
-    cascaded_items.extend(get_monthly_items_for_date(user_id, date_obj))
+    cascaded_items.extend(get_monthly_items_for_date(user_id, date_obj, monthly_plan=monthly_plan))
 
     # 3. Weekly todos for this date
-    cascaded_items.extend(get_weekly_todos_for_date(user_id, date_obj))
+    cascaded_items.extend(get_weekly_todos_for_date(user_id, date_obj, weekly_plan=weekly_plan))
 
     return cascaded_items

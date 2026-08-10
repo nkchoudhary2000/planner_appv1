@@ -60,6 +60,9 @@ def create_app(config_class=Config):
                 if 'custom_tags' not in columns:
                     with db.engine.begin() as conn:
                         conn.execute(text('ALTER TABLE "user" ADD COLUMN custom_tags JSON DEFAULT \'[]\''))
+                if 'display_name' not in columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN display_name VARCHAR(128) NULL'))
 
             if 'daily_plan' in tables:
                 columns = [c['name'] for c in inspector.get_columns('daily_plan')]

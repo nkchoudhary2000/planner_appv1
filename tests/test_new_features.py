@@ -188,5 +188,81 @@ class NewFeaturesTestCase(unittest.TestCase):
         self.assertIn(b'Fresh Coffee Beans', dash_res.data)
         self.assertIn(b'Critical Client Meeting', dash_res.data)
 
+    def test_weekly_unbought_shopping_list_move_to_next_week(self):
+        """Feature 6: Test that unbought weekly shopping list items are moved to next week and removed from prior week."""
+        self.register_and_login()
+        user = User.query.filter_by(username='testuser').first()
+
+        # Add 2 shopping items to Week 30: one bought, one unbought
+        self.client.post('/weekly?year=2026&week=30', data={
+            'action': 'add_shopping_item',
+            'item_name': 'Oat Milk (Bought)',
+            'category': 'Groceries'
+        }, follow_redirects=True)
+
+        self.client.post('/weekly?year=2026&week=30', data={
+            'action': 'add_shopping_item',
+            'item_name': 'Almond Milk (Unbought)',
+            'category': 'Groceries'
+        }, follow_redirects=True)
+
+        # Mark Oat Milk as bought
+        wp30 = WeeklyPlan.query.filter_by(user_id=user.id, year=2026, week_number=30).first()
+        oat_item = next(s for s in wp30.shopping_list if s['item'] == 'Oat Milk (Bought)')
+        self.client.post('/weekly?year=2026&week=30', data={
+            'action': 'toggle_shopping_item',
+            'item_id': oat_item['id']
+        })
+
+        # Load Week 31
+        res31 = self.client.get('/weekly?year=2026&week=31')
+        self.assertEqual(res31.status_code, 200)
+
+        # Verify Week 30 has ONLY Oat Milk (Bought) left
+        wp30_updated = WeeklyPlan.query.filter_by(user_id=user.id, year=2026, week_number=30).first()
+        self.assertEqual(len(wp30_updated.shopping_list), 1)
+        self.assertEqual(wp30_updated.shopping_list[0]['item'], 'Oat Milk (Bought)')
+
+        # Verify Week 31 has Almond Milk (Unbought) moved into it
+        wp31 = WeeklyPlan.query.filter_by(user_id=user.id, year=2026, week_number=31).first()
+        self.assertIsNotNone(wp31)
+        self.assertEqual(len(wp31.shopping_list), 1)
+        self.assertEqual(wp31.shopping_list[0]['item'], 'Almond Milk (Unbought)')
+
+    def test_user_profile_update(self):
+        """Feature 7: Test updating user display name, username, email, and password."""
+        self.register_and_login()
+        user = User.query.filter_by(username='testuser').first()
+
+        # Update profile via AJAX
+        res = self.client.post('/auth/update-profile', json={
+            'display_name': 'Niraj Choudhary',
+            'username': 'niraj_updated',
+            'email': 'niraj_new@example.com',
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['user']['display_name'], 'Niraj Choudhary')
+        self.assertEqual(data['user']['name'], 'Niraj Choudhary')
+        self.assertEqual(data['user']['username'], 'niraj_updated')
+        self.assertEqual(data['user']['email'], 'niraj_new@example.com')
+
+        # Verify DB updates
+        updated_user = User.query.filter_by(id=user.id).first()
+        self.assertEqual(updated_user.display_name, 'Niraj Choudhary')
+        self.assertEqual(updated_user.name, 'Niraj Choudhary')
+        self.assertEqual(updated_user.username, 'niraj_updated')
+        self.assertEqual(updated_user.email, 'niraj_new@example.com')
+        self.assertTrue(updated_user.check_password('newpassword123'))
+
+        # Verify Dashboard reflects display_name
+        dash_res = self.client.get('/dashboard')
+        self.assertEqual(dash_res.status_code, 200)
+        self.assertIn(b'Niraj Choudhary', dash_res.data)
+
 if __name__ == '__main__':
     unittest.main()

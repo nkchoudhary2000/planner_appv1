@@ -273,7 +273,7 @@ const TabCacheManager = {
             if (path.length > 1 && path.endsWith('/')) {
                 path = path.slice(0, -1);
             }
-            return path; // e.g. '/daily', '/weekly', '/monthly', '/yearly', '/dashboard', '/admin'
+            return path + (parsed.search || '');
         } catch (e) {
             return url;
         }
@@ -300,7 +300,10 @@ const TabCacheManager = {
     },
 
     invalidate(url) {
-        this.cache.delete(this.getKey(url));
+        const fullKey = this.getKey(url);
+        this.cache.delete(fullKey);
+        const baseKey = fullKey.split('?')[0];
+        this.cache.delete(baseKey);
     }
 };
 
@@ -373,7 +376,10 @@ function setTabLoadingProgress(show) {
     }
 }
 
-// Core Tab Switcher (Immediate rendering if cached, graceful fetch if missing)
+let activeTabSwitchId = 0;
+let currentTabFetchController = null;
+
+// Stale-While-Revalidate Core Tab Switcher (Instant 0ms rendering if cached + smooth background revalidation)
 async function switchTab(targetUrl, pushState = true) {
     const mainContent = document.getElementById('app-main-content');
     if (!mainContent) {
@@ -381,9 +387,20 @@ async function switchTab(targetUrl, pushState = true) {
         return;
     }
 
-    const key = TabCacheManager.getKey(targetUrl);
+    // Cancel any previous in-flight tab fetch immediately
+    if (currentTabFetchController) {
+        try { currentTabFetchController.abort(); } catch (e) {}
+        currentTabFetchController = null;
+    }
 
-    // 1. CACHE HIT: Render immediately with zero delay & no loading spinner
+    const requestId = ++activeTabSwitchId;
+    const controller = new AbortController();
+    currentTabFetchController = controller;
+
+    const key = TabCacheManager.getKey(targetUrl);
+    let hasRenderedCache = false;
+
+    // 1. INSTANT CACHE RENDER (0ms latency - zero delay!)
     if (TabCacheManager.has(key)) {
         const cached = TabCacheManager.get(key);
         mainContent.innerHTML = cached.html;
@@ -395,26 +412,46 @@ async function switchTab(targetUrl, pushState = true) {
             document.querySelectorAll('.task-card-wrapper').forEach(w => window.bindTaskDragEvents(w));
         }
 
-        if (pushState && window.location.pathname !== key) {
+        const currFullPath = window.location.pathname + window.location.search;
+        if (pushState && currFullPath !== key) {
             window.history.pushState({ path: targetUrl }, '', targetUrl);
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
+        hasRenderedCache = true;
     }
 
-    // 2. CACHE MISS: Perform AJAX fetch with top loading bar
-    setTabLoadingProgress(true);
+    // 2. Perform Network Fetch (Background revalidation if cache hit, or primary fetch if cache miss)
+    if (!hasRenderedCache) {
+        setTabLoadingProgress(true);
+    }
+
     try {
         const response = await fetch(targetUrl, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            signal: controller.signal
         });
 
         if (!response.ok) {
-            window.location.href = targetUrl;
+            if (!hasRenderedCache && requestId === activeTabSwitchId) {
+                window.location.href = targetUrl;
+            }
             return;
         }
 
         const htmlText = await response.text();
+
+        // If user navigated away to another tab while this fetch was in-flight, discard DOM update!
+        if (requestId !== activeTabSwitchId) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlText, 'text/html');
+            const newMain = doc.getElementById('app-main-content');
+            const newTitle = doc.title || document.title;
+            if (newMain) {
+                TabCacheManager.set(key, newMain.innerHTML, newTitle);
+            }
+            return;
+        }
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlText, 'text/html');
         const newMain = doc.getElementById('app-main-content');
@@ -424,27 +461,45 @@ async function switchTab(targetUrl, pushState = true) {
             const htmlContent = newMain.innerHTML;
             TabCacheManager.set(key, htmlContent, newTitle);
 
-            mainContent.innerHTML = htmlContent;
-            document.title = newTitle;
-            updateNavTabHighlight(targetUrl);
-            executeContainerScripts(mainContent);
+            // Update DOM ONLY if user is still on this tab!
+            if (requestId === activeTabSwitchId) {
+                mainContent.innerHTML = htmlContent;
+                document.title = newTitle;
+                updateNavTabHighlight(targetUrl);
+                executeContainerScripts(mainContent);
 
-            if (window.bindTaskDragEvents) {
-                document.querySelectorAll('.task-card-wrapper').forEach(w => window.bindTaskDragEvents(w));
-            }
+                if (window.bindTaskDragEvents) {
+                    document.querySelectorAll('.task-card-wrapper').forEach(w => window.bindTaskDragEvents(w));
+                }
 
-            if (pushState && window.location.pathname !== key) {
-                window.history.pushState({ path: targetUrl }, '', targetUrl);
+                const currFullPath = window.location.pathname + window.location.search;
+                if (pushState && currFullPath !== key) {
+                    window.history.pushState({ path: targetUrl }, '', targetUrl);
+                }
+                if (!hasRenderedCache) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
             }
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
-            window.location.href = targetUrl;
+            if (!hasRenderedCache && requestId === activeTabSwitchId) {
+                window.location.href = targetUrl;
+            }
         }
     } catch (err) {
+        if (err.name === 'AbortError') {
+            return; // Ignore cancelled fetches cleanly
+        }
         console.error('Tab switch fetch error:', err);
-        window.location.href = targetUrl;
+        if (!hasRenderedCache && requestId === activeTabSwitchId) {
+            window.location.href = targetUrl;
+        }
     } finally {
-        setTabLoadingProgress(false);
+        if (requestId === activeTabSwitchId) {
+            setTabLoadingProgress(false);
+            if (currentTabFetchController === controller) {
+                currentTabFetchController = null;
+            }
+        }
     }
 }
 
@@ -532,16 +587,23 @@ document.addEventListener('click', (e) => {
     const isTabLink = link.getAttribute('data-tab-link') === 'true';
     const href = link.getAttribute('href');
 
-    if (isTabLink && href && !href.startsWith('#') && !href.startsWith('javascript:')) {
-        e.preventDefault();
-        switchTab(href, true);
-        return;
-    }
+    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
 
-    // Intercept standard internal links for tab routes (/dashboard, /daily, /weekly, /monthly, /yearly, /admin, /admin/)
-    if (href && (href === '/dashboard' || href === '/daily' || href === '/weekly' || href === '/monthly' || href === '/yearly' || href === '/admin' || href === '/admin/')) {
-        e.preventDefault();
-        switchTab(href, true);
+    try {
+        const urlObj = new URL(href, window.location.origin);
+        let path = urlObj.pathname;
+        if (path.length > 1 && path.endsWith('/')) {
+            path = path.slice(0, -1);
+        }
+
+        const isPlannerTab = (path === '/dashboard' || path === '/daily' || path === '/weekly' || path === '/monthly' || path === '/yearly' || path === '/admin');
+
+        if (isTabLink || isPlannerTab) {
+            e.preventDefault();
+            switchTab(href, true);
+        }
+    } catch (err) {
+        // Fallback to default browser navigation if URL parsing fails
     }
 });
 
