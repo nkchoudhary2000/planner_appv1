@@ -13,7 +13,7 @@ from flask_login import login_required, current_user
 from sqlalchemy.orm.attributes import flag_modified
 from app import db
 from app.planner import planner
-from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, User
+from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, User, PlanningTask
 from app.services.cascade_service import (
     get_yearly_events_for_month,
     get_monthly_items_for_date,
@@ -2831,4 +2831,177 @@ def export_yearly_excel():
     return send_file(excel_file, download_name=filename, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+# ---------------------------------------------------------------------------
+# PLANNING TAB — Persistent, date-independent task checklist
+# ---------------------------------------------------------------------------
 
+@planner.route('/planning')
+@login_required
+def planning():
+    """Render the Planning page with all persistent tasks for the current user."""
+    user_tags = get_user_tags(current_user)
+    tasks = (
+        PlanningTask.query
+        .filter_by(user_id=current_user.id)
+        .order_by(PlanningTask.sort_order.asc(), PlanningTask.created_at.asc())
+        .all()
+    )
+    return render_template(
+        'planner/planning.html',
+        tasks=tasks,
+        user_tags=user_tags,
+        today=get_today_date()
+    )
+
+
+@planner.route('/api/planning/task/add', methods=['POST'])
+@login_required
+def api_planning_add_task():
+    data = request.get_json() or {}
+    text = data.get('text', '').strip()
+    priority = data.get('priority', 'Medium')
+    tags = data.get('tags', [])
+    if isinstance(tags, str):
+        tags = [x.strip() for x in tags.split(',') if x.strip()]
+
+    if not text:
+        return jsonify({'success': False, 'message': 'Task text is required'}), 400
+
+    max_order = db.session.query(db.func.max(PlanningTask.sort_order)).filter_by(user_id=current_user.id).scalar() or 0
+
+    task = PlanningTask(
+        user_id=current_user.id,
+        text=text,
+        priority=priority,
+        tags=tags,
+        completed=False,
+        sort_order=max_order + 1
+    )
+    db.session.add(task)
+    db.session.commit()
+    return jsonify({'success': True, 'task': task.to_dict()})
+
+
+@planner.route('/api/planning/task/toggle', methods=['POST'])
+@login_required
+def api_planning_toggle_task():
+    data = request.get_json() or {}
+    task_id = data.get('task_id')
+    if not task_id:
+        return jsonify({'success': False, 'message': 'Missing task_id'}), 400
+
+    task = PlanningTask.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+
+    task.completed = not task.completed
+    db.session.commit()
+    return jsonify({'success': True, 'completed': task.completed})
+
+
+@planner.route('/api/planning/task/edit', methods=['POST'])
+@login_required
+def api_planning_edit_task():
+    data = request.get_json() or {}
+    task_id = data.get('task_id')
+    if not task_id:
+        return jsonify({'success': False, 'message': 'Missing task_id'}), 400
+
+    task = PlanningTask.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+
+    if 'text' in data and data['text'].strip():
+        task.text = data['text'].strip()
+    if 'priority' in data:
+        task.priority = data['priority']
+    if 'tags' in data:
+        tags = data['tags']
+        if isinstance(tags, str):
+            tags = [x.strip() for x in tags.split(',') if x.strip()]
+        task.tags = tags
+
+    db.session.commit()
+    return jsonify({'success': True, 'task': task.to_dict()})
+
+
+@planner.route('/api/planning/task/delete', methods=['POST'])
+@login_required
+def api_planning_delete_task():
+    data = request.get_json() or {}
+    task_id = data.get('task_id')
+    if not task_id:
+        return jsonify({'success': False, 'message': 'Missing task_id'}), 400
+
+    task = PlanningTask.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@planner.route('/api/planning/task/move_to_daily', methods=['POST'])
+@login_required
+def api_planning_move_to_daily():
+    """Copy a planning task into today's DailyPlan tasks list, then delete from Planning."""
+    data = request.get_json() or {}
+    task_id = data.get('task_id')
+    if not task_id:
+        return jsonify({'success': False, 'message': 'Missing task_id'}), 400
+
+    task = PlanningTask.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+
+    today = get_today_date()
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=today).first()
+    if not plan:
+        plan = DailyPlan(user_id=current_user.id, date=today, schedule={}, tasks=[], notes='')
+        db.session.add(plan)
+
+    daily_tasks = list(plan.tasks or [])
+    new_daily_task = {
+        'id': str(int(datetime.utcnow().timestamp() * 1000)),
+        'text': task.text,
+        'priority': task.priority,
+        'tags': task.tags or [],
+        'status': 'To Do',
+        'note': '',
+        'completed': False,
+        'is_default': False,
+        'is_spillover': False,
+        'spillover_count': 0,
+        'original_date': today.strftime('%Y-%m-%d')
+    }
+    daily_tasks.append(new_daily_task)
+    plan.tasks = daily_tasks
+    flag_modified(plan, 'tasks')
+
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({'success': True, 'message': f"Task moved to today's Daily checklist ({today.strftime('%b %d')})"})
+
+
+@planner.route('/api/planning/task/reorder', methods=['POST'])
+@login_required
+def api_planning_reorder_tasks():
+    data = request.get_json() or {}
+    task_ids = data.get('task_ids', [])
+    if not isinstance(task_ids, list):
+        return jsonify({'success': False, 'message': 'task_ids must be a list'}), 400
+
+    tasks = PlanningTask.query.filter_by(user_id=current_user.id).all()
+    task_map = {t.id: t for t in tasks}
+
+    for idx, tid in enumerate(task_ids):
+        try:
+            tid_int = int(tid)
+        except (ValueError, TypeError):
+            continue
+        if tid_int in task_map:
+            task_map[tid_int].sort_order = idx
+
+    db.session.commit()
+    return jsonify({'success': True})

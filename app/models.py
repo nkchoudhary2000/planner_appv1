@@ -31,6 +31,7 @@ class User(UserMixin, db.Model):
     daily_plans = db.relationship('DailyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     monthly_plans = db.relationship('MonthlyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     yearly_plans = db.relationship('YearlyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
+    planning_tasks = db.relationship('PlanningTask', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
 
     @property
     def name(self):
@@ -122,3 +123,35 @@ class WeeklyPlan(db.Model):
     def __repr__(self):
         return f'<WeeklyPlan User:{self.user_id} Year:{self.year} W:{self.week_number}>'
 
+
+class PlanningTask(db.Model):
+    """Persistent, date-independent planning tasks.
+
+    Unlike DailyPlan tasks (JSON blobs inside a date-keyed record), each
+    PlanningTask is a first-class DB row.  Tasks here never spill over and
+    are not tied to any date — they live until the user deletes them or
+    explicitly moves them to the Daily checklist.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    text = db.Column(db.String(1024), nullable=False)
+    priority = db.Column(db.String(16), default='Medium')    # High / Medium / Low
+    tags = db.Column(db.JSON, default=list)                  # list of tag id strings
+    completed = db.Column(db.Boolean, default=False, nullable=False)
+    sort_order = db.Column(db.Integer, default=0)            # manual reorder position
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'text': self.text,
+            'priority': self.priority,
+            'tags': self.tags or [],
+            'completed': self.completed,
+            'sort_order': self.sort_order,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
+        }
+
+    def __repr__(self):
+        return f'<PlanningTask User:{self.user_id} id:{self.id}>'

@@ -1,0 +1,647 @@
+{% extends "base.html" %}
+
+{% block title %}Planning — ChronosPlanner{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Page Header -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <span class="text-xs font-semibold text-violet-400 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    Persistent Planning Board
+                </span>
+                <h1 class="text-2xl font-bold text-white mt-0.5">Planning</h1>
+                <p class="text-xs text-slate-400 mt-1">Tasks here persist until deleted or moved to your Daily checklist. No dates, no spillover.</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <span id="planning-counter" class="text-xs bg-slate-800 text-slate-400 px-3 py-1.5 rounded-full font-medium border border-slate-700">
+                    {% set done_count = tasks | selectattr('completed') | list | length %}
+                    {{ done_count }}/{{ tasks | length }} Done
+                </span>
+                <button type="button" onclick="openTagManagerModal()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all flex items-center space-x-1.5" title="Manage Custom Tags">
+                    <i class="fa-solid fa-tags text-purple-400"></i>
+                    <span>Manage Tags</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Panel -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6">
+
+        <!-- Add Task Form -->
+        <form id="planning-add-task-form" onsubmit="handlePlanningAddTask(event)" class="space-y-3">
+            <input type="text" id="planning-new-task-text" required placeholder="Add a planning task..." class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <select id="planning-new-task-priority" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Low">Low</option>
+                    </select>
+                    <select id="planning-new-task-tag" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                        <option value="">🏷️ Tag (Optional)</option>
+                        {% for tag in user_tags %}
+                        <option value="{{ tag.id }}" data-color="{{ tag.color }}" data-name="{{ tag.name }}">{{ tag.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="openTagManagerModal()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all flex items-center space-x-1" title="Manage Custom Tags">
+                        <i class="fa-solid fa-tags text-purple-400"></i>
+                        <span>Tags</span>
+                    </button>
+                </div>
+                <button type="submit" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md shadow-violet-500/20 transition-all flex items-center space-x-1.5 whitespace-nowrap ml-auto">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Add Task</span>
+                </button>
+            </div>
+        </form>
+
+        <!-- Divider -->
+        <div class="border-t border-slate-700/40"></div>
+
+        <!-- Task List Container (rendered client-side) -->
+        <div id="planning-tasks-container" class="space-y-1"></div>
+
+        <!-- Empty State -->
+        <div id="planning-empty-state" class="hidden text-center py-14 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-4">
+                <i class="fa-solid fa-clipboard-list text-violet-400 text-2xl"></i>
+            </div>
+            <p class="text-slate-400 text-sm font-medium">No planning tasks yet.</p>
+            <p class="text-slate-500 text-xs mt-1">Add your first task above — it stays here until you complete, move, or delete it.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Edit Task Modal                                            -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="planning-edit-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+    <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-violet-500/40 shadow-2xl space-y-5">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-pen-to-square text-violet-400 text-lg"></i>
+                <h3 class="text-lg font-bold text-white">Edit Planning Task</h3>
+            </div>
+            <button onclick="closePlanningEditModal()" class="text-slate-400 hover:text-white p-1 rounded-lg transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+        <form id="planning-edit-form" onsubmit="submitPlanningEdit(event)" class="space-y-4">
+            <input type="hidden" id="planning-edit-task-id">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Task Description</label>
+                <input type="text" id="planning-edit-text" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Priority</label>
+                    <select id="planning-edit-priority" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Tag</label>
+                    <select id="planning-edit-tag" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                        <option value="">No Tag</option>
+                        {% for tag in user_tags %}
+                        <option value="{{ tag.id }}">{{ tag.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="pt-2 flex items-center justify-end space-x-3">
+                <button type="button" onclick="closePlanningEditModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors">Cancel</button>
+                <button type="submit" class="bg-violet-600 hover:bg-violet-500 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-md shadow-violet-500/20 transition-all flex items-center space-x-1.5">
+                    <i class="fa-solid fa-check text-xs"></i>
+                    <span>Save Changes</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Manage Custom Tags Modal                                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="manage-tags-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+    <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-purple-500/40 shadow-2xl space-y-5">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+            <div class="flex items-center space-x-2 text-purple-400">
+                <i class="fa-solid fa-tags text-lg"></i>
+                <h3 class="text-base font-bold text-white">Dynamic Custom Tags</h3>
+            </div>
+            <button type="button" onclick="closeTagManagerModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+        <form onsubmit="handleAddNewTag(event)" class="flex gap-2">
+            <input type="text" id="new-tag-name-input" required placeholder="Tag Name (e.g. Work, Gym)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <input type="color" id="new-tag-color-input" value="#8b5cf6" class="w-10 h-9 p-1 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer" title="Choose Tag Color">
+            <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-md transition-all whitespace-nowrap">+ Create</button>
+        </form>
+        <div id="tags-manager-list" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {% for tag in user_tags %}
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <span class="w-3.5 h-3.5 rounded-full border border-white/20" style="background-color: {{ tag.color }};"></span>
+                    <span class="text-xs font-semibold text-slate-200">{{ tag.name }}</span>
+                </div>
+                <button type="button" onclick="deleteUserTag('{{ tag.id }}')" class="text-slate-500 hover:text-rose-400 p-1 transition-colors" title="Delete Tag">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Styles                                                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<style>
+.planning-action-drawer {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, padding 0.3s ease;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+.planning-action-drawer.is-open {
+    max-height: 70px;
+    opacity: 1;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+.planning-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px 4px;
+    margin-top: 14px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(100,116,139,0.2);
+}
+.planning-group-header:first-child {
+    margin-top: 0;
+}
+</style>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- JavaScript                                                 -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+/* ─────────────────────────────────────────────────────────────
+   Client-side state — seeded from server on first page load
+   ───────────────────────────────────────────────────────────── */
+let planningTasks = [
+    {% for t in tasks %}
+    {
+        id: {{ t.id }},
+        text: {{ t.text | tojson }},
+        priority: {{ t.priority | tojson }},
+        tags: {{ (t.tags or []) | tojson }},
+        completed: {{ 'true' if t.completed else 'false' }},
+        sort_order: {{ t.sort_order or 0 }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+let planningUserTagsMap = {};
+{% for tag in user_tags %}
+planningUserTagsMap[{{ tag.id | tojson }}] = {
+    id:    {{ tag.id    | tojson }},
+    name:  {{ tag.name  | tojson }},
+    color: {{ tag.color | tojson }}
+};
+{% endfor %}
+
+/* ─────────────────────────────────────────────────────────────
+   Render
+   ───────────────────────────────────────────────────────────── */
+function renderPlanningTasks() {
+    const container  = document.getElementById('planning-tasks-container');
+    const emptyState = document.getElementById('planning-empty-state');
+    if (!container) return;
+
+    if (!planningTasks.length) {
+        container.innerHTML = '';
+        emptyState && emptyState.classList.remove('hidden');
+        updatePlanningCounter();
+        return;
+    }
+    emptyState && emptyState.classList.add('hidden');
+
+    const pending = planningTasks.filter(t => !t.completed);
+    const done    = planningTasks.filter(t =>  t.completed);
+
+    // Group pending tasks by first tag id (or '__no_tag__')
+    const groups     = {};
+    const groupOrder = [];
+    pending.forEach(t => {
+        const tagId = (t.tags && t.tags.length) ? String(t.tags[0]) : '__no_tag__';
+        if (!groups[tagId]) { groups[tagId] = []; groupOrder.push(tagId); }
+        groups[tagId].push(t);
+    });
+
+    let html = '';
+
+    groupOrder.forEach(tagId => {
+        const tagInfo  = (tagId !== '__no_tag__') ? planningUserTagsMap[tagId] : null;
+        const tagName  = tagInfo ? tagInfo.name  : 'No Tag';
+        const tagColor = tagInfo ? tagInfo.color : '#64748b';
+
+        html += `<div class="planning-group-header">
+            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color:${tagColor};"></span>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">${escHtml(tagName)}</span>
+            <span class="text-[10px] text-slate-500 ml-1">${groups[tagId].length} task${groups[tagId].length !== 1 ? 's' : ''}</span>
+        </div>`;
+        groups[tagId].forEach(t => { html += buildPlanningCard(t); });
+    });
+
+    // Completed section — flat, at the bottom
+    if (done.length) {
+        html += `<div class="planning-group-header mt-2">
+            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-emerald-500/70"></span>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Completed</span>
+            <span class="text-[10px] text-slate-500 ml-1">${done.length} task${done.length !== 1 ? 's' : ''}</span>
+        </div>`;
+        done.forEach(t => { html += buildPlanningCard(t); });
+    }
+
+    container.innerHTML = html;
+    updatePlanningCounter();
+}
+
+function buildPlanningCard(t) {
+    const tagId   = (t.tags && t.tags.length) ? String(t.tags[0]) : null;
+    const tagInfo = tagId ? planningUserTagsMap[tagId] : null;
+    const accentStyle = tagInfo ? `border-left: 4px solid ${tagInfo.color};` : '';
+
+    const priorityClass = t.priority === 'High'
+        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+        : (t.priority === 'Medium'
+            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+            : 'bg-slate-700 text-slate-300 border border-slate-600');
+
+    const cardBg   = t.completed
+        ? 'bg-slate-800/30 border-slate-700/25'
+        : 'bg-slate-800/60 border-slate-700/40 hover:border-slate-600';
+    const textClass = t.completed ? 'line-through text-slate-500' : 'text-slate-200';
+
+    const tagBadge = tagInfo
+        ? `<span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold border"
+                 style="background-color:${tagInfo.color}18; color:${tagInfo.color}; border-color:${tagInfo.color}40;"
+           >${escHtml(tagInfo.name)}</span>`
+        : '';
+
+    return `
+<div class="relative rounded-xl border ${cardBg} transition-all mb-2"
+     style="${accentStyle}"
+     data-planning-id="${t.id}">
+    <div class="flex items-start justify-between p-3 gap-2">
+        <div class="flex items-start space-x-2.5 flex-1 min-w-0">
+            <input type="checkbox" ${t.completed ? 'checked' : ''}
+                   onchange="planningToggleTask(${t.id}, this)"
+                   class="custom-checkbox flex-shrink-0 mt-0.5">
+            <div class="flex-1 min-w-0 space-y-1.5">
+                <span class="block text-xs sm:text-sm font-medium break-words w-full leading-relaxed ${textClass}">${escHtml(t.text)}</span>
+                <div class="flex items-center flex-wrap gap-1.5 pt-0.5">
+                    ${tagBadge}
+                    <span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${priorityClass}">${escHtml(t.priority)}</span>
+                </div>
+            </div>
+        </div>
+        <button type="button"
+                onclick="togglePlanningActions(${t.id})"
+                class="p-1.5 rounded-lg bg-slate-900/80 hover:bg-violet-600/40 text-slate-300 hover:text-violet-200 border border-slate-700/80 transition-all cursor-pointer flex-shrink-0 self-start mt-0.5"
+                title="Task Actions">
+            <i class="fa-solid fa-ellipsis-vertical text-xs pointer-events-none"></i>
+        </button>
+    </div>
+
+    <!-- Sliding Action Drawer -->
+    <div id="planning-drawer-${t.id}" class="planning-action-drawer bg-slate-900/95 border-t border-slate-700/60 rounded-b-xl px-2.5 transition-all duration-300">
+        <div class="flex items-center justify-end gap-1.5">
+            <button type="button" onclick="openPlanningEditModal(${t.id})"
+                    class="w-8 h-8 rounded-lg bg-violet-600/20 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/40 flex items-center justify-center transition-colors cursor-pointer"
+                    title="Edit Task">
+                <i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i>
+            </button>
+            <button type="button" onclick="planningMoveToDaily(${t.id}, this)"
+                    class="w-8 h-8 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 flex items-center justify-center transition-colors cursor-pointer"
+                    title="Move to Today's Daily Checklist">
+                <i class="fa-solid fa-arrow-right-to-bracket text-xs pointer-events-none"></i>
+            </button>
+            <button type="button" onclick="planningDeleteTask(${t.id})"
+                    class="w-8 h-8 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center justify-center transition-colors cursor-pointer"
+                    title="Delete Task">
+                <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
+            </button>
+        </div>
+    </div>
+</div>`;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Counter
+   ───────────────────────────────────────────────────────────── */
+function updatePlanningCounter() {
+    const el = document.getElementById('planning-counter');
+    if (!el) return;
+    const done  = planningTasks.filter(t => t.completed).length;
+    const total = planningTasks.length;
+    el.textContent = `${done}/${total} Done`;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Add Task
+   ───────────────────────────────────────────────────────────── */
+async function handlePlanningAddTask(e) {
+    e.preventDefault();
+    const textEl = document.getElementById('planning-new-task-text');
+    const prioEl = document.getElementById('planning-new-task-priority');
+    const tagEl  = document.getElementById('planning-new-task-tag');
+    const text   = textEl.value.trim();
+    if (!text) return;
+
+    const tags = tagEl.value ? [tagEl.value] : [];
+    try {
+        const res  = await fetch('/api/planning/task/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, priority: prioEl.value, tags })
+        });
+        const data = await res.json();
+        if (data.success) {
+            planningTasks.push(data.task);
+            renderPlanningTasks();
+            textEl.value = '';
+            prioEl.value = 'Medium';
+            tagEl.value  = '';
+            showToast('Task added!', 'success');
+        } else {
+            showToast(data.message || 'Failed to add task', 'danger');
+        }
+    } catch {
+        showToast('Server error adding task', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Toggle Completion
+   ───────────────────────────────────────────────────────────── */
+async function planningToggleTask(taskId, cbEl) {
+    try {
+        const res  = await fetch('/api/planning/task/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const t = planningTasks.find(t => t.id === taskId);
+            if (t) t.completed = data.completed;
+            renderPlanningTasks();
+        } else {
+            cbEl.checked = !cbEl.checked;
+            showToast(data.message || 'Failed to toggle task', 'danger');
+        }
+    } catch {
+        cbEl.checked = !cbEl.checked;
+        showToast('Server error', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Action Drawer
+   ───────────────────────────────────────────────────────────── */
+function togglePlanningActions(taskId) {
+    const drawer = document.getElementById(`planning-drawer-${taskId}`);
+    if (!drawer) return;
+    const opening = !drawer.classList.contains('is-open');
+    document.querySelectorAll('.planning-action-drawer').forEach(d => {
+        if (d.id !== `planning-drawer-${taskId}`) d.classList.remove('is-open');
+    });
+    void drawer.offsetWidth;
+    drawer.classList.toggle('is-open', opening);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Edit Modal
+   ───────────────────────────────────────────────────────────── */
+function openPlanningEditModal(taskId) {
+    const t = planningTasks.find(t => t.id === taskId);
+    if (!t) return;
+    document.getElementById('planning-edit-task-id').value  = taskId;
+    document.getElementById('planning-edit-text').value     = t.text;
+    document.getElementById('planning-edit-priority').value = t.priority || 'Medium';
+    const tagEl = document.getElementById('planning-edit-tag');
+    if (tagEl) tagEl.value = (t.tags && t.tags.length) ? String(t.tags[0]) : '';
+    document.getElementById('planning-edit-modal').classList.remove('hidden');
+}
+
+function closePlanningEditModal() {
+    document.getElementById('planning-edit-modal').classList.add('hidden');
+}
+
+async function submitPlanningEdit(e) {
+    e.preventDefault();
+    const taskId   = parseInt(document.getElementById('planning-edit-task-id').value);
+    const text     = document.getElementById('planning-edit-text').value.trim();
+    const priority = document.getElementById('planning-edit-priority').value;
+    const tagEl    = document.getElementById('planning-edit-tag');
+    const tags     = (tagEl && tagEl.value) ? [tagEl.value] : [];
+
+    try {
+        const res  = await fetch('/api/planning/task/edit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId, text, priority, tags })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const idx = planningTasks.findIndex(t => t.id === taskId);
+            if (idx !== -1) {
+                planningTasks[idx] = { ...planningTasks[idx], ...data.task, id: taskId };
+            }
+            closePlanningEditModal();
+            renderPlanningTasks();
+            showToast('Task updated!', 'success');
+        } else {
+            showToast(data.message || 'Failed to update task', 'danger');
+        }
+    } catch {
+        showToast('Server error', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Delete
+   ───────────────────────────────────────────────────────────── */
+async function planningDeleteTask(taskId) {
+    if (!confirm('Delete this planning task permanently?')) return;
+    try {
+        const res  = await fetch('/api/planning/task/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            planningTasks = planningTasks.filter(t => t.id !== taskId);
+            renderPlanningTasks();
+            showToast('Task deleted.', 'info');
+        } else {
+            showToast(data.message || 'Delete failed', 'danger');
+        }
+    } catch {
+        showToast('Server error', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Move to Daily
+   ───────────────────────────────────────────────────────────── */
+async function planningMoveToDaily(taskId, btn) {
+    const icon = btn.querySelector('i');
+    btn.disabled = true;
+    if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-xs pointer-events-none';
+
+    try {
+        const res  = await fetch('/api/planning/task/move_to_daily', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            planningTasks = planningTasks.filter(t => t.id !== taskId);
+            renderPlanningTasks();
+            showToast(data.message || 'Moved to Daily checklist!', 'success');
+        } else {
+            btn.disabled = false;
+            if (icon) icon.className = 'fa-solid fa-arrow-right-to-bracket text-xs pointer-events-none';
+            showToast(data.message || 'Move failed', 'danger');
+        }
+    } catch {
+        btn.disabled = false;
+        if (icon) icon.className = 'fa-solid fa-arrow-right-to-bracket text-xs pointer-events-none';
+        showToast('Server error', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Tag Manager  (reuses shared /api/tags endpoint)
+   ───────────────────────────────────────────────────────────── */
+function openTagManagerModal()  { document.getElementById('manage-tags-modal').classList.remove('hidden'); }
+function closeTagManagerModal() { document.getElementById('manage-tags-modal').classList.add('hidden');    }
+
+async function handleAddNewTag(e) {
+    e.preventDefault();
+    const nameInput  = document.getElementById('new-tag-name-input');
+    const colorInput = document.getElementById('new-tag-color-input');
+    const name  = nameInput  ? nameInput.value.trim() : '';
+    const color = colorInput ? colorInput.value       : '#8b5cf6';
+    if (!name) return;
+
+    try {
+        const res  = await fetch('/api/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'add', name, color })
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (nameInput) nameInput.value = '';
+            _planningRefreshTags(data.tags);
+            showToast('Tag created!', 'success');
+        } else {
+            showToast(data.message || 'Failed to create tag', 'danger');
+        }
+    } catch {
+        showToast('Server error creating tag', 'danger');
+    }
+}
+
+async function deleteUserTag(tagId) {
+    try {
+        const res  = await fetch('/api/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', tag_id: tagId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            _planningRefreshTags(data.tags);
+            showToast('Tag deleted', 'info');
+        }
+    } catch {
+        showToast('Server error deleting tag', 'danger');
+    }
+}
+
+function _planningRefreshTags(tags) {
+    // Rebuild map
+    planningUserTagsMap = {};
+    tags.forEach(t => { planningUserTagsMap[t.id] = { id: t.id, name: t.name, color: t.color }; });
+
+    // Rebuild dropdowns
+    ['planning-new-task-tag', 'planning-edit-tag'].forEach(selId => {
+        const sel = document.getElementById(selId);
+        if (!sel) return;
+        const cur      = sel.value;
+        const defLabel = selId === 'planning-new-task-tag' ? '🏷️ Tag (Optional)' : 'No Tag';
+        sel.innerHTML  = `<option value="">${defLabel}</option>`;
+        tags.forEach(t => {
+            const opt     = document.createElement('option');
+            opt.value     = t.id;
+            opt.textContent = t.name;
+            if (String(t.id) === String(cur)) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    });
+
+    // Rebuild tags-manager-list
+    const list = document.getElementById('tags-manager-list');
+    if (list) {
+        list.innerHTML = tags.map(t => `
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <span class="w-3.5 h-3.5 rounded-full border border-white/20" style="background-color:${escAttr(t.color)};"></span>
+                    <span class="text-xs font-semibold text-slate-200">${escHtml(t.name)}</span>
+                </div>
+                <button type="button" onclick="deleteUserTag('${escAttr(t.id)}')" class="text-slate-500 hover:text-rose-400 p-1 transition-colors">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </div>`).join('');
+    }
+
+    renderPlanningTasks();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Utility Helpers
+   ───────────────────────────────────────────────────────────── */
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(str) {
+    return String(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Boot
+   ───────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', renderPlanningTasks);
+</script>
+{% endblock %}

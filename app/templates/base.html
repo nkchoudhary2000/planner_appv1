@@ -71,6 +71,10 @@
                         <i class="fa-solid fa-bullseye"></i>
                         <span>Yearly</span>
                     </a>
+                    <a href="{{ url_for('planner.planning') }}" data-tab-link="true" data-tab-key="/planning" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner.planning' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                        <span>Planning</span>
+                    </a>
                     {% if (current_user.email or '').strip().lower() == 'niraj.choudhary1995@gmail.com' %}
                     <a href="{{ url_for('admin.dashboard') }}" data-tab-link="true" data-tab-key="/admin/" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20' if request.endpoint == 'admin.dashboard' else 'text-amber-400 hover:bg-amber-500/10 hover:text-amber-300' }}">
                         <i class="fa-solid fa-shield-halved"></i>
@@ -248,6 +252,10 @@
             <a href="{{ url_for('planner.yearly') }}" data-tab-link="true" data-tab-key="/yearly" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.yearly' else 'text-slate-300 hover:bg-slate-700/60' }}">
                 <i class="fa-solid fa-bullseye text-[11px]"></i>
                 <span>Yearly</span>
+            </a>
+            <a href="{{ url_for('planner.planning') }}" data-tab-link="true" data-tab-key="/planning" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.planning' else 'text-slate-300 hover:bg-slate-700/60' }}">
+                <i class="fa-solid fa-clipboard-list text-[11px]"></i>
+                <span>Planning</span>
             </a>
             {% if (current_user.email or '').strip().lower() == 'niraj.choudhary1995@gmail.com' %}
             <a href="{{ url_for('admin.dashboard') }}" data-tab-link="true" data-tab-key="/admin/" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-amber-500 text-slate-950 shadow-sm font-bold' if request.endpoint == 'admin.dashboard' else 'text-amber-400 hover:bg-amber-500/10' }}">
