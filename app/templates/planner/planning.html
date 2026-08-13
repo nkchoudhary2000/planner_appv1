@@ -404,34 +404,32 @@ function buildPlanningCard(t) {
         </div>
     </div>
 </div>`;
-                showToast('Tag deleted', 'info');
-            }
-        } catch {
-            showToast('Server error deleting tag', 'danger');
-        }
-    }
+}
 
     function _planningRefreshTags(tags) {
         // Rebuild map
-        planningUserTagsMap = {};
-        tags.forEach(t => { planningUserTagsMap[t.id] = { id: t.id, name: t.name, color: t.color }; });
+        window.planningUserTagsMap = {};
+        tags.forEach(t => { window.planningUserTagsMap[t.id] = { id: t.id, name: t.name, color: t.color }; });
 
         // Rebuild dropdowns
         ['planning-new-task-tag', 'planning-edit-tag'].forEach(selId => {
-            const sel = document.getElementB        sel        
-            if (!sel)     ret    urn;
+            const sel = document.getElementById(selId);
+            if (!sel) return;
             const cur = sel.value;
-            const defLabe        selId === 'plan       g-new-task-tag' ? '🏷️ Tag (Optional)' : 'No Tag';
-            se    l.innerHTML = `<option v        ="">${defLabel}</op                        ta gs.forEach(t => {
-                         t opt = docume nt.createElement('opt ion');
-                        opt.value = t.                        opt.textContent  = t.name;
-                 if (Str    ing    (t.id) === String(cur)) opt.selected = true;
-                sel.       endCh       (opt);
+            const defLabel = (selId === 'planning-new-task-tag') ? '🏷️ Tag (Optional)' : 'No Tag';
+            sel.innerHTML = `<option value="">${defLabel}</option>`;
+            tags.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                if (String(t.id) === String(cur)) opt.selected = true;
+                sel.appendChild(opt);
             });
         });
 
-        // Rebuild tags-manag    er-list
-        const list = document.getElementById('tags-manager-list (list) {
+        // Rebuild tags-manager-list
+        const list = document.getElementById('tags-manager-list');
+        if (list) {
             list.innerHTML = tags.map(t => `
             <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-between">
                 <div class="flex items-center space-x-2">
