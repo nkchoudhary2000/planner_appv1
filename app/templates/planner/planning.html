@@ -406,7 +406,293 @@ function buildPlanningCard(t) {
 </div>`;
 }
 
-    function _planningRefreshTags(tags) {
+/* ─────────────────────────────────────────────────────────────
+   Counter
+   ───────────────────────────────────────────────────────────── */
+function updatePlanningCounter() {
+    const el = document.getElementById('planning-counter');
+    if (!el) return;
+    const pending = window.planningTasks.filter(t => !t.completed).length;
+    const total   = pending + window.totalCompleted;
+    el.textContent = `${window.totalCompleted}/${total} Done`;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Load More Completed Tasks (pagination)
+   ───────────────────────────────────────────────────────────── */
+async function loadMoreCompleted() {
+    if (window.loadingMoreCompleted) return;
+    window.loadingMoreCompleted = true;
+
+    const btn = document.getElementById('load-more-completed-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Loading…';
+    }
+
+    try {
+        const res  = await fetch(`/api/planning/completed?offset=${window.completedOffset}`);
+        const data = await res.json();
+        if (data.success && data.tasks.length) {
+            data.tasks.forEach(t => {
+                if (!window.planningTasks.find(existing => existing.id === t.id)) {
+                    window.planningTasks.push(t);
+                }
+            });
+            window.completedOffset += data.tasks.length;
+            window.totalCompleted   = data.total_completed;
+            renderPlanningTasks();
+        } else {
+            showToast('No more completed tasks to load.', 'info');
+            if (btn) btn.remove();
+        }
+    } catch (err) {
+        console.error('Load more completed error:', err);
+        showToast('Could not load more tasks.', 'danger');
+        if (btn) { btn.disabled = false; btn.textContent = 'Retry'; }
+    } finally {
+        window.loadingMoreCompleted = false;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Add Task
+   ───────────────────────────────────────────────────────────── */
+async function handlePlanningAddTask(e) {
+    e.preventDefault();
+    const textEl = document.getElementById('planning-new-task-text');
+    const prioEl = document.getElementById('planning-new-task-priority');
+    const tagEl  = document.getElementById('planning-new-task-tag');
+    const text   = textEl.value.trim();
+    if (!text) return;
+
+    const tags = tagEl.value ? [tagEl.value] : [];
+    try {
+        const res  = await fetch('/api/planning/task/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, priority: prioEl.value, tags })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.planningTasks.push(data.task);
+            renderPlanningTasks();
+            textEl.value = '';
+            prioEl.value = 'Medium';
+            tagEl.value  = '';
+            showToast('Task added!', 'success');
+        } else {
+            showToast(data.message || 'Failed to add task', 'danger');
+        }
+    } catch {
+        showToast('Server error adding task', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Toggle Completion
+   ───────────────────────────────────────────────────────────── */
+async function planningToggleTask(taskId, cbEl) {
+    try {
+        const res  = await fetch('/api/planning/task/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const t = window.planningTasks.find(t => t.id === taskId);
+            if (t) {
+                const wasCompleted = t.completed;
+                t.completed = data.completed;
+                if (!wasCompleted && data.completed) {
+                    window.totalCompleted++;
+                    window.completedOffset++;
+                } else if (wasCompleted && !data.completed) {
+                    window.totalCompleted  = Math.max(0, window.totalCompleted - 1);
+                    window.completedOffset = Math.max(0, window.completedOffset - 1);
+                }
+            }
+            renderPlanningTasks();
+        } else {
+            cbEl.checked = !cbEl.checked;
+            showToast(data.message || 'Failed to toggle task', 'danger');
+        }
+    } catch {
+        cbEl.checked = !cbEl.checked;
+        showToast('Server error', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Action Drawer
+   ───────────────────────────────────────────────────────────── */
+function togglePlanningActions(taskId) {
+    const drawer = document.getElementById(`planning-drawer-${taskId}`);
+    if (!drawer) return;
+    const opening = !drawer.classList.contains('is-open');
+    document.querySelectorAll('.planning-action-drawer').forEach(d => {
+        if (d.id !== `planning-drawer-${taskId}`) d.classList.remove('is-open');
+    });
+    void drawer.offsetWidth;
+    drawer.classList.toggle('is-open', opening);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Edit Modal
+   ───────────────────────────────────────────────────────────── */
+function openPlanningEditModal(taskId) {
+    const t = window.planningTasks.find(t => t.id === taskId);
+    if (!t) return;
+    document.getElementById('planning-edit-task-id').value  = taskId;
+    document.getElementById('planning-edit-text').value     = t.text;
+    document.getElementById('planning-edit-priority').value = t.priority || 'Medium';
+    const tagEl = document.getElementById('planning-edit-tag');
+    if (tagEl) tagEl.value = (t.tags && t.tags.length) ? String(t.tags[0]) : '';
+    document.getElementById('planning-edit-modal').classList.remove('hidden');
+}
+
+function closePlanningEditModal() {
+    document.getElementById('planning-edit-modal').classList.add('hidden');
+}
+
+async function submitPlanningEdit(e) {
+    e.preventDefault();
+    const taskId   = parseInt(document.getElementById('planning-edit-task-id').value);
+    const text     = document.getElementById('planning-edit-text').value.trim();
+    const priority = document.getElementById('planning-edit-priority').value;
+    const tagEl    = document.getElementById('planning-edit-tag');
+    const tags     = (tagEl && tagEl.value) ? [tagEl.value] : [];
+
+    try {
+        const res  = await fetch('/api/planning/task/edit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId, text, priority, tags })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const idx = window.planningTasks.findIndex(t => t.id === taskId);
+            if (idx !== -1) {
+                window.planningTasks[idx] = { ...window.planningTasks[idx], ...data.task, id: taskId };
+            }
+            closePlanningEditModal();
+            renderPlanningTasks();
+            showToast('Task updated!', 'success');
+        } else {
+            showToast(data.message || 'Failed to update task', 'danger');
+        }
+    } catch {
+        showToast('Server error', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Delete
+   ───────────────────────────────────────────────────────────── */
+async function planningDeleteTask(taskId) {
+    if (!confirm('Delete this planning task permanently?')) return;
+    try {
+        const res  = await fetch('/api/planning/task/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.planningTasks = window.planningTasks.filter(t => t.id !== taskId);
+            renderPlanningTasks();
+            showToast('Task deleted.', 'info');
+        } else {
+            showToast(data.message || 'Delete failed', 'danger');
+        }
+    } catch {
+        showToast('Server error', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Move to Daily
+   ───────────────────────────────────────────────────────────── */
+async function planningMoveToDaily(taskId, btn) {
+    const icon = btn.querySelector('i');
+    btn.disabled = true;
+    if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-xs pointer-events-none';
+
+    try {
+        const res  = await fetch('/api/planning/task/move_to_daily', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.planningTasks = window.planningTasks.filter(t => t.id !== taskId);
+            renderPlanningTasks();
+            showToast(data.message || 'Moved to Daily checklist!', 'success');
+        } else {
+            btn.disabled = false;
+            if (icon) icon.className = 'fa-solid fa-arrow-right-to-bracket text-xs pointer-events-none';
+            showToast(data.message || 'Move failed', 'danger');
+        }
+    } catch {
+        btn.disabled = false;
+        if (icon) icon.className = 'fa-solid fa-arrow-right-to-bracket text-xs pointer-events-none';
+        showToast('Server error', 'danger');
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Tag Manager
+   ───────────────────────────────────────────────────────────── */
+function openTagManagerModal()  { document.getElementById('manage-tags-modal').classList.remove('hidden'); }
+function closeTagManagerModal() { document.getElementById('manage-tags-modal').classList.add('hidden');    }
+
+async function handleAddNewTag(e) {
+    e.preventDefault();
+    const nameInput  = document.getElementById('new-tag-name-input');
+    const colorInput = document.getElementById('new-tag-color-input');
+    const name  = nameInput  ? nameInput.value.trim() : '';
+    const color = colorInput ? colorInput.value       : '#8b5cf6';
+    if (!name) return;
+
+    try {
+        const res  = await fetch('/api/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'add', name, color })
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (nameInput) nameInput.value = '';
+            _planningRefreshTags(data.tags);
+            showToast('Tag created!', 'success');
+        } else {
+            showToast(data.message || 'Failed to create tag', 'danger');
+        }
+    } catch {
+        showToast('Server error creating tag', 'danger');
+    }
+}
+
+async function deleteUserTag(tagId) {
+    try {
+        const res  = await fetch('/api/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', tag_id: tagId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            _planningRefreshTags(data.tags);
+            showToast('Tag deleted', 'info');
+        }
+    } catch {
+        showToast('Server error deleting tag', 'danger');
+    }
+}
+
+function _planningRefreshTags(tags) {
         // Rebuild map
         window.planningUserTagsMap = {};
         tags.forEach(t => { window.planningUserTagsMap[t.id] = { id: t.id, name: t.name, color: t.color }; });
