@@ -4,7 +4,14 @@ from authlib.integrations.flask_client import OAuth
 from flask import url_for, current_app
 from sqlalchemy.orm.attributes import flag_modified
 from app import db
-from app.models import User, DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan
+from app.models import User, DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, PlanningTask
+
+# Admin email — same constant used in admin/routes.py
+ADMIN_EMAIL = 'niraj.choudhary1995@gmail.com'
+
+def is_admin(user):
+    """Return True if the user is the designated admin."""
+    return (user.email or '').strip().lower() == ADMIN_EMAIL
 
 oauth = OAuth()
 
@@ -89,6 +96,114 @@ def export_user_data_payload(user):
         ]
     }
     return payload
+
+
+def export_full_db_payload():
+    """Serialize the ENTIRE database — all users and all their plan data.
+
+    Used exclusively when the admin syncs to Google Drive so that a complete
+    system-wide backup is stored rather than just the admin's own plans.
+    Sensitive fields (password hashes, raw OAuth tokens) are intentionally
+    excluded; the backup is meant for data recovery, not credential export.
+    """
+    all_users = User.query.order_by(User.id.asc()).all()
+
+    def _serialize_user(u):
+        daily_plans = DailyPlan.query.filter_by(user_id=u.id).all()
+        weekly_plans = WeeklyPlan.query.filter_by(user_id=u.id).all()
+        monthly_plans = MonthlyPlan.query.filter_by(user_id=u.id).all()
+        yearly_plans = YearlyPlan.query.filter_by(user_id=u.id).all()
+        planning_tasks = PlanningTask.query.filter_by(user_id=u.id).all()
+
+        return {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "display_name": u.display_name,
+            "google_id": u.google_id,
+            "drive_sync_enabled": u.drive_sync_enabled,
+            "last_drive_sync": u.last_drive_sync.isoformat() if u.last_drive_sync else None,
+            "google_drive_folder_id": u.google_drive_folder_id,
+            "google_drive_folder_name": u.google_drive_folder_name,
+            "google_drive_folder_path": u.google_drive_folder_path,
+            "custom_tags": u.custom_tags or [],
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "daily_plans": [
+                {
+                    "date": dp.date.strftime('%Y-%m-%d'),
+                    "schedule": dp.schedule or {},
+                    "tasks": dp.tasks or [],
+                    "notes": dp.notes or '',
+                    "depression_episodes": dp.depression_episodes or [],
+                    "memory_logs": dp.memory_logs or [],
+                    "sleep_log": dp.sleep_log or {},
+                    "created_at": dp.created_at.isoformat() if dp.created_at else None,
+                    "updated_at": dp.updated_at.isoformat() if dp.updated_at else None,
+                }
+                for dp in daily_plans
+            ],
+            "weekly_plans": [
+                {
+                    "year": wp.year,
+                    "week_number": wp.week_number,
+                    "start_date": wp.start_date.strftime('%Y-%m-%d') if wp.start_date else None,
+                    "goals": wp.goals or [],
+                    "daily_todos": wp.daily_todos or {},
+                    "shopping_list": wp.shopping_list or [],
+                    "meals_menu": wp.meals_menu or {},
+                    "notes": wp.notes or '',
+                    "updated_at": wp.updated_at.isoformat() if wp.updated_at else None,
+                }
+                for wp in weekly_plans
+            ],
+            "monthly_plans": [
+                {
+                    "year": mp.year,
+                    "month": mp.month,
+                    "goals": mp.goals or [],
+                    "habits": mp.habits or [],
+                    "milestones": mp.milestones or [],
+                    "calendar_days": mp.calendar_days or {},
+                    "notes": mp.notes or '',
+                    "updated_at": mp.updated_at.isoformat() if mp.updated_at else None,
+                }
+                for mp in monthly_plans
+            ],
+            "yearly_plans": [
+                {
+                    "year": yp.year,
+                    "resolutions": yp.resolutions or [],
+                    "objectives": yp.objectives or [],
+                    "events": yp.events or [],
+                    "reflections": yp.reflections or '',
+                    "updated_at": yp.updated_at.isoformat() if yp.updated_at else None,
+                }
+                for yp in yearly_plans
+            ],
+            "planning_tasks": [
+                {
+                    "id": pt.id,
+                    "text": pt.text,
+                    "priority": pt.priority,
+                    "tags": pt.tags or [],
+                    "completed": pt.completed,
+                    "sort_order": pt.sort_order,
+                    "created_at": pt.created_at.isoformat() if pt.created_at else None,
+                    "updated_at": pt.updated_at.isoformat() if pt.updated_at else None,
+                }
+                for pt in planning_tasks
+            ],
+        }
+
+    return {
+        "app": "Chronos Planner",
+        "version": "1.0",
+        "backup_type": "full_database",
+        "exported_at": datetime.utcnow().isoformat(),
+        "total_users": len(all_users),
+        "users": [_serialize_user(u) for u in all_users],
+    }
+
 
 def import_user_data_payload(user, payload):
     """Restore database records for a user from a JSON payload across all tables."""
@@ -296,9 +411,21 @@ def create_google_drive_folder(user, folder_name, parent_id='root'):
     return {'id': folder_id, 'name': folder_name}
 
 def sync_to_google_drive(user):
-    """Upload or update Chronos_Planner_Backup.json in specified Google Drive folder using OAuth token or Mock mode."""
-    payload = export_user_data_payload(user)
-    backup_filename = f"Chronos_Planner_Backup_{user.username}.json"
+    """Upload or update backup JSON in the user's specified Google Drive folder.
+
+    For the admin user, a full-database backup (all users, all tables) is
+    uploaded under a distinct filename. For regular users only their own
+    plan data is included.
+    """
+    admin_backup = is_admin(user)
+
+    if admin_backup:
+        payload = export_full_db_payload()
+        backup_filename = "Chronos_Planner_FULL_DB_Backup.json"
+    else:
+        payload = export_user_data_payload(user)
+        backup_filename = f"Chronos_Planner_Backup_{user.username}.json"
+
     folder_id = user.google_drive_folder_id
     folder_name = user.google_drive_folder_name or "Root Folder"
 

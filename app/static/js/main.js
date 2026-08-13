@@ -159,7 +159,79 @@ async function toggleHabitDay(year, month, habitId, day, cellElement) {
     }
 }
 
-// Google Drive Backup Sync
+// ── Google Drive Smart Sync System ────────────────────────────────────────────
+// Enforces once-per-day sync. Shows last-sync badge. Auto-retries every 30 min
+// until today's sync succeeds (so the user doesn't need to do anything manually
+// after the first login).
+
+const DRIVE_SYNC_RETRY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+let _driveSyncRetryTimer = null;
+
+/** Format an ISO date string into a human-readable relative label */
+function _formatDriveSyncTime(isoStr) {
+    if (!isoStr) return null;
+    try {
+        // Server timestamps are UTC; append 'Z' if missing so JS parses correctly
+        const ts = isoStr.endsWith('Z') ? isoStr : isoStr + 'Z';
+        const d = new Date(ts);
+        if (isNaN(d)) return isoStr;
+
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffHr = Math.floor(diffMin / 60);
+
+        if (diffMin < 2) return 'just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        if (diffHr < 24) return `${diffHr}h ago`;
+
+        // More than a day ago — show date + time
+        return d.toLocaleString(undefined, {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+    } catch (e) {
+        return isoStr;
+    }
+}
+
+/** Update the last-sync badge in the profile dropdown */
+function _updateDriveSyncBadge(syncedToday, lastSyncIso, lastSyncStr) {
+    const textEl = document.querySelector('#drive-last-sync-text span:last-child');
+    const todayBadge = document.getElementById('drive-sync-today-badge');
+
+    if (!textEl) return;
+
+    if (syncedToday) {
+        const relTime = _formatDriveSyncTime(lastSyncIso);
+        textEl.textContent = `Synced ${relTime}`;
+        if (document.getElementById('drive-last-sync-text')) {
+            document.getElementById('drive-last-sync-text').classList.remove('text-slate-500');
+            document.getElementById('drive-last-sync-text').classList.add('text-emerald-500/70');
+        }
+        if (todayBadge) todayBadge.classList.remove('hidden');
+    } else {
+        textEl.textContent = lastSyncStr ? `Last: ${_formatDriveSyncTime(lastSyncIso)}` : 'Not synced today';
+        if (document.getElementById('drive-last-sync-text')) {
+            document.getElementById('drive-last-sync-text').classList.remove('text-emerald-500/70');
+            document.getElementById('drive-last-sync-text').classList.add('text-slate-500');
+        }
+        if (todayBadge) todayBadge.classList.add('hidden');
+    }
+}
+
+/** Fetch current sync status from server and update badge (no sync triggered) */
+async function refreshDriveSyncStatus() {
+    try {
+        const res = await fetch('/api/google/drive/sync_status');
+        if (!res.ok) return;
+        const data = await res.json();
+        _updateDriveSyncBadge(data.synced_today, data.last_sync_iso, data.last_sync);
+    } catch (e) {
+        // Silently ignore network errors in status check
+    }
+}
+
+/** Core sync call — returns true if synced today after the call */
 async function syncToGoogleDrive() {
     try {
         const response = await fetch('/api/google/drive/sync', {
@@ -167,8 +239,75 @@ async function syncToGoogleDrive() {
             headers: { 'Content-Type': 'application/json' }
         });
         const data = await response.json();
+
+        // Update badge immediately with latest info from response
+        if (data.last_sync_iso || data.last_sync) {
+            _updateDriveSyncBadge(
+                data.already_synced_today || data.success,
+                data.last_sync_iso,
+                data.last_sync
+            );
+        }
+
+        if (data.already_synced_today) {
+            return true; // Already done for today
+        }
+
         if (data.success) {
-            showToast(data.message || 'Cloud Backup Complete! All planner data synced to Google Drive.', 'success');
+            return true;
+        } else {
+            if (data.google_connected === false) {
+                setTimeout(() => {
+                    if (confirm('Google Account is not connected. Would you like to download a local JSON backup file to your computer now?')) {
+                        window.location.href = '/api/backup/export_json';
+                    }
+                }, 1000);
+            }
+            return false;
+        }
+    } catch (err) {
+        console.error('Drive sync error:', err);
+        return false;
+    }
+}
+
+/** Manual trigger — called when user clicks the button; shows toast feedback */
+async function manualSyncToGoogleDrive() {
+    const icon = document.getElementById('drive-sync-icon');
+    if (icon) {
+        icon.classList.remove('fa-cloud-arrow-up');
+        icon.classList.add('fa-spinner', 'fa-spin');
+    }
+
+    try {
+        const response = await fetch('/api/google/drive/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force: true })   // always sync + update timestamp on manual clicks
+        });
+        const data = await response.json();
+
+        if (data.last_sync_iso || data.last_sync) {
+            _updateDriveSyncBadge(
+                data.already_synced_today || data.success,
+                data.last_sync_iso,
+                data.last_sync
+            );
+        }
+
+        if (data.already_synced_today) {
+            showToast('Already synced today! ' + (data.message || ''), 'info');
+        } else if (data.success) {
+            if (data.is_admin_backup) {
+                showToast('🛡️ Full DB Backup Complete! All users\' data synced to Google Drive.', 'success');
+            } else {
+                showToast(data.message || 'Cloud Backup Complete! All planner data synced to Google Drive.', 'success');
+            }
+            // Cancel retry timer — today's sync is now done
+            if (_driveSyncRetryTimer) {
+                clearInterval(_driveSyncRetryTimer);
+                _driveSyncRetryTimer = null;
+            }
         } else {
             showToast(data.message || 'Could not sync to Google Drive.', 'warning');
             if (data.google_connected === false) {
@@ -182,8 +321,54 @@ async function syncToGoogleDrive() {
     } catch (err) {
         console.error('Drive sync error:', err);
         showToast('Could not sync to Google Drive. Please check your network connection.', 'danger');
+    } finally {
+        if (icon) {
+            icon.classList.remove('fa-spinner', 'fa-spin');
+            icon.classList.add('fa-cloud-arrow-up');
+        }
     }
 }
+
+/**
+ * Start the background auto-retry loop.
+ * Checks every 30 min if today's sync has not happened yet, and retries until it succeeds.
+ * Once synced today, the timer is cleared automatically.
+ */
+async function _startDriveSyncRetryLoop() {
+    // Initial status check to populate the badge
+    await refreshDriveSyncStatus();
+
+    // Retry loop — fires every 30 minutes
+    _driveSyncRetryTimer = setInterval(async () => {
+        // Re-check status first
+        try {
+            const res = await fetch('/api/google/drive/sync_status');
+            if (res.ok) {
+                const status = await res.json();
+                _updateDriveSyncBadge(status.synced_today, status.last_sync_iso, status.last_sync);
+                if (status.synced_today) {
+                    // Today's sync is done — stop retrying
+                    clearInterval(_driveSyncRetryTimer);
+                    _driveSyncRetryTimer = null;
+                    return;
+                }
+            }
+        } catch (e) { /* network error — try sync anyway */ }
+
+        // Not synced today — attempt background sync (silent, no toast)
+        const success = await syncToGoogleDrive();
+        if (success) {
+            clearInterval(_driveSyncRetryTimer);
+            _driveSyncRetryTimer = null;
+        }
+    }, DRIVE_SYNC_RETRY_INTERVAL_MS);
+}
+
+// Kick off on page load
+document.addEventListener('DOMContentLoaded', () => {
+    _startDriveSyncRetryLoop();
+});
+
 
 // Google Drive Data Restore
 async function restoreFromGoogleDrive() {

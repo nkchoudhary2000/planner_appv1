@@ -2379,18 +2379,59 @@ def api_toggle_habit_day():
 @planner.route('/api/google/drive/sync', methods=['POST'])
 @login_required
 def api_google_drive_sync():
-    from app.services.google_service import sync_to_google_drive
+    from app.services.google_service import sync_to_google_drive, is_admin
+    from datetime import datetime
     try:
+        body = request.get_json(silent=True) or {}
+        force = bool(body.get('force', False))
+
+        # Enforce once-per-day — skipped when the user manually forces a sync
+        today_utc = datetime.utcnow().date()
+        if not force and current_user.last_drive_sync:
+            last_sync_date = current_user.last_drive_sync.date()
+            if last_sync_date >= today_utc:
+                last_sync_str = current_user.last_drive_sync.strftime('%d %b %Y, %I:%M %p UTC')
+                return jsonify({
+                    'success': True,
+                    'already_synced_today': True,
+                    'message': f'Already synced today at {last_sync_str}. Next sync available tomorrow.',
+                    'last_sync': last_sync_str,
+                    'last_sync_iso': current_user.last_drive_sync.isoformat()
+                })
+
         res = sync_to_google_drive(current_user)
-        last_sync = current_user.last_drive_sync.strftime('%Y-%m-%d %H:%M:%S UTC') if current_user.last_drive_sync else 'Just now'
+        last_sync_str = current_user.last_drive_sync.strftime('%d %b %Y, %I:%M %p UTC') if current_user.last_drive_sync else 'Just now'
         return jsonify({
             'success': res.get('success', False),
+            'already_synced_today': False,
+            'is_admin_backup': is_admin(current_user),
             'message': res.get('message', 'Drive sync completed'),
-            'last_sync': last_sync,
+            'last_sync': last_sync_str,
+            'last_sync_iso': current_user.last_drive_sync.isoformat() if current_user.last_drive_sync else None,
             'google_connected': res.get('google_connected', True)
         })
     except Exception as e:
         return jsonify({'success': False, 'message': f'Drive sync error: {str(e)}'}), 500
+
+
+# Google Drive Sync Status (GET) — returns last sync time without triggering sync
+@planner.route('/api/google/drive/sync_status', methods=['GET'])
+@login_required
+def api_google_drive_sync_status():
+    from datetime import datetime
+    today_utc = datetime.utcnow().date()
+    synced_today = False
+    last_sync_str = None
+    last_sync_iso = None
+    if current_user.last_drive_sync:
+        last_sync_str = current_user.last_drive_sync.strftime('%d %b %Y, %I:%M %p UTC')
+        last_sync_iso = current_user.last_drive_sync.isoformat()
+        synced_today = current_user.last_drive_sync.date() >= today_utc
+    return jsonify({
+        'synced_today': synced_today,
+        'last_sync': last_sync_str,
+        'last_sync_iso': last_sync_iso
+    })
 
 
 # Google Drive Data Restore Endpoint

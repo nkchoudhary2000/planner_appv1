@@ -89,8 +89,8 @@
                         <div class="nav-user-initial w-7 h-7 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                             {{ current_user.name[0]|upper }}
                         </div>
-                        <span class="nav-user-name text-sm font-medium text-slate-200 max-w-[130px] truncate">{{ current_user.name }}</span>
-                        <i class="fa-solid fa-chevron-down text-slate-400 text-[11px] transition-transform duration-200" id="user-menu-chevron"></i>
+                        <span class="nav-user-name hidden sm:inline text-sm font-medium text-slate-200 max-w-[130px] truncate">{{ current_user.name }}</span>
+                        <i class="fa-solid fa-chevron-down hidden sm:inline text-slate-400 text-[11px] transition-transform duration-200" id="user-menu-chevron"></i>
                     </button>
 
                     <!-- Dropdown Menu -->
@@ -153,12 +153,25 @@
                                 <span>Google Drive Cloud</span>
                             </div>
 
-                            <button onclick="syncToGoogleDrive(); closeUserDropdown();" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors flex items-center space-x-3 group">
-                                <div class="w-6 h-6 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center group-hover:bg-sky-500/20">
-                                    <i class="fa-solid fa-cloud-arrow-up text-xs"></i>
+                            <div class="relative">
+                                <button onclick="manualSyncToGoogleDrive(); closeUserDropdown();" id="drive-sync-btn" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors flex items-center space-x-3 group">
+                                    <div class="w-6 h-6 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center group-hover:bg-sky-500/20">
+                                        <i class="fa-solid fa-cloud-arrow-up text-xs" id="drive-sync-icon"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <span>Sync to Google Drive</span>
+                                        <span id="drive-sync-today-badge" class="hidden ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">✓ Today</span>
+                                    </div>
+                                </button>
+                                <!-- Last sync time badge -->
+                                <div id="drive-last-sync-badge" class="px-4 pb-1.5 -mt-0.5">
+                                    <span id="drive-last-sync-text" class="text-[10px] text-slate-500 flex items-center gap-1">
+                                        <i class="fa-solid fa-clock text-[9px]"></i>
+                                        <span>Loading sync status…</span>
+                                    </span>
                                 </div>
-                                <span>Sync to Google Drive</span>
-                            </button>
+                            </div>
+
 
                             <button onclick="restoreFromGoogleDrive(); closeUserDropdown();" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors flex items-center space-x-3 group">
                                 <div class="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:bg-emerald-500/20">
