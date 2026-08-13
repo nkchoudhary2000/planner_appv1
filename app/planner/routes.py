@@ -2879,20 +2879,75 @@ def export_yearly_excel():
 @planner.route('/planning')
 @login_required
 def planning():
-    """Render the Planning page with all persistent tasks for the current user."""
+    """Render the Planning page. Pending tasks: all. Completed tasks: only 10 most recent."""
+    COMPLETED_PAGE_SIZE = 10
     user_tags = get_user_tags(current_user)
-    tasks = (
+
+    # All pending tasks (ordered by sort_order, then created_at)
+    pending_tasks = (
         PlanningTask.query
-        .filter_by(user_id=current_user.id)
+        .filter_by(user_id=current_user.id, completed=False)
         .order_by(PlanningTask.sort_order.asc(), PlanningTask.created_at.asc())
         .all()
     )
+
+    # Total completed count (used to show pagination hint)
+    total_completed = (
+        PlanningTask.query
+        .filter_by(user_id=current_user.id, completed=True)
+        .count()
+    )
+
+    # Only 10 most recently completed tasks for the initial render
+    recent_completed = (
+        PlanningTask.query
+        .filter_by(user_id=current_user.id, completed=True)
+        .order_by(PlanningTask.updated_at.desc(), PlanningTask.id.desc())
+        .limit(COMPLETED_PAGE_SIZE)
+        .all()
+    )
+
+    tasks = pending_tasks + recent_completed
     return render_template(
         'planner/planning.html',
         tasks=tasks,
         user_tags=user_tags,
-        today=get_today_date()
+        today=get_today_date(),
+        total_completed=total_completed,
+        completed_page_size=COMPLETED_PAGE_SIZE
     )
+
+
+@planner.route('/api/planning/completed', methods=['GET'])
+@login_required
+def api_planning_completed_page():
+    """Return a paginated batch of completed planning tasks (oldest-first after the initial 10)."""
+    COMPLETED_PAGE_SIZE = 10
+    try:
+        offset = int(request.args.get('offset', COMPLETED_PAGE_SIZE))
+    except (ValueError, TypeError):
+        offset = COMPLETED_PAGE_SIZE
+
+    tasks = (
+        PlanningTask.query
+        .filter_by(user_id=current_user.id, completed=True)
+        .order_by(PlanningTask.updated_at.desc(), PlanningTask.id.desc())
+        .offset(offset)
+        .limit(COMPLETED_PAGE_SIZE)
+        .all()
+    )
+    total_completed = (
+        PlanningTask.query
+        .filter_by(user_id=current_user.id, completed=True)
+        .count()
+    )
+    return jsonify({
+        'success': True,
+        'tasks': [t.to_dict() for t in tasks],
+        'total_completed': total_completed,
+        'offset': offset,
+        'page_size': COMPLETED_PAGE_SIZE
+    })
 
 
 @planner.route('/api/planning/task/add', methods=['POST'])

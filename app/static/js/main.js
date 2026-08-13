@@ -574,7 +574,7 @@ async function switchTab(targetUrl, pushState = true) {
 
     // Cancel any previous in-flight tab fetch immediately
     if (currentTabFetchController) {
-        try { currentTabFetchController.abort(); } catch (e) {}
+        try { currentTabFetchController.abort(); } catch (e) { }
         currentTabFetchController = null;
     }
 

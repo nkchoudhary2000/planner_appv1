@@ -151,6 +151,7 @@ class PlanningTask(db.Model):
             'completed': self.completed,
             'sort_order': self.sort_order,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M') if self.updated_at else '',
         }
 
     def __repr__(self):
