@@ -234,123 +234,131 @@
 <!-- JavaScript                                                 -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <script>
-        /* ──────────────────────────────────────────────────────────       
-       Client-side state — seeded from server on first pa       load
-       ─────────────────────────────────────────────────────    ──────── */
-    let pl        ngTasks = [
-        {% for t in tasks %} 
+/* ─────────────────────────────────────────────────────────────
+   Client-side state — seeded from server on EVERY injection.
+   IMPORTANT: use window.* (never let/const at top level) so
+   re-execution by executeContainerScripts() on AJAX tab-switch
+   does NOT throw "Identifier already declared" SyntaxError.
+   ───────────────────────────────────────────────────────────── */
+window.planningTasks = [
+    {% for t in tasks %}
     {
-         id: { { t.i d } },
-        text : { { t.text | tojson  } },
-        priority:  { { t.priority | t ojson } },
-       tags: {  { (t.tags or[]) | tojso n } },
-        completed: { { 'true' i f t.completed else 'fals e' } },
-        sort_ order:  { { t.sort_order or 0 }  }
-    } {% if not loop.last %},     {% endif %}
+        id: {{ t.id }},
+        text: {{ t.text | tojson }},
+        priority: {{ t.priority | tojson }},
+        tags: {{ (t.tags or []) | tojson }},
+        completed: {{ 'true' if t.completed else 'false' }},
+        sort_order: {{ t.sort_order or 0 }}
+    }{% if not loop.last %},{% endif %}
     {% endfor %}
 ];
 
-    //     Pagination state for completed tasks
-    const COMPLETE    D_PAGE_SIZE = {{ completed_page_size }};
-    let totalCompleted = {{ total_completed }};          // true DB count of all completed tasks
-    let completedOffset = {{ tasks | selectattr('completed') | li    st | length }};  // how many we've     loaded so far
-    let loadingM    oreCompleted = false;
+// Pagination state for completed tasks
+window.COMPLETED_PAGE_SIZE  = {{ completed_page_size }};
+window.totalCompleted       = {{ total_completed }};
+window.completedOffset      = {{ tasks | selectattr('completed') | list | length }};
+window.loadingMoreCompleted = false;
 
-        let planningUserTagsMap = {};
-    {% for tag in        r_t % }
-    pl ngUserTags Map        tag.i |  tojson }} = {
-         i         { tag.i d | tojson } },
-             nam    e: { { tag.nam    e | tojson } },
-        color: { { tag.color | tojson } }
-    };
-        {% end        %}
+window.planningUserTagsMap = {};
+{% for tag in user_tags %}
+window.planningUserTagsMap[{{ tag.id | tojson }}] = {
+    id:    {{ tag.id    | tojson }},
+    name:  {{ tag.name  | tojson }},
+    color: {{ tag.color | tojson }}
+};
+{% endfor %}
 
-    /* ─────────────────────────────────────────────────────    ────────
-       Render
-       ───        ─────────────── ───────────────────────────────────── */
-    function r        rPlanningTasks() {
-        const container = document.getElementById        anning-tasks-container');             const emptyState = docum            lementById('planning-empty            ;
-        if (!container) return;
+/* ─────────────────────────────────────────────────────────────
+   Render
+   ───────────────────────────────────────────────────────────── */
+function renderPlanningTasks() {
+    const container  = document.getElementById('planning-tasks-container');
+    const emptyState = document.getElementById('planning-empty-state');
+    if (!container) return;
 
-        if (!plann            .length) {
-            co            innerHTM        ''                  emptyState && emptyState.classList.remove        dden');
-            updatePlanningCounter();
-                    rn;
-               emptyState && empty ate.classList.a        hidden');
+    const pending = window.planningTasks.filter(t => !t.completed);
+    const done    = window.planningTasks.filter(t =>  t.completed);
 
-        const pending = planningTasks.filter(t        !t.completed               t done = planningTasks.        er(t => t.completed);
+    if (!pending.length && !done.length && window.totalCompleted === 0) {
+        container.innerHTML = '';
+        emptyState && emptyState.classList.remove('hidden');
+        updatePlanningCounter();
+        return;
+    }
+    emptyState && emptyState.classList.add('hidden');
 
-            // Group pending tasks by first tag id (or '__no_tag__')
-        const group                    const groupOrder = [];
-        pending.forEach(t => {
-                  nst tagId = (t.tags &&         gs.le        ) ? String(t.tag        ) : '__no_tag__';
-                        ups[tagId]) { roups[tagId] = []; groupOrder.push(tagId); }
-            groups[            ush(t);
-       });
+    // Group pending tasks by first tag id (or '__no_tag__')
+    const groups     = {};
+    const groupOrder = [];
+    pending.forEach(t => {
+        const tagId = (t.tags && t.tags.length) ? String(t.tags[0]) : '__no_tag__';
+        if (!groups[tagId]) { groups[tagId] = []; groupOrder.push(tagId); }
+        groups[tagId].push(t);
+    });
 
-        let html = ';
+    let html = '';
 
-                    er.forEach(tagId => {
-            const tagInfo = (tagI            _no_tag__') ? planningUserTagsMap[tagId] : null;
-            const tagName = tagInfo ? tagInfo.name : 'No Tag';
-            const tagColor = tagInfo ? tagInfo.color : '#64748b';
+    groupOrder.forEach(tagId => {
+        const tagInfo  = (tagId !== '__no_tag__') ? window.planningUserTagsMap[tagId] : null;
+        const tagName  = tagInfo ? tagInfo.name  : 'No Tag';
+        const tagColor = tagInfo ? tagInfo.color : '#64748b';
 
-            html += `<div class="planning-group-header">
+        html += `<div class="planning-group-header">
             <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color:${tagColor};"></span>
-            <span class="text-[11px] font-bold uppercase tracking-wider tex            400">${escHtml(tagName)}</span>
-            <span class="text-[        ] tex        ate-500 ml-1">${groups[tagId].length} task${groups[tag        length !== 1 ? 's' : ''}</span>
-        <                        groups[tagId].forEach(t => { html += build            Card(t); });
-        });
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">${escHtml(tagName)}</span>
+            <span class="text-[10px] text-slate-500 ml-1">${groups[tagId].length} task${groups[tagId].length !== 1 ? 's' : ''}</span>
+        </div>`;
+        groups[tagId].forEach(t => { html += buildPlanningCard(t); });
+    });
 
-        // Completed section — top 10 most recent + Load More
-        if (done.length || totalCompleted > 0) {
-            const hiddenCount = totalCompleted - completedOffset;
-            html += `<div class="planning-group-header mt-2">
+    // Completed section — top 10 most recent + Load More
+    if (done.length || window.totalCompleted > 0) {
+        html += `<div class="planning-group-header mt-2">
             <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-emerald-500/70"></span>
-            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">C            </span>
-            <span class="text-[10px] text-slate            1">${done.length} shown${totalCompleted > completedOffset ? ` · ${totalCo            - completedOffset} older hidden` : ''}</                  </div>`;
-            done.forEach(t => { html += buildPlanningCard(t); });
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Completed</span>
+            <span class="text-[10px] text-slate-500 ml-1">${done.length} shown${window.totalCompleted > window.completedOffset ? ` · ${window.totalCompleted - window.completedOffset} older hidden` : ''}</span>
+        </div>`;
+        done.forEach(t => { html += buildPlanningCard(t); });
 
-            // Load more button — only when there are more completed tasks in the DB
-            if (totalCompleted > completedOffset) {
-                html += `<button id="load-more-completed-btn" onclick="loadMoreCompleted()"
+        if (window.totalCompleted > window.completedOffset) {
+            html += `<button id="load-more-completed-btn" onclick="loadMoreCompleted()"
                 class="w-full mt-1 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-emerald-300
                        bg-slate-800/40 hover:bg-slate-700/60 border border-slate-700/40 hover:border-emerald-500/30
                        transition-all flex items-center justify-center gap-2">
                 <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                           Ma        in(        LETED_PAGE_SIZE, totalComple        - completedOffset)} older     co    mpleted tasks
-                <s        class="text 0px] text-slate-500">(${totalCompleted - completedOffset        maining)</span>
+                Load ${Math.min(window.COMPLETED_PAGE_SIZE, window.totalCompleted - window.completedOffset)} older completed tasks
+                <span class="text-[10px] text-slate-500">(${window.totalCompleted - window.completedOffset} remaining)</span>
             </button>`;
-            }
-             
-
-        container.innerHTML = html;
-        updatePlanningCounter();
+        }
     }
 
-          nction buildPlanningCard(t) {
-        const             (t.tags && t.tags.length) ? String(t.tags[0]) : null;
-                  tagInfo = tagId ? planning                tagId] : null;
-        const accentStyle = tagInfo ? `border-l                id ${tagInfo.color};` : '';
+    container.innerHTML = html;
+    updatePlanningCounter();
+}
 
-        const priorityClass =         iority === ' h'
-                       ose-500/20 text-rose-300 border border-r            40'
-            : (t.priority === 'Medium'
-                ? 'bg        er-500/20 text-amber-300 border border-amber-500/30'
-                : 'bg-slate-70        xt-slate-300 border borde            600');
+function buildPlanningCard(t) {
+    const tagId   = (t.tags && t.tags.length) ? String(t.tags[0]) : null;
+    const tagInfo = tagId ? window.planningUserTagsMap[tagId] : null;
+    const accentStyle = tagInfo ? `border-left: 4px solid ${tagInfo.color};` : '';
 
-        const cardBg = t.completed
-            ? 'bg-slate-800/30 border-slate-700/25'
-            : 'bg-slate-800/60 border-slate-700/40 hover:border-slate-600';
-        const textClass = t.completed ? 'line-through text-slate-500' : 'text-            0';
+    const priorityClass = t.priority === 'High'
+        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+        : (t.priority === 'Medium'
+            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+            : 'bg-slate-700 text-slate-300 border border-slate-600');
 
-            const tagBadge = tagInfo
-            ? `<span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold border"
+    const cardBg   = t.completed
+        ? 'bg-slate-800/30 border-slate-700/25'
+        : 'bg-slate-800/60 border-slate-700/40 hover:border-slate-600';
+    const textClass = t.completed ? 'line-through text-slate-500' : 'text-slate-200';
+
+    const tagBadge = tagInfo
+        ? `<span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold border"
                  style="background-color:${tagInfo.color}18; color:${tagInfo.color}; border-color:${tagInfo.color}40;"
            >${escHtml(tagInfo.name)}</span>`
-            : '';
+        : '';
 
-        return `
+    return `
 <div class="relative rounded-xl border ${cardBg} transition-all mb-2"
      style="${accentStyle}"
      data-planning-id="${t.id}">
@@ -389,254 +397,13 @@
                 <i class="fa-solid fa-arrow-right-to-bracket text-xs pointer-events-none"></i>
             </button>
             <button type="button" onclick="planningDeleteTask(${t.id})"
-                    class="w-8 h-8 rounded-lg bg-rose-600/20 hover:b    g-r    ose-600 text-rose-300 hover:text-white border border-rose-500/40        x items-       ter justify-center transition-colors cursor-pointer"
-                        title="Delete Task">
-                    <i class="fa-solid fa-trash-can text-xs pointer-ev        -none"></i>
-                </button>
+                    class="w-8 h-8 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center justify-center transition-colors cursor-pointer"
+                    title="Delete Task">
+                <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
+            </button>
         </div>
     </div>
 </div>`;
-    }
-
-    /* ──        ─────────── ────────────────────────────        ─────────
-       Counter
-       ────────────────────    ───    ────────────────────────────────────── */
-    function updatePlan       gCounter() {
-        const el = documen       etElementById('planning-counter');
-        if (!el) return;
-            const pending = planningTasks.filt         => !t.completed).length;
-                t total = pending + totalCompl        ;
-        el.textContent = `${totalCompleted}/${total} Done`;
-          
-    /* ───            ─────────────────────            ─────────────────────
-       Load More Completed Tasks (pagination)
-       ─────────        ───        ──────            ───────── ──────────────── */
-    async function loadMoreCompleted() {
-                   dingMoreCompleted) return;
-                ingMoreCompleted = true;
-
-        const b                t.getElementById('load-more-completed-btn');
-                btn) {
-            btn.dis                              btn.innerHTML = '<i class="fa-solid fa-spinner fa-s                        > Loading…';
-        }
-                                      st r                etch(`/api/planning/completed?offset=$                fset}`);
-          const data = await res.json();
-            i                ess && data.tasks.lengt                                     d newly loaded tasks to client state
-                da                Each(t => {
-                        i        planningTasks.fi            ing => existing.id === t.id)) {
-                              anningTasks.push(t);
-                    }
-                    });
-                completedOffset += data.tasks.length;
-                    tota            ed = data.total_completed;  //        re    sh     from server
-                renderPlanningTasks();
-            }        e {
-                    showToast('No more completed tasks to load.', 'info');
-                    if (btn) btn.remove();
-                }
-        } catch        r) {
-            console.error('Load more completed error:', err);                 showToast('Could not load more tasks.', 'danger');
-                   (btn) { bt disabled = false; btn.textContent = 'Retry'; }
-              finally {           loadingMoreCo        ted = false;
-                  }
-
-    /* ──────────────────────────────────        ──────            ─────────       Add Task
-       ────────────────────                ────────────────                ─ */
-    async function handlePlanningAddTask(e)                 preventDefault();
-        const textEl = document.getElementB            nnin            sk-text');
-        const prioEl            ent.getElementById('                -task-priority');
-        const                ument.getElementById('p                task-tag');
-                       = textEl.value.trim();
-                  ext) return 
-                     s = tagEl.value ? [tagEl.value] : [];             try {
-                  nst res = await fetch('/api/planning/task/add', {
-                     et         'POST',
-                    headers: { 'Content-Type': 'application/js        },    
-                    body: JSON.stringify({ text, priority: prioEl.value       ags })
-                  ;
-            const data = await res.json();
-            if (data    .success) {
-                planningTasks.push(dat        sk);
-                    re erPlanningTasks();
-                textEl.val                             pri                'Medium';
-                tagEl.value = '';
-                     howToast('Task added!', 'success');
-                  else                       showToast(data.messa            ailed to add task',                            }
-        } catch {
-            showToast                or adding                    );
-        }
-    }
-
-    /* ───────                    ──────────────────────────────                    Toggle Completion
-       ───────                    ──────────────────────────────────────                         n planningToggleTa                               try {
-                          = await fetch('/api/planning/task/toggle', {
-                         d: 'POST',
-                headers: { 'Content-Typ                        n' },
-                body: JSON.stringify({ task_id                                                        t data = await res.json                    i                ess) {
-                const t                asks.find(t => t.id === taskId);
-                if (t) {
-                            const wa            ed = t.completed;
-                        t.completed = data.completed;
-                                // Keep global counters in sync
-                    if (!wasC       leted && data.       pleted) {
-                        totalCompleted++;
-                            completedOffset++;
-                        } else if (wasCompleted && !data.completed) {
-                            totalCompleted = Ma        ax(0, totalCompleted - 1);
-                        comp        dOffset = Math.max(0, completedOffset - 1);
-                    }
-                    }
-                renderPlanningTasks();
-            } else {
-                         bEl.checked = !cbEl.check                        showToast(data.message || 'Fa    ile    d to toggle task', 'danger');
-            }
-        } catch {
-                cbEl.       cked = !cbEl.checked;
-            showToast('Server error', 'dang    er');
-        }
-    }
-
-    /* ───────────        ──────────────────────────────────────────────
-             tion Drawer
-            ────────────────────────────────────────────────────── ──── */
-          nction togglePlanningActions(taskId) {
-        cons wer = docu        .getElementById(`planning-drawer-${taskId}`);
-        if (!drawer) return;
-               st opening = !drawer.classList.contains('is-open');
-                ment.querySelectorAll('.planning-action-drawer').forEach(d => {
-            i        .id !== `planning-drawer-${taskId}`) d.classList.remove('is-open');
-            })    ;
-        void drawer.offsetWidth;
-            drawer.classList.toggle('is-open', opening);
-    }
-
-    /* ──────────    ───    ───────────────────────────────────────        ─────
-       Edit Mo               ───── ───────────────────────────────────────────────────── */
-    functio        enPlanning odal(taskId) {
-        const t = planningTasks.find(t => t.id         taskId);
-        if (!t) return;
-        document.getElementById('planning        t-task-id') ue = taskId;
-        document.getElementById('pl        ng-edit-te value = t.text;
-        document.getElementById(        nning-            ority').v ue = t.priority || 'Medium';
-        const                 ment.getElementB                g-edit-tag');
-        if (tagEl) tagEl.value = (t                ags.length) ? String(t.tags[0]) : '';
-        document.getElemen            lann            -modal').classList.remove('hidd              }
-
-    function cl                ditModal() {
-        document.getElementById('planning-edit                ssList.add('hidden                    sync function submitPlanningEdit(e) {
-        e.preventDefault();
-                         =                cument.getElementById('pla                ask-id').value);
-                       = document.getElementById('planning-ed            ).value.t                   const priority = document.getElementById('planning-edit-pri            va        
-        c            El = document.getElementById('plannin        it    -ta    g');
-        const tags = (tagEl && tagEl.value) ? [tagEl.value]        ];
-
-            try {
-            const res = await fetch('/api/planning/task/e    dit', {
-                method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    b            N.stringi ({ task_id: taskId, text, priority, tags })
-                 );
-            c                await res.json();
-            if (data.success) {                     const idx = planningTasks.findIndex(t             ===            ;
-                if (idx !== -                             pla                dx] = { ...planningTasks[idx], ...data.task, id: taskId };
-                    }
-                cl                ditModal();
-                renderPl            sks();
-                    showToast('Task updated!', 'success');
-            }                                            t(data.message || 'Failed to update t        ,     'da    nger');
-            }
-        } catch {
-            showToast('Se       r error', 'dan       ');
-        }
-    }
-
-    /* ─────────────────────────────────────    ────────────────────────
-       Delete
-       ────        ─────────────────────────────────────        ──────────── */
-    a         function planningDeleteTask(taskId) {
-        if (!confirm('Delete this planning task         anentl            turn;
-       try {
-            const res = await fetch('/api/p                /delete', {
-                    method: 'POST',
-                headers: { 'Conte                pplication/json' },
-                body:             ingi            k_id: taskId })
-            });                 const data = aw                ();
-            if (data.success) {
-                planning                ningTasks.filter(t => t                Id);
-                renderPlanningTasks();
-                showToa             deleted.                            } else {
-                    showToast(data.message || 'Delete failed', 'danger');
-            }
-        } catch {
-                    Toast('Server error', 'danger');
-        }
-    }
-
-              ──        ──────────            ──────────────────────            ────
-       Move to Daily
-       ────────────────────────────────────────────────────────────             async function planningMoveToDaily(t        d,     bt    n) {
-        const icon = btn.querySelector('i');
-        btn.dis       ed = true;
-        if (icon) icon.className = 'f       olid fa-spinner fa-spin text-xs pointer-events-none';
-
-        tr    y {
-            const res = aw t fetch('/api/planning/task/move_to_daily', {
-                method: 'POST',    
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify( sk_    id: taskId })
-            });
-                const data = await        .json();
-           if (data.success) {
-                planningT         = planningTasks.filter(t => t.id !== taskId);
-                rend        anningTask );
-               showToast(data.message ||        ved to Daily checklist!', 'success');
-      } else {
-                    btn.disabled        alse;
-                    i (icon) icon.className = 'fa-s                w-right-to-brack                ointer-events-none';
-                showToast(da                | 'Move failed', 'danger');
-            }
-        } c                            tn.disabled = false;
-                      on) icon.className =                a-arrow-right-to-bracket text-xs poin                one';
-            showToast('Serv                danger');
-        }
-    }
-
-    /* ────            ─────────                ────────────────────────────
-       Tag Manager  (reuses shar            ta        ndpoint)
-             ──────────────────────────────────────────────────        ──    ───     */
-    function openTagManagerModal()        ocumen            mentById( anage-tags-modal').classList.                en'); }
-    func                gManagerModal() { document.getElementById('manage                ).classList.add('hidden'); }
-
-    async function handleAdd            ) {
-            e.preventDefault();
-        con            nput = document.getE                new-tag-name-input');
-        con                t = document.getElementById('new-t            -i        ');
-                  name = nameInput ? nameInput.value.trim() : '';
-                con    st color = colorInput ? colorInput.val         '#8b5cf6';
-            if (!name) return;
-
-             ry {
-            const res = await fetch('/api/tags', {
-                method: 'POST',
-                    headers: { 'Conten        pe': 'application/json' },
-                body: JSON.stringify({             'add', name, color })
-            });
-                  nst data = await r            );
-       if (data.succ                           if (nameInput) nameInput.value = '';
-                _planningRefreshTa            tags);
-               showToast('Tag created!', 'success'                   } else {
-                    showToast .message || 'Failed to create tag',                                  }                         showToast('Server                ing tag', 'danger');
-        }
-    }
-
-    async functio                Tag(tagId) {
-        t                         cons        s = await fetch('/api/tags',                       method: 'POST',
-                headers: { 'C        nt-Type': 'a            on/json' },
-                body: JSON.stringify({ action: 'delete', tag_id: tagId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                _planningRefreshTags(data.tags);
                 showToast('Tag deleted', 'info');
             }
         } catch {
@@ -680,23 +447,26 @@
         renderPlanningTasks();
     }
 
-    /* ─────────────────────────────────────────────────────────────
-       Utility Helpers
-       ───────────────────────────────────────────────────────────── */
-    function escHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-    function escAttr(str) {
-        return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
+/* ─────────────────────────────────────────────────────────────
+   Utility Helpers
+   ───────────────────────────────────────────────────────────── */
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(str) {
+    return String(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
-    /* ─────────────────────────────────────────────────────────────
-       Boot
-       ───────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────
+   Boot — works on initial load AND AJAX tab-switch re-injection.
+   DOMContentLoaded already fired on tab-switch, so call directly.
+   ───────────────────────────────────────────────────────────── */
+if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', renderPlanningTasks);
-</script>
-{% endblock %}
+} else {
+    renderPlanningTasks();
+}
 </script>
 {% endblock %}
