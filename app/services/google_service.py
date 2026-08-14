@@ -606,6 +606,8 @@ def check_and_trigger_daily_drive_sync(user):
     Runs asynchronously in a background thread to prevent blocking page loads.
     Returns sync result dict if initiated, None otherwise.
     """
+    from datetime import datetime, timezone
+    
     if not user or not getattr(user, 'is_authenticated', False):
         return None
 
@@ -617,29 +619,41 @@ def check_and_trigger_daily_drive_sync(user):
     if not token or not isinstance(token, dict) or 'access_token' not in token:
         return None
 
-    today_date = datetime.now().date()
+    # 1. Get current local date
     try:
         from zoneinfo import ZoneInfo
         tz_name = current_app.config.get('APP_TIMEZONE', 'Asia/Kolkata')
-        today_date = datetime.now(ZoneInfo(tz_name)).date()
+        local_tz = ZoneInfo(tz_name)
     except Exception:
-        pass
+        # Fallback to UTC if zoneinfo fails
+        local_tz = timezone.utc
 
-    # Check if already synced today
+    today_date = datetime.now(local_tz).date()
+
+    # 2. Check if already synced today by converting DB time to local time first
     if user.last_drive_sync:
-        sync_date = user.last_drive_sync.date()
+        # Ensure the DB datetime is treated as UTC, then convert to local timezone
+        if user.last_drive_sync.tzinfo is None:
+            last_sync_utc = user.last_drive_sync.replace(tzinfo=timezone.utc)
+        else:
+            last_sync_utc = user.last_drive_sync
+            
+        last_sync_local = last_sync_utc.astimezone(local_tz)
+        sync_date = last_sync_local.date()
+        
         if sync_date >= today_date:
             return None
 
-    # Update timestamp immediately to avoid redundant triggers today
+    # 3. Update timestamp (Keeping it as UTC for database best practices)
     try:
-        user.last_drive_sync = datetime.utcnow()
+        user.last_drive_sync = datetime.utcnow() 
         db.session.commit()
     except Exception:
         db.session.rollback()
 
     try:
         app_obj = current_app._get_current_object()
+        import threading
         thread = threading.Thread(target=_async_daily_drive_sync_task, args=(app_obj, user.id), daemon=True)
         thread.start()
         return {'success': True, 'async': True, 'message': 'Daily background Drive sync started'}
@@ -647,7 +661,6 @@ def check_and_trigger_daily_drive_sync(user):
         current_app.logger.warning(f"Daily auto Drive sync thread start error: {e}")
 
     return None
-
 
 
 
