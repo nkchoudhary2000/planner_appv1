@@ -44,6 +44,30 @@ def get_today_date():
             pass
     return datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
 
+def to_24h_time(time_str, default="23:00"):
+    if not time_str or not isinstance(time_str, str):
+        return default
+    time_str = time_str.strip()
+    for fmt in ('%I:%M %p', '%I:%M%p', '%H:%M', '%H:%M:%S'):
+        try:
+            dt = datetime.strptime(time_str, fmt)
+            return dt.strftime('%H:%M')
+        except ValueError:
+            pass
+    return default
+
+def format_time_12h(time_str, default="11:00 PM"):
+    if not time_str or not isinstance(time_str, str):
+        return default
+    time_str = time_str.strip()
+    for fmt in ('%H:%M', '%I:%M %p', '%I:%M%p', '%H:%M:%S'):
+        try:
+            dt = datetime.strptime(time_str, fmt)
+            return dt.strftime('%I:%M %p').lstrip('0')
+        except ValueError:
+            pass
+    return time_str
+
 @planner.route('/')
 def index():
     if current_user.is_authenticated:
@@ -1104,11 +1128,12 @@ def daily():
         elif action == 'save_schedule':
             new_schedule = {}
             default_slots = [
-                "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM", "08:00 - 09:00 AM",
-                "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM", "12:00 - 01:00 PM",
-                "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM", "04:00 - 05:00 PM",
-                "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM", "08:00 - 09:00 PM",
-                "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
+                "12:00 - 01:00 AM", "01:00 - 02:00 AM", "02:00 - 03:00 AM", "03:00 - 04:00 AM",
+                "04:00 - 05:00 AM", "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM",
+                "08:00 - 09:00 AM", "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM",
+                "12:00 - 01:00 PM", "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM",
+                "04:00 - 05:00 PM", "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM",
+                "08:00 - 09:00 PM", "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
             ]
             raw_sched = plan.schedule or {}
             if isinstance(raw_sched, dict):
@@ -1229,15 +1254,18 @@ def daily():
             except ValueError:
                 quality = 8
 
-            bedtime = request.form.get('bedtime', '').strip() or '11:00 PM'
-            wake_time = request.form.get('wake_time', '').strip() or '07:00 AM'
+            # bedtime and wake_time now come in as HH:MM (24h) from <input type="time">
+            bedtime_24h = request.form.get('bedtime', '').strip() or '23:00'
+            wake_time_24h = request.form.get('wake_time', '').strip() or '06:30'
             disruptions = request.form.get('disruptions', 'None').strip()
             notes = request.form.get('notes', '').strip()
 
             plan.sleep_log = {
                 'hours': hours,
-                'bedtime': bedtime,
-                'wake_time': wake_time,
+                'bedtime': format_time_12h(bedtime_24h, '11:00 PM'),
+                'bedtime_24h': bedtime_24h,
+                'wake_time': format_time_12h(wake_time_24h, '6:30 AM'),
+                'wake_time_24h': wake_time_24h,
                 'quality': quality,
                 'disruptions': disruptions,
                 'notes': notes,
@@ -1251,19 +1279,20 @@ def daily():
             return jsonify({'success': True, 'action': action, 'message': 'Operation completed successfully'})
         return redirect(url_for('planner.daily', date=selected_date.strftime('%Y-%m-%d')))
 
-    # Hourly default schedule slots (05:00 - 06:00 AM to 11:00 - 12:00 AM)
+    # Hourly default schedule slots (12:00 - 01:00 AM to 11:00 - 12:00 AM)
     default_slots = [
-        "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM", "08:00 - 09:00 AM",
-        "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM", "12:00 - 01:00 PM",
-        "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM", "04:00 - 05:00 PM",
-        "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM", "08:00 - 09:00 PM",
-        "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
+        "12:00 - 01:00 AM", "01:00 - 02:00 AM", "02:00 - 03:00 AM", "03:00 - 04:00 AM",
+        "04:00 - 05:00 AM", "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM",
+        "08:00 - 09:00 AM", "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM",
+        "12:00 - 01:00 PM", "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM",
+        "04:00 - 05:00 PM", "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM",
+        "08:00 - 09:00 PM", "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
     ]
 
     # Normalize schedule dict for 12h format & mood tracking
     raw_schedule = plan.schedule if plan and plan.schedule else {}
     normalized_schedule = {}
-    legacy_map = {f'{h:02d}:00': f'{(h if (h % 12 != 0) else 12):02d}:00 {"AM" if h < 12 else "PM"}' for h in range(5, 24)}
+    legacy_map = {f'{h:02d}:00': f'{(h if (h % 12 != 0) else 12):02d}:00 {"AM" if h < 12 else "PM"}' for h in range(0, 24)}
 
     for slot in default_slots:
         val = raw_schedule.get(slot)
@@ -2686,11 +2715,12 @@ def export_daily_excel():
 
     # Hourly Schedule & Mood Sheet
     default_slots = [
-        "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM", "08:00 - 09:00 AM",
-        "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM", "12:00 - 01:00 PM",
-        "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM", "04:00 - 05:00 PM",
-        "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM", "08:00 - 09:00 PM",
-        "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
+        "12:00 - 01:00 AM", "01:00 - 02:00 AM", "02:00 - 03:00 AM", "03:00 - 04:00 AM",
+        "04:00 - 05:00 AM", "05:00 - 06:00 AM", "06:00 - 07:00 AM", "07:00 - 08:00 AM",
+        "08:00 - 09:00 AM", "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM",
+        "12:00 - 01:00 PM", "01:00 - 02:00 PM", "02:00 - 03:00 PM", "03:00 - 04:00 PM",
+        "04:00 - 05:00 PM", "05:00 - 06:00 PM", "06:00 - 07:00 PM", "07:00 - 08:00 PM",
+        "08:00 - 09:00 PM", "09:00 - 10:00 PM", "10:00 - 11:00 PM", "11:00 - 12:00 AM"
     ]
     schedule_rows = [["Time Slot", "Activity Details", "Hourly Mood Tag"]]
     raw_schedule = plan.schedule if plan and plan.schedule else {}
@@ -2763,6 +2793,100 @@ def export_daily_excel():
     return send_file(excel_file, download_name=filename, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+@planner.route('/daily/fetch_activity')
+@login_required
+def fetch_daily_activity():
+    date_str = request.args.get('date')
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            target_date = get_today_date()
+    else:
+        target_date = get_today_date()
+
+    dp = DailyPlan.query.filter_by(user_id=current_user.id, date=target_date).first()
+
+    formatted_lines = []
+    formatted_lines.append(f"=== DATASET: DAILY ACTIVITY LOG ({target_date.strftime('%Y-%m-%d, %A')}) ===")
+    formatted_lines.append("")
+
+    if not dp:
+        formatted_lines.append("(No daily plan or activities logged for this date)")
+    else:
+        # Time slots / Schedule
+        sched = dp.schedule or {}
+        if sched and isinstance(sched, dict):
+            formatted_lines.append("Hourly Time Slots & Activities:")
+            has_slots = False
+            for slot, sdata in sched.items():
+                if str(slot).startswith('_'):
+                    continue
+                has_slots = True
+                if isinstance(sdata, dict):
+                    activity = sdata.get('activity', '').strip() or 'No activity recorded'
+                    mood = sdata.get('mood', '').strip()
+                    context = sdata.get('context', '').strip() or sdata.get('notes', '').strip()
+                    tag = sdata.get('tag', '').strip()
+                    details = []
+                    if mood:
+                        details.append(f"Mood: {mood}")
+                    if context:
+                        details.append(f"Context/Notes: {context}")
+                    if tag:
+                        details.append(f"Tag: {tag}")
+                    detail_str = f" [{', '.join(details)}]" if details else ""
+                    formatted_lines.append(f"  - {slot}: {activity}{detail_str}")
+                else:
+                    formatted_lines.append(f"  - {slot}: {sdata}")
+            if not has_slots:
+                formatted_lines.append("  - No hourly time slots logged.")
+        else:
+            formatted_lines.append("Hourly Time Slots & Activities: None logged.")
+
+        formatted_lines.append("")
+
+        # Tasks
+        tasks = dp.tasks or []
+        if tasks and isinstance(tasks, list):
+            formatted_lines.append("Daily Tasks:")
+            for t in tasks:
+                if isinstance(t, dict):
+                    status = "Completed" if t.get('completed') else "Pending"
+                    prio = f" (Priority: {t.get('priority')})" if t.get('priority') else ""
+                    spill = f" [Spillover: {t.get('spillover_count')}d]" if t.get('is_spillover') else ""
+                    formatted_lines.append(f"  - [{status}] {t.get('text', '')}{prio}{spill}")
+        else:
+            formatted_lines.append("Daily Tasks: None logged.")
+
+        formatted_lines.append("")
+
+        # Sleep Log
+        sleep = dp.sleep_log
+        if sleep and isinstance(sleep, dict) and any(sleep.values()):
+            formatted_lines.append(f"Sleep Log: {sleep.get('hours', 'N/A')} hrs (Bed: {sleep.get('bedtime', 'N/A')}, Wake: {sleep.get('wake_time', 'N/A')}, Quality: {sleep.get('quality', 'N/A')}/10)")
+
+        # Depression Episodes
+        episodes = dp.depression_episodes or []
+        if episodes and isinstance(episodes, list):
+            ep_texts = [f"Intensity {ep.get('intensity')}/10 ({ep.get('start_time', 'N/A')}, {ep.get('duration', 'N/A')})" for ep in episodes if isinstance(ep, dict)]
+            if ep_texts:
+                formatted_lines.append(f"Depression Episodes: {'; '.join(ep_texts)}")
+
+        # Daily Notes
+        if dp.notes and dp.notes.strip():
+            formatted_lines.append("")
+            formatted_lines.append(f"End of Day Reflection & Notes: {dp.notes.strip()}")
+
+    formatted_text = "\n".join(formatted_lines)
+
+    return jsonify({
+        'success': True,
+        'date': target_date.strftime('%Y-%m-%d'),
+        'formatted_text': formatted_text
+    })
+
+
 # 2. Weekly Planner Excel Export
 @planner.route('/weekly/export_excel')
 @login_required
@@ -2818,6 +2942,117 @@ def export_weekly_excel():
 
     filename = f"Weekly_Planner_{year_param}_W{week_param:02d}.xlsx"
     return send_file(excel_file, download_name=filename, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@planner.route('/weekly/fetch_activity')
+@login_required
+def fetch_weekly_activity():
+    year_param = request.args.get('year', type=int)
+    week_param = request.args.get('week', type=int)
+    today = get_today_date()
+    if not year_param or not week_param:
+        year_param, week_param, _ = today.isocalendar()
+
+    first_day_of_year = date(year_param, 1, 4)
+    start_of_week = first_day_of_year + timedelta(weeks=week_param - 1) - timedelta(days=first_day_of_year.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+
+    week_daily_plans = DailyPlan.query.filter(
+        DailyPlan.user_id == current_user.id,
+        DailyPlan.date >= start_of_week,
+        DailyPlan.date <= end_of_week
+    ).order_by(DailyPlan.date.asc()).all()
+
+    plan_by_date = {dp.date: dp for dp in week_daily_plans}
+
+    formatted_lines = []
+    formatted_lines.append(f"=== DATASET: DAILY ACTIVITY LOGS (Week {week_param}, {year_param}: {start_of_week.strftime('%b %d, %Y')} - {end_of_week.strftime('%b %d, %Y')}) ===")
+    formatted_lines.append("")
+
+    day_abbrs = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+    for i in range(7):
+        curr_date = start_of_week + timedelta(days=i)
+        day_abbr = day_abbrs[i]
+        date_str = curr_date.strftime('%Y-%m-%d (%A)')
+        dp = plan_by_date.get(curr_date)
+
+        formatted_lines.append(f"--- Day {i+1}: {day_abbr} {date_str} ---")
+
+        if not dp:
+            formatted_lines.append("  (No daily plan logged for this date)")
+            formatted_lines.append("")
+            continue
+
+        # Time slots / Schedule
+        sched = dp.schedule or {}
+        if sched and isinstance(sched, dict):
+            formatted_lines.append("  Hourly Time Slots & Activities:")
+            has_slots = False
+            for slot, sdata in sched.items():
+                if str(slot).startswith('_'):
+                    continue
+                has_slots = True
+                if isinstance(sdata, dict):
+                    activity = sdata.get('activity', '').strip() or 'No activity recorded'
+                    mood = sdata.get('mood', '').strip()
+                    context = sdata.get('context', '').strip() or sdata.get('notes', '').strip()
+                    tag = sdata.get('tag', '').strip()
+                    details = []
+                    if mood:
+                        details.append(f"Mood: {mood}")
+                    if context:
+                        details.append(f"Context/Notes: {context}")
+                    if tag:
+                        details.append(f"Tag: {tag}")
+                    detail_str = f" [{', '.join(details)}]" if details else ""
+                    formatted_lines.append(f"    - {slot}: {activity}{detail_str}")
+                else:
+                    formatted_lines.append(f"    - {slot}: {sdata}")
+            if not has_slots:
+                formatted_lines.append("    - No hourly time slots logged.")
+        else:
+            formatted_lines.append("  Hourly Time Slots & Activities: None logged.")
+
+        # Daily Tasks
+        tasks = dp.tasks or []
+        if tasks and isinstance(tasks, list):
+            formatted_lines.append("  Daily Tasks:")
+            for t in tasks:
+                if isinstance(t, dict):
+                    status = "Completed" if t.get('completed') else "Pending"
+                    prio = f" (Priority: {t.get('priority')})" if t.get('priority') else ""
+                    spill = f" [Spillover: {t.get('spillover_count')}d]" if t.get('is_spillover') else ""
+                    formatted_lines.append(f"    - [{status}] {t.get('text', '')}{prio}{spill}")
+        else:
+            formatted_lines.append("  Daily Tasks: None logged.")
+
+        # Sleep Log
+        sleep = dp.sleep_log
+        if sleep and isinstance(sleep, dict) and any(sleep.values()):
+            formatted_lines.append(f"  Sleep Log: {sleep.get('hours', 'N/A')} hrs (Bed: {sleep.get('bedtime', 'N/A')}, Wake: {sleep.get('wake_time', 'N/A')}, Quality: {sleep.get('quality', 'N/A')}/10)")
+
+        # Depression Episodes
+        episodes = dp.depression_episodes or []
+        if episodes and isinstance(episodes, list):
+            ep_texts = [f"Intensity {ep.get('intensity')}/10 ({ep.get('start_time', 'N/A')}, {ep.get('duration', 'N/A')})" for ep in episodes if isinstance(ep, dict)]
+            if ep_texts:
+                formatted_lines.append(f"  Depression Episodes: {'; '.join(ep_texts)}")
+
+        # Daily Notes
+        if dp.notes and dp.notes.strip():
+            formatted_lines.append(f"  Daily Notes: {dp.notes.strip()}")
+
+        formatted_lines.append("")
+
+    formatted_text = "\n".join(formatted_lines)
+
+    return jsonify({
+        'success': True,
+        'year': year_param,
+        'week': week_param,
+        'formatted_text': formatted_text
+    })
 
 
 # 3. Monthly Planner Excel Export

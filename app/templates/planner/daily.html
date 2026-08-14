@@ -417,7 +417,7 @@
                                 <span>Sleep Duration</span>
                                 <span class="text-indigo-400 font-bold" id="sleep-hours-label">{{ s_log.get('hours', 7.5) }} hrs</span>
                             </label>
-                            <input type="number" step="0.5" min="0" max="24" name="sleep_hours" value="{{ s_log.get('hours', 7.5) }}" 
+                            <input type="number" step="0.1" min="0" max="24" id="sleep-hours-input" name="sleep_hours" value="{{ s_log.get('hours', 7.5) }}" 
                                    oninput="document.getElementById('sleep-hours-label').innerText = this.value + ' hrs'"
                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
@@ -425,15 +425,17 @@
                         <!-- Bedtime -->
                         <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 space-y-1.5">
                             <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Bedtime</label>
-                            <input type="text" name="bedtime" value="{{ s_log.get('bedtime', '11:00 PM') }}" placeholder="e.g. 11:00 PM"
-                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="time" id="bedtime-input" name="bedtime" value="{{ s_log.get('bedtime_24h', '23:00') }}" 
+                                   onchange="calcSleepDuration()" oninput="calcSleepDuration()"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                         </div>
 
                         <!-- Wake-up Time -->
                         <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/40 space-y-1.5">
                             <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Wake-up Time</label>
-                            <input type="text" name="wake_time" value="{{ s_log.get('wake_time', '06:30 AM') }}" placeholder="e.g. 06:30 AM"
-                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="time" id="wake-time-input" name="wake_time" value="{{ s_log.get('wake_time_24h', '06:30') }}" 
+                                   onchange="calcSleepDuration()" oninput="calcSleepDuration()"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                         </div>
 
                         <!-- Sleep Quality Score -->
@@ -676,6 +678,46 @@
                         </button>
                     </div>
                 </form>
+            </div>
+
+            <!-- Summary of Today's Daily Activity Panel -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-700/50 gap-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                            <i class="fa-solid fa-brain text-base"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-white">Summary of Today's Daily Activity</h2>
+                            <p class="text-xs text-slate-400">Extract daily activity tracker data for AI behavioral &amp; productivity analysis</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2.5 self-end sm:self-auto">
+                        <button type="button" id="fetch-daily-activity-btn" onclick="fetchDailyActivity('{{ selected_date.strftime('%Y-%m-%d') }}')" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all flex items-center space-x-1.5" title="Fetch activity tracker data for today">
+                            <i class="fa-solid fa-cloud-arrow-down text-xs"></i>
+                            <span>Fetch</span>
+                        </button>
+                        <button type="button" id="copy-daily-activity-btn" onclick="copyDailyActivity()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-200 hover:text-white text-xs font-semibold transition-all flex items-center space-x-1.5" title="Copy text area content with prompt">
+                            <i class="fa-solid fa-copy text-xs"></i>
+                            <span>Copy</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <textarea id="daily-activity-summary-textarea" rows="12" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed shadow-inner">I have provided a dataset containing my daily activity logs, time slots, tasks, and moods for today. Please act as a productivity and behavioral analyst. Parse the data and provide a comprehensive report covering the following:
+
+Productivity Breakdown: Categorize my activities into 'Productive,' 'Self-Care/Routine,' and 'Unproductive/Distracted.' What were my most and least productive time blocks today?
+
+Distraction Zones: Pinpoint the exact hours and environments/contexts where I logged 'timewaste,' 'overthinking,' or distractions today.
+
+Sentiment & Mood Analysis: Correlate my logged moods (text or emojis) with specific times and tasks today. When did I feel most positive, and what triggered negative or neutral moods?
+
+Proactive Peak Hours: Identify the time blocks where I was consistently engaging in high-value, deep-work activities today.
+
+Actionable Recommendations: Based on today's patterns, suggest 2-3 specific behavioral tweaks to help me avoid slumps and maximize my peak hours tomorrow.</textarea>
+                </div>
             </div>
         </div>
     </div>
@@ -1928,5 +1970,134 @@ function autoSaveSlot(dateStr, slot, slotId) {
         }
     }, 600);
 }
+
+const BASE_DAILY_PROMPT = `I have provided a dataset containing my daily activity logs, time slots, tasks, and moods for today. Please act as a productivity and behavioral analyst. Parse the data and provide a comprehensive report covering the following:
+
+Productivity Breakdown: Categorize my activities into 'Productive,' 'Self-Care/Routine,' and 'Unproductive/Distracted.' What were my most and least productive time blocks today?
+
+Distraction Zones: Pinpoint the exact hours and environments/contexts where I logged 'timewaste,' 'overthinking,' or distractions today.
+
+Sentiment & Mood Analysis: Correlate my logged moods (text or emojis) with specific times and tasks today. When did I feel most positive, and what triggered negative or neutral moods?
+
+Proactive Peak Hours: Identify the time blocks where I was consistently engaging in high-value, deep-work activities today.
+
+Actionable Recommendations: Based on today's patterns, suggest 2-3 specific behavioral tweaks to help me avoid slumps and maximize my peak hours tomorrow.`;
+
+async function fetchDailyActivity(dateStr) {
+    const fetchBtn = document.getElementById('fetch-daily-activity-btn');
+    const textarea = document.getElementById('daily-activity-summary-textarea');
+    if (!fetchBtn || !textarea) return;
+
+    const originalHTML = fetchBtn.innerHTML;
+    fetchBtn.disabled = true;
+    fetchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Fetching...</span>';
+
+    try {
+        const response = await fetch(`/daily/fetch_activity?date=${dateStr}`);
+        const data = await response.json();
+
+        if (data.success && data.formatted_text) {
+            textarea.value = BASE_DAILY_PROMPT + '\n\n' + data.formatted_text;
+            if (window.showToast) {
+                showToast('Fetched today\'s daily activity tracker data successfully!', 'success');
+            }
+        } else {
+            if (window.showToast) {
+                showToast(data.message || 'Failed to fetch daily activity data.', 'danger');
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching daily activity:', err);
+        if (window.showToast) {
+            showToast('Server error while fetching activity data.', 'danger');
+        }
+    } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.innerHTML = originalHTML;
+    }
+}
+
+async function copyDailyActivity() {
+    const textarea = document.getElementById('daily-activity-summary-textarea');
+    const copyBtn = document.getElementById('copy-daily-activity-btn');
+    if (!textarea) return;
+
+    const textToCopy = textarea.value;
+    if (!textToCopy) {
+        if (window.showToast) showToast('Nothing to copy.', 'warning');
+        return;
+    }
+
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(textToCopy);
+        } else {
+            textarea.select();
+            document.execCommand('copy');
+        }
+
+        if (copyBtn) {
+            const orig = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fa-solid fa-check text-xs text-emerald-400"></i><span>Copied!</span>';
+            setTimeout(() => { copyBtn.innerHTML = orig; }, 2000);
+        }
+
+        if (window.showToast) {
+            showToast('Copied daily summary prompt & activity dataset to clipboard!', 'info');
+        }
+    } catch (err) {
+        console.error('Failed to copy text:', err);
+        if (window.showToast) {
+            showToast('Failed to copy to clipboard.', 'danger');
+        }
+    }
+}
+
+function calcSleepDuration() {
+    const bedtimeInput = document.getElementById('bedtime-input');
+    const wakeTimeInput = document.getElementById('wake-time-input');
+    const durationInput = document.getElementById('sleep-hours-input');
+    const durationLabel = document.getElementById('sleep-hours-label');
+
+    if (!bedtimeInput || !wakeTimeInput || !durationInput) return;
+
+    const bedtimeVal = bedtimeInput.value;
+    const wakeTimeVal = wakeTimeInput.value;
+
+    if (!bedtimeVal || !wakeTimeVal) return;
+
+    const bParts = bedtimeVal.split(':');
+    const wParts = wakeTimeVal.split(':');
+
+    if (bParts.length < 2 || wParts.length < 2) return;
+
+    const bHours = parseInt(bParts[0], 10);
+    const bMins = parseInt(bParts[1], 10);
+    const wHours = parseInt(wParts[0], 10);
+    const wMins = parseInt(wParts[1], 10);
+
+    if (isNaN(bHours) || isNaN(bMins) || isNaN(wHours) || isNaN(wMins)) return;
+
+    let bTotalMinutes = bHours * 60 + bMins;
+    let wTotalMinutes = wHours * 60 + wMins;
+
+    if (wTotalMinutes <= bTotalMinutes) {
+        wTotalMinutes += 24 * 60;
+    }
+
+    const diffMinutes = wTotalMinutes - bTotalMinutes;
+    const diffHours = Math.round((diffMinutes / 60) * 10) / 10;
+
+    if (diffHours >= 0 && diffHours <= 24) {
+        durationInput.value = diffHours;
+        if (durationLabel) {
+            durationLabel.innerText = diffHours + ' hrs';
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    calcSleepDuration();
+});
 </script>
 {% endblock %}
