@@ -1353,6 +1353,43 @@ def monthly():
 
     plan = MonthlyPlan.query.filter_by(user_id=current_user.id, year=selected_year, month=selected_month).first()
 
+    # Auto-copy habits from the previous month when navigating to a brand-new month
+    if plan is None and request.method == 'GET':
+        # Calculate the previous month
+        if selected_month == 1:
+            prev_year, prev_month = selected_year - 1, 12
+        else:
+            prev_year, prev_month = selected_year, selected_month - 1
+
+        prev_plan = MonthlyPlan.query.filter_by(
+            user_id=current_user.id, year=prev_year, month=prev_month
+        ).first()
+
+        inherited_habits = []
+        if prev_plan and prev_plan.habits:
+            inherited_habits = [
+                {
+                    'id': str(int(datetime.utcnow().timestamp() * 1000) + idx),
+                    'name': h.get('name', ''),
+                    'completed_days': []          # fresh slate for the new month
+                }
+                for idx, h in enumerate(prev_plan.habits)
+                if h.get('name', '').strip()
+            ]
+
+        plan = MonthlyPlan(
+            user_id=current_user.id,
+            year=selected_year,
+            month=selected_month,
+            goals=[],
+            habits=inherited_habits,
+            milestones=[],
+            calendar_days={},
+            notes=''
+        )
+        db.session.add(plan)
+        db.session.commit()
+
     if request.method == 'POST':
         action = request.form.get('action')
         
