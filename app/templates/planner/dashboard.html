@@ -186,6 +186,451 @@
         </div>
     </div>
 
+    <!-- ========================================================= -->
+    <!-- ========================================================= -->
+    <!-- Habit Momentum Chart                                        -->
+    <!-- ========================================================= -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-4" id="momentum-chart-panel">
+        <!-- Chart Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700/50">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                    <i class="fa-solid fa-chart-line text-sm"></i>
+                </div>
+                <div>
+                    <h2 class="text-base font-bold text-white">Habit Momentum Chart</h2>
+                    <p class="text-[11px] text-slate-400">Select one or multiple habits below to isolate momentum trends</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3 self-start sm:self-auto">
+                <!-- Select All / Clear All Quick Controls -->
+                <div class="flex items-center space-x-1 text-[11px]" id="momentum-selection-controls">
+                    <button type="button" onclick="selectAllHabits(true)"
+                        class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-medium">
+                        Select All
+                    </button>
+                    <span class="text-slate-700">|</span>
+                    <button type="button" onclick="selectAllHabits(false)"
+                        class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-medium">
+                        Clear All
+                    </button>
+                </div>
+
+                <!-- Monthly / Yearly Toggle Buttons -->
+                <div class="flex items-center space-x-1.5 bg-slate-800/80 border border-slate-700 rounded-xl p-1" id="momentum-view-toggle">
+                    <button type="button" id="momentum-btn-monthly"
+                        onclick="switchMomentumView('monthly')"
+                        class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all bg-indigo-600 text-white shadow-sm shadow-indigo-500/20">
+                        <i class="fa-solid fa-calendar-days mr-1 text-[10px]"></i>Monthly
+                    </button>
+                    <button type="button" id="momentum-btn-yearly"
+                        onclick="switchMomentumView('yearly')"
+                        class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white hover:bg-slate-700">
+                        <i class="fa-solid fa-calendar mr-1 text-[10px]"></i>Yearly
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Canvas — taller to accommodate multiple lines -->
+        <div class="relative" style="height: 280px;">
+            <!-- Loading spinner -->
+            <div id="momentum-chart-loading" class="absolute inset-0 hidden items-center justify-center z-10 bg-slate-900/50 rounded-xl backdrop-blur-sm">
+                <div class="flex items-center space-x-2.5 text-indigo-400">
+                    <i class="fa-solid fa-circle-notch animate-spin text-lg"></i>
+                    <span class="text-xs font-semibold">Loading yearly data...</span>
+                </div>
+            </div>
+            <!-- Empty state -->
+            <div id="momentum-chart-empty" class="absolute inset-0 hidden items-center justify-center">
+                <div class="text-center space-y-2">
+                    <i class="fa-solid fa-chart-line text-2xl text-slate-600"></i>
+                    <p class="text-sm text-slate-500" id="momentum-empty-msg">No habits tracked this month yet.</p>
+                    <a href="{{ url_for('planner.monthly') }}" id="momentum-empty-link" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Add habits in Monthly Planner →</a>
+                </div>
+            </div>
+            <canvas id="habitMomentumChart" class="w-full h-full"></canvas>
+        </div>
+
+        <!-- Dynamic Interactive Legend Pills — click to toggle individual habits -->
+        <div class="flex items-center flex-wrap gap-2 text-xs pt-2 border-t border-slate-700/40" id="momentum-legend">
+            <!-- JS fills this in -->
+            <span class="text-slate-500 italic text-[11px]" id="momentum-legend-empty">No habits available.</span>
+        </div>
+    </div>
+    <!-- ========================================================= -->
+
+    <!-- Chart.js v4 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+    <script>
+    (function () {
+        'use strict';
+
+        // ── Constants ──────────────────────────────────────────────────────────
+        const GAIN_FACTOR  = 2.0;   // Score added when habit is done
+        const DECAY_FACTOR = 1.5;   // Score removed when habit is missed
+        const SCORE_FLOOR  = 0;     // Momentum never goes below zero
+
+        const CURRENT_YEAR  = {{ current_year }};
+        const CURRENT_MONTH = {{ current_month }};
+        const TODAY_DAY     = {{ today.day }};
+
+        // Curated 10-color palette — vibrant, dark-mode friendly
+        const PALETTE = [
+            { line: 'rgb(99,102,241)',  fill: 'rgba(99,102,241,0.12)'  },  // indigo
+            { line: 'rgb(34,211,238)',  fill: 'rgba(34,211,238,0.12)'  },  // cyan
+            { line: 'rgb(52,211,153)',  fill: 'rgba(52,211,153,0.12)'  },  // emerald
+            { line: 'rgb(251,191,36)',  fill: 'rgba(251,191,36,0.12)'  },  // amber
+            { line: 'rgb(244,114,182)', fill: 'rgba(244,114,182,0.12)' },  // pink
+            { line: 'rgb(167,139,250)', fill: 'rgba(167,139,250,0.12)' },  // violet
+            { line: 'rgb(251,146,60)',  fill: 'rgba(251,146,60,0.12)'  },  // orange
+            { line: 'rgb(94,234,212)',  fill: 'rgba(94,234,212,0.12)'  },  // teal
+            { line: 'rgb(248,113,113)', fill: 'rgba(248,113,113,0.12)' },  // rose
+            { line: 'rgb(163,230,53)',  fill: 'rgba(163,230,53,0.12)'  },  // lime
+        ];
+
+        // Habits data from server
+        const INITIAL_HABITS = {{ monthly_habits | default([]) | tojson }};
+        let liveHabits = JSON.parse(JSON.stringify(INITIAL_HABITS));
+
+        let currentView = 'monthly';
+        let momentumChartInstance = null;
+
+        // Current Habit Selection State (Set of active habit names)
+        let selectedHabitNames = null; // null = all selected by default
+        let lastRawDatasets = [];      // cached for filtering
+        let lastLabels = [];
+
+        // ── Selection Logic ───────────────────────────────────────────────────
+        function isHabitSelected(name) {
+            if (!selectedHabitNames) return true;
+            return selectedHabitNames.has(name);
+        }
+
+        window.toggleHabitSelection = function(name) {
+            if (!selectedHabitNames) {
+                // Initialize with all known habit names except the one toggled off
+                selectedHabitNames = new Set(lastRawDatasets.map(d => d.name));
+            }
+            if (selectedHabitNames.has(name)) {
+                selectedHabitNames.delete(name);
+            } else {
+                selectedHabitNames.add(name);
+            }
+            updateChartAndLegend();
+        };
+
+        window.selectAllHabits = function(selectActive) {
+            if (selectActive) {
+                selectedHabitNames = new Set(lastRawDatasets.map(d => d.name));
+            } else {
+                selectedHabitNames = new Set(); // clear all
+            }
+            updateChartAndLegend();
+        };
+
+        // ── Per-Habit Momentum (Monthly) ──────────────────────────────────────
+        function computePerHabitMonthly(habits, upToDay) {
+            const labels = Array.from({ length: upToDay }, (_, i) => `Day ${i + 1}`);
+
+            const habitDatasets = habits.map((habit, idx) => {
+                const color = PALETTE[idx % PALETTE.length];
+                const done  = new Set(
+                    (habit.completed_days || []).map(d => parseInt(d, 10))
+                );
+                let rolling = 0;
+                const scores = [];
+
+                for (let d = 1; d <= upToDay; d++) {
+                    if (done.has(d)) {
+                        rolling += GAIN_FACTOR;
+                    } else {
+                        rolling -= DECAY_FACTOR;
+                    }
+                    rolling = Math.max(rolling, SCORE_FLOOR);
+                    scores.push(parseFloat(rolling.toFixed(2)));
+                }
+
+                return { name: habit.name || `Habit ${idx + 1}`, color, scores };
+            });
+
+            return { labels, habitDatasets };
+        }
+
+        // ── Per-Habit Momentum (Yearly) ───────────────────────────────────────
+        function computePerHabitYearly(yearlyData) {
+            const labels = yearlyData.map(m => m.label);
+
+            const habitMap = {};
+            yearlyData.forEach(monthData => {
+                (monthData.habits || []).forEach(h => {
+                    if (h.name && !(h.name in habitMap)) {
+                        habitMap[h.name] = Object.keys(habitMap).length;
+                    }
+                });
+            });
+
+            const habitNames = Object.keys(habitMap);
+            if (habitNames.length === 0) return { labels, habitDatasets: [] };
+
+            const habitDatasets = habitNames.map((name, idx) => {
+                const color = PALETTE[idx % PALETTE.length];
+                let rolling = 0;
+                const scores = [];
+
+                yearlyData.forEach(monthData => {
+                    const habitEntry = (monthData.habits || []).find(h => h.name === name);
+                    let coverage = 0;
+                    if (habitEntry && monthData.days_in_month > 0) {
+                        coverage = Math.min(habitEntry.completed_count / monthData.days_in_month, 1);
+                    }
+
+                    if (coverage >= 0.5) {
+                        rolling += coverage * GAIN_FACTOR * 10;
+                    } else {
+                        rolling -= (1 - coverage) * DECAY_FACTOR * 10;
+                    }
+                    rolling = Math.max(rolling, SCORE_FLOOR);
+                    scores.push(parseFloat(rolling.toFixed(2)));
+                });
+
+                return { name, color, scores };
+            });
+
+            return { labels, habitDatasets };
+        }
+
+        // ── Update Chart & Dynamic Interactive Legend ──────────────────────────
+        function updateChartAndLegend() {
+            const canvas   = document.getElementById('habitMomentumChart');
+            const emptyEl  = document.getElementById('momentum-chart-empty');
+            const emptyMsg = document.getElementById('momentum-empty-msg');
+            const emptyLink = document.getElementById('momentum-empty-link');
+            const legendEl = document.getElementById('momentum-legend');
+
+            if (!canvas || !lastLabels) return;
+
+            // Rebuild legend pills for all known habits
+            if (legendEl) {
+                if (lastRawDatasets.length === 0) {
+                    legendEl.innerHTML = '<span class="text-slate-500 italic text-[11px]">No habits available.</span>';
+                } else {
+                    legendEl.innerHTML = lastRawDatasets.map(ds => {
+                        const active = isHabitSelected(ds.name);
+                        const activeStyles = active
+                            ? `bg-slate-800 border-slate-600/80 text-white shadow-sm ring-1 ring-white/10`
+                            : `bg-slate-900/50 border-slate-800 text-slate-500 opacity-50 line-through`;
+
+                        return `
+                            <button type="button"
+                                onclick="toggleHabitSelection('${ds.name.replace(/'/g, "\\'")}')"
+                                class="flex items-center space-x-2 px-3 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer ${activeStyles}">
+                                <span style="background: ${active ? ds.color.line : '#64748b'}"
+                                      class="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0 transition-colors"></span>
+                                <span class="font-medium truncate max-w-[140px] text-xs" title="${ds.name}">${ds.name}</span>
+                            </button>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // Filter datasets according to selection
+            const visibleDatasets = lastRawDatasets.filter(ds => isHabitSelected(ds.name));
+
+            // Check empty cases
+            if (lastRawDatasets.length === 0) {
+                canvas.style.display = 'none';
+                emptyEl.classList.remove('hidden');
+                emptyEl.style.display = 'flex';
+                if (emptyMsg) emptyMsg.textContent = 'No habits tracked for this period yet.';
+                if (emptyLink) emptyLink.style.display = '';
+                return;
+            }
+
+            if (visibleDatasets.length === 0) {
+                canvas.style.display = 'none';
+                emptyEl.classList.remove('hidden');
+                emptyEl.style.display = 'flex';
+                if (emptyMsg) emptyMsg.textContent = 'All habits hidden. Click a habit badge below to toggle visibility.';
+                if (emptyLink) emptyLink.style.display = 'none';
+                return;
+            }
+
+            canvas.style.display = '';
+            emptyEl.style.display = 'none';
+            emptyEl.classList.add('hidden');
+
+            // Destroy old chart instance
+            if (momentumChartInstance) {
+                momentumChartInstance.destroy();
+                momentumChartInstance = null;
+            }
+
+            const hideDots = lastLabels.length > 15;
+
+            const chartDatasets = visibleDatasets.map(ds => ({
+                label: ds.name,
+                data: ds.scores,
+                borderColor: ds.color.line,
+                borderWidth: 2,
+                backgroundColor: ds.color.fill,
+                fill: true,
+                tension: 0.42,
+                pointRadius: hideDots ? 0 : 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: ds.color.line,
+                pointBorderColor: 'rgba(255,255,255,0.6)',
+                pointBorderWidth: 1.5,
+            }));
+
+            momentumChartInstance = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: { labels: lastLabels, datasets: chartDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 400, easing: 'easeInOutCubic' },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            borderColor: 'rgba(148,163,184,0.15)',
+                            borderWidth: 1,
+                            titleColor: '#94a3b8',
+                            bodyColor: '#e2e8f0',
+                            titleFont: { size: 10, weight: '600' },
+                            bodyFont:  { size: 11 },
+                            padding: 10,
+                            cornerRadius: 10,
+                            callbacks: {
+                                label: ctx => `  ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.04)' },
+                            ticks: {
+                                color: '#64748b',
+                                font: { size: 10 },
+                                maxRotation: 0,
+                                callback: function(val, idx) {
+                                    if (currentView === 'monthly' && lastLabels.length > 15) {
+                                        return (idx + 1) % 5 === 1 ? lastLabels[idx] : '';
+                                    }
+                                    return lastLabels[idx];
+                                }
+                            },
+                            border: { color: 'transparent' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: {
+                                color: '#64748b',
+                                font: { size: 10 },
+                                padding: 8,
+                                callback: val => val.toFixed(0)
+                            },
+                            min: 0,
+                            border: { color: 'transparent' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── View Switching ────────────────────────────────────────────────────
+        function setActiveToggle(mode) {
+            const monthlyBtn = document.getElementById('momentum-btn-monthly');
+            const yearlyBtn  = document.getElementById('momentum-btn-yearly');
+            const activeClass   = ['bg-indigo-600', 'text-white', 'shadow-sm', 'shadow-indigo-500/20'];
+            const inactiveClass = ['text-slate-400', 'hover:text-white', 'hover:bg-slate-700'];
+
+            if (mode === 'monthly') {
+                monthlyBtn.classList.add(...activeClass);
+                monthlyBtn.classList.remove(...inactiveClass);
+                yearlyBtn.classList.remove(...activeClass);
+                yearlyBtn.classList.add(...inactiveClass);
+            } else {
+                yearlyBtn.classList.add(...activeClass);
+                yearlyBtn.classList.remove(...inactiveClass);
+                monthlyBtn.classList.remove(...activeClass);
+                monthlyBtn.classList.add(...inactiveClass);
+            }
+        }
+
+        window.switchMomentumView = function (mode) {
+            if (mode === currentView) return;
+            currentView = mode;
+            setActiveToggle(mode);
+            selectedHabitNames = null; // reset selection filter when changing views
+            if (mode === 'monthly') renderMonthlyView();
+            else renderYearlyView();
+        };
+
+        function renderMonthlyView() {
+            const { labels, habitDatasets } = computePerHabitMonthly(liveHabits, TODAY_DAY);
+            lastLabels = labels;
+            lastRawDatasets = habitDatasets;
+            updateChartAndLegend();
+        }
+
+        async function renderYearlyView() {
+            const loadingEl = document.getElementById('momentum-chart-loading');
+            if (loadingEl) { loadingEl.style.display = 'flex'; loadingEl.classList.remove('hidden'); }
+
+            try {
+                const res  = await fetch(`/api/monthly/habit/momentum-yearly?year=${CURRENT_YEAR}`,
+                                         { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await res.json();
+
+                if (data.success && data.data) {
+                    const { labels, habitDatasets } = computePerHabitYearly(data.data);
+                    lastLabels = labels;
+                    lastRawDatasets = habitDatasets;
+                } else {
+                    lastLabels = [];
+                    lastRawDatasets = [];
+                }
+            } catch (err) {
+                console.error('Momentum yearly API error:', err);
+                lastLabels = [];
+                lastRawDatasets = [];
+            } finally {
+                if (loadingEl) { loadingEl.style.display = 'none'; loadingEl.classList.add('hidden'); }
+                updateChartAndLegend();
+            }
+        }
+
+        // ── Real-time Toggle Hook ─────────────────────────────────────────────
+        window.updateMomentumChartAfterToggle = function (habitId, day, isChecked) {
+            for (const habit of liveHabits) {
+                if (String(habit.id) === String(habitId)) {
+                    const dayNum = parseInt(day, 10);
+                    const dayStr = String(day);
+                    habit.completed_days = (habit.completed_days || [])
+                        .filter(d => d !== dayNum && d !== dayStr);
+                    if (isChecked) habit.completed_days.push(dayNum);
+                    break;
+                }
+            }
+            if (currentView === 'monthly') renderMonthlyView();
+        };
+
+        // ── Boot ──────────────────────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', renderMonthlyView);
+
+        window.refreshMomentumChart = function () {
+            if (currentView === 'monthly') renderMonthlyView();
+            else renderYearlyView();
+        };
+
+    })();
+    </script>
+
     <!-- Main 3-Column Layout: Left (2 Cols Main Content) & Right (1 Col Sidebar) -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         

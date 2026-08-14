@@ -150,6 +150,10 @@ async function toggleHabitDay(year, month, habitId, day, cellElement) {
                 cellElement.classList.add('habit-cell-inactive');
                 cellElement.innerText = '•';
             }
+            // Hook: update Habit Momentum Chart if it's present on the page
+            if (typeof window.updateMomentumChartAfterToggle === 'function') {
+                window.updateMomentumChartAfterToggle(habitId, day, data.checked);
+            }
         } else {
             console.error('Habit toggle failed:', data.message);
             showToast(data.message || 'Habit toggle failed', 'danger');

@@ -524,6 +524,7 @@ def dashboard():
         yearly_resolutions=yearly_resolutions,
         yearly_objectives=yearly_objectives,
         current_year=current_year,
+        current_month=current_month,
         month_name=month_name,
         recent_episodes=recent_episodes[:5],
         total_episodes_count=total_episodes_count,
@@ -2373,6 +2374,59 @@ def api_toggle_habit_day():
         return jsonify({'success': True, 'checked': is_checked})
 
     return jsonify({'success': False, 'message': 'Habit not found'}), 404
+
+
+# AJAX Endpoint for yearly habit momentum data (used by Dashboard Momentum Chart)
+@planner.route('/api/monthly/habit/momentum-yearly', methods=['GET'])
+@login_required
+def api_habit_momentum_yearly():
+    """Returns per-month habit completion stats for all 12 months of a given year.
+
+    Query params:
+        year (int): the calendar year to aggregate. Defaults to the current year.
+
+    Response JSON:
+        {
+            "success": true,
+            "data": [
+                { "month": 1, "label": "Jan", "total_habits": 3, "days_in_month": 31, "completed_slots": 47 },
+                ...
+            ]
+        }
+    """
+    import calendar as cal_mod
+    try:
+        year = int(request.args.get('year', get_today_date().year))
+    except (ValueError, TypeError):
+        year = get_today_date().year
+
+    all_monthly = MonthlyPlan.query.filter_by(user_id=current_user.id, year=year).all()
+    monthly_map = {mp.month: mp for mp in all_monthly}
+
+    result = []
+    for m in range(1, 13):
+        days_in_month = cal_mod.monthrange(year, m)[1]
+        mp = monthly_map.get(m)
+        habits = mp.habits if (mp and mp.habits) else []
+        total_habits = len(habits)
+        completed_slots = sum(len(h.get('completed_days', [])) for h in habits)
+        result.append({
+            'month': m,
+            'label': cal_mod.month_abbr[m],
+            'total_habits': total_habits,
+            'days_in_month': days_in_month,
+            'completed_slots': completed_slots,
+            'habits': [
+                {
+                    'id': h.get('id'),
+                    'name': h.get('name', 'Habit'),
+                    'completed_count': len(h.get('completed_days', []))
+                }
+                for h in habits
+            ]
+        })
+
+    return jsonify({'success': True, 'data': result})
 
 
 # Google Drive Backup Sync Endpoint
