@@ -706,17 +706,19 @@
                 </div>
 
                 <div class="relative">
-                    <textarea id="daily-activity-summary-textarea" rows="12" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed shadow-inner">I have provided a dataset containing my daily activity logs, time slots, tasks, and moods for today. Please act as a productivity and behavioral analyst. Parse the data and provide a comprehensive report covering the following:
+                    <textarea id="daily-activity-summary-textarea" rows="12" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed shadow-inner">Act as a strategic productivity and behavioral analyst. I will provide a dataset of my daily logs, which includes my tasks, activities, moods, sleep duration, and any logged depression episodes.
 
-Productivity Breakdown: Categorize my activities into 'Productive,' 'Self-Care/Routine,' and 'Unproductive/Distracted.' What were my most and least productive time blocks today?
+Please analyze this data and provide a concise, high-level strategic summary. CRITICAL: Do NOT list my activities on an hourly basis or provide a chronological breakdown.
 
-Distraction Zones: Pinpoint the exact hours and environments/contexts where I logged 'timewaste,' 'overthinking,' or distractions today.
+Instead, synthesize the data into a brief, easy-to-read report covering:
 
-Sentiment & Mood Analysis: Correlate my logged moods (text or emojis) with specific times and tasks today. When did I feel most positive, and what triggered negative or neutral moods?
+Peak & Slump Zones: Identify the broad time windows where I am most productive and the zones where I am least productive.
 
-Proactive Peak Hours: Identify the time blocks where I was consistently engaging in high-value, deep-work activities today.
+Unproductivity Triggers: What specific patterns (e.g., sleep deficits, mood shifts, depression episodes, or specific types of tasks) lead to my unproductive zones and distractions?
 
-Actionable Recommendations: Based on today's patterns, suggest 2-3 specific behavioral tweaks to help me avoid slumps and maximize my peak hours tomorrow.</textarea>
+Daily Optimization: Based on my patterns, what is the core reason behind my slumps, and how can I adjust my routine to get the most out of my day?
+
+Action Plan for Tomorrow: Provide a concrete, highly actionable strategy for how I should structure and plan tomorrow to maximize my peak hours, mitigate the slumps, and get my most important things done. Keep this section to 2-3 focused bullet points.</textarea>
                 </div>
             </div>
         </div>
@@ -1971,17 +1973,19 @@ function autoSaveSlot(dateStr, slot, slotId) {
     }, 600);
 }
 
-const BASE_DAILY_PROMPT = `I have provided a dataset containing my daily activity logs, time slots, tasks, and moods for today. Please act as a productivity and behavioral analyst. Parse the data and provide a comprehensive report covering the following:
+const BASE_DAILY_PROMPT = `Act as a strategic productivity and behavioral analyst. I will provide a dataset of my daily logs, which includes my tasks, activities, moods, sleep duration, and any logged depression episodes.
 
-Productivity Breakdown: Categorize my activities into 'Productive,' 'Self-Care/Routine,' and 'Unproductive/Distracted.' What were my most and least productive time blocks today?
+Please analyze this data and provide a concise, high-level strategic summary. CRITICAL: Do NOT list my activities on an hourly basis or provide a chronological breakdown.
 
-Distraction Zones: Pinpoint the exact hours and environments/contexts where I logged 'timewaste,' 'overthinking,' or distractions today.
+Instead, synthesize the data into a brief, easy-to-read report covering:
 
-Sentiment & Mood Analysis: Correlate my logged moods (text or emojis) with specific times and tasks today. When did I feel most positive, and what triggered negative or neutral moods?
+Peak & Slump Zones: Identify the broad time windows where I am most productive and the zones where I am least productive.
 
-Proactive Peak Hours: Identify the time blocks where I was consistently engaging in high-value, deep-work activities today.
+Unproductivity Triggers: What specific patterns (e.g., sleep deficits, mood shifts, depression episodes, or specific types of tasks) lead to my unproductive zones and distractions?
 
-Actionable Recommendations: Based on today's patterns, suggest 2-3 specific behavioral tweaks to help me avoid slumps and maximize my peak hours tomorrow.`;
+Daily Optimization: Based on my patterns, what is the core reason behind my slumps, and how can I adjust my routine to get the most out of my day?
+
+Action Plan for Tomorrow: Provide a concrete, highly actionable strategy for how I should structure and plan tomorrow to maximize my peak hours, mitigate the slumps, and get my most important things done. Keep this section to 2-3 focused bullet points.`;
 
 async function fetchDailyActivity(dateStr) {
     const fetchBtn = document.getElementById('fetch-daily-activity-btn');
