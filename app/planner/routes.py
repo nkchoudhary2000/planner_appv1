@@ -1319,6 +1319,29 @@ def daily():
     raw_tasks = plan.tasks if plan and plan.tasks else []
     sorted_tasks = sorted(raw_tasks, key=lambda t: 1 if (isinstance(t, dict) and t.get('completed')) else 0)
 
+    # Return JSON response for API calls (Token auth or Session auth)
+    if request.is_json or request.headers.get('Accept') == 'application/json' or request.args.get('format') == 'json':
+        completed_count = sum(1 for t in sorted_tasks if isinstance(t, dict) and t.get('completed'))
+        total_count = len(sorted_tasks)
+        return jsonify({
+            'success': True,
+            'date': selected_date.strftime('%Y-%m-%d'),
+            'is_today': selected_date == today,
+            'summary': {
+                'total_tasks': total_count,
+                'completed_tasks': completed_count,
+                'pending_tasks': total_count - completed_count,
+                'completion_pct': int((completed_count / total_count * 100)) if total_count > 0 else 0
+            },
+            'tasks': sorted_tasks,
+            'schedule': normalized_schedule,
+            'notes': plan.notes if plan else '',
+            'sleep_log': plan.sleep_log if plan and plan.sleep_log else {},
+            'memory_logs': plan.memory_logs if plan and plan.memory_logs else [],
+            'depression_episodes': plan.depression_episodes if plan and plan.depression_episodes else [],
+            'cascaded_items': cascaded_items
+        })
+
     return render_template(
         'planner/daily.html',
         selected_date=selected_date,
@@ -1334,6 +1357,57 @@ def daily():
         cascaded_items=cascaded_items,
         user_tags=user_tags
     )
+
+
+@planner.route('/api/daily/today', methods=['GET'])
+@planner.route('/api/daily', methods=['GET'])
+@login_required
+def api_daily_plan():
+    """Dedicated REST API endpoint to get today's or selected date's planned tasks as JSON.
+    Supports Token-based Authentication (Authorization: Bearer <token>, X-API-Token, or ?api_token).
+    """
+    today = get_today_date()
+    date_param = request.args.get('date')
+    if date_param and date_param.lower() != 'today':
+        try:
+            selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = today
+    else:
+        selected_date = today
+
+    process_task_spillovers(current_user.id, selected_date)
+    populate_daily_defaults(current_user.id, selected_date)
+
+    plan = DailyPlan.query.filter_by(user_id=current_user.id, date=selected_date).first()
+    tasks = list(plan.tasks or []) if plan else []
+    sorted_tasks = sorted(tasks, key=lambda t: (1 if (isinstance(t, dict) and t.get('completed')) else 0, 0 if (isinstance(t, dict) and t.get('priority') == 'High') else 1))
+
+    completed_count = sum(1 for t in sorted_tasks if isinstance(t, dict) and t.get('completed'))
+    total_count = len(sorted_tasks)
+
+    return jsonify({
+        'success': True,
+        'date': selected_date.strftime('%Y-%m-%d'),
+        'is_today': selected_date == today,
+        'user': {
+            'id': current_user.id,
+            'username': current_user.username,
+            'email': current_user.email
+        },
+        'summary': {
+            'total_tasks': total_count,
+            'completed_tasks': completed_count,
+            'pending_tasks': total_count - completed_count,
+            'completion_pct': int((completed_count / total_count * 100)) if total_count > 0 else 0
+        },
+        'tasks': sorted_tasks,
+        'schedule': plan.schedule if plan else {},
+        'notes': plan.notes if plan else '',
+        'sleep_log': plan.sleep_log if plan else {},
+        'memory_logs': plan.memory_logs if plan else [],
+        'depression_episodes': plan.depression_episodes if plan else []
+    })
 
 
 @planner.route('/monthly', methods=['GET', 'POST'])
@@ -1958,6 +2032,34 @@ def yearly():
 @planner.route('/api/daily/task/toggle', methods=['POST'])
 @login_required
 def api_toggle_task():
+    """
+    Toggle a daily task's completion status.
+    ---
+    tags:
+      - Daily Tasks
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - date
+            - task_id
+          properties:
+            date:
+              type: string
+              description: Date of the plan (YYYY-MM-DD)
+            task_id:
+              type: string
+              description: ID of the task to toggle
+    responses:
+      200:
+        description: Task toggled successfully
+      400:
+        description: Missing arguments or invalid date
+      404:
+        description: Plan or task not found
+    """
     data = request.get_json() or {}
     date_str = data.get('date')
     task_id = data.get('task_id')
@@ -2121,6 +2223,46 @@ def api_edit_task():
 @planner.route('/api/daily/task/add', methods=['POST'])
 @login_required
 def api_add_task():
+    """
+    Add a new daily task.
+    ---
+    tags:
+      - Daily Tasks
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - date
+            - text
+          properties:
+            date:
+              type: string
+              description: Date of the plan (YYYY-MM-DD)
+            text:
+              type: string
+              description: Task description
+            priority:
+              type: string
+              default: Medium
+            is_default:
+              type: boolean
+            tags:
+              type: array
+              items:
+                type: string
+            note:
+              type: string
+            status:
+              type: string
+              default: To Do
+    responses:
+      200:
+        description: Task added successfully
+      400:
+        description: Missing text or invalid date
+    """
     data = request.get_json() or {}
     date_str = data.get('date')
     task_text = data.get('text', '').strip()
@@ -2226,6 +2368,34 @@ def api_duplicate_task():
 @planner.route('/api/daily/task/delete', methods=['POST'])
 @login_required
 def api_delete_task():
+    """
+    Delete a daily task.
+    ---
+    tags:
+      - Daily Tasks
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - date
+            - task_id
+          properties:
+            date:
+              type: string
+              description: Date of the plan (YYYY-MM-DD)
+            task_id:
+              type: string
+              description: ID of the task to delete
+    responses:
+      200:
+        description: Task deleted successfully
+      400:
+        description: Missing arguments or invalid date
+      404:
+        description: Plan or task not found
+    """
     data = request.get_json() or {}
     date_str = data.get('date')
     task_id = data.get('task_id')

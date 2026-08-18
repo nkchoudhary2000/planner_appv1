@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flasgger import Swagger
 from config import Config
 
 db = SQLAlchemy()
@@ -10,6 +11,38 @@ migrate = Migrate()
 login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'info'
+
+@login_manager.request_loader
+def load_user_from_request(request):
+    """Securely authenticates incoming HTTP requests via API Token.
+    Supports Authorization Bearer/Token header, X-API-Token header, or api_token query param.
+    """
+    token = None
+
+    # 1. Check Authorization Header (Bearer <token> or Token <token>)
+    auth_header = request.headers.get('Authorization')
+    if auth_header:
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() in ('bearer', 'token'):
+            token = parts[1]
+        elif len(parts) == 1 and not parts[0].lower().startswith('basic'):
+            token = parts[0]
+
+    # 2. Check X-API-Token header
+    if not token:
+        token = request.headers.get('X-API-Token')
+
+    # 3. Check Query parameter or Form data
+    if not token:
+        token = request.args.get('api_token') or request.args.get('token')
+
+    if token:
+        from app.models import User
+        user = User.query.filter_by(api_token=token).first()
+        if user:
+            return user
+
+    return None
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -35,6 +68,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+    Swagger(app)
 
     from app.services.google_service import init_google_oauth
     init_google_oauth(app)
@@ -63,6 +97,12 @@ def create_app(config_class=Config):
                 if 'display_name' not in columns:
                     with db.engine.begin() as conn:
                         conn.execute(text('ALTER TABLE "user" ADD COLUMN display_name VARCHAR(128) NULL'))
+                if 'api_token' not in columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN api_token VARCHAR(128) NULL'))
+                if 'api_token_created_at' not in columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN api_token_created_at TIMESTAMP NULL'))
 
             if 'daily_plan' in tables:
                 columns = [c['name'] for c in inspector.get_columns('daily_plan')]

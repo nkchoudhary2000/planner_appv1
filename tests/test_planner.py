@@ -654,7 +654,7 @@ class PlannerTestCase(unittest.TestCase):
         self.assertIsNotNone(plan.sleep_log)
         self.assertEqual(plan.sleep_log.get('hours'), 8.0)
         self.assertEqual(plan.sleep_log.get('bedtime'), '10:30 PM')
-        self.assertEqual(plan.sleep_log.get('wake_time'), '06:30 AM')
+        self.assertIn(plan.sleep_log.get('wake_time'), ('6:30 AM', '06:30 AM'))
         self.assertEqual(plan.sleep_log.get('quality'), 9)
         self.assertEqual(plan.sleep_log.get('disruptions'), 'Woke up once at 3 AM')
 

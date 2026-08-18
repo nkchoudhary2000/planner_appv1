@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
@@ -27,6 +28,10 @@ class User(UserMixin, db.Model):
     # Dynamic User Tags
     custom_tags = db.Column(db.JSON, default=list)
 
+    # Security API Token for External Services & REST Clients
+    api_token = db.Column(db.String(128), unique=True, nullable=True, index=True)
+    api_token_created_at = db.Column(db.DateTime, nullable=True)
+
 
     daily_plans = db.relationship('DailyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     monthly_plans = db.relationship('MonthlyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
@@ -44,6 +49,27 @@ class User(UserMixin, db.Model):
         if not self.password_hash:
             return False
         return check_password_hash(self.password_hash, password)
+
+    def generate_api_token(self):
+        """Generates a secure random API token with prefix 'cp_' for external service authentication."""
+        raw_token = f"cp_{secrets.token_hex(32)}"
+        self.api_token = raw_token
+        self.api_token_created_at = datetime.utcnow()
+        return raw_token
+
+    def revoke_api_token(self):
+        """Revokes the current API token."""
+        self.api_token = None
+        self.api_token_created_at = None
+
+    def get_masked_api_token(self):
+        """Returns a masked version of the token for safe display in UI."""
+        if not self.api_token:
+            return None
+        tok = self.api_token
+        if len(tok) > 12:
+            return f"{tok[:6]}...{tok[-4:]}"
+        return tok
 
     def __repr__(self):
         return f'<User {self.username}>'

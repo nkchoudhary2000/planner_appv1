@@ -202,12 +202,53 @@ def update_profile():
                 'username': current_user.username,
                 'email': current_user.email,
                 'display_name': current_user.display_name or '',
-                'name': current_user.name
+                'name': current_user.name,
+                'has_token': bool(current_user.api_token),
+                'masked_token': current_user.get_masked_api_token()
             }
         })
 
     flash('Profile updated successfully!', 'success')
     return redirect(request.referrer or url_for('planner.dashboard'))
+
+
+@auth.route('/generate-api-token', methods=['POST'])
+@login_required
+def generate_api_token():
+    """Generates a new API token for the logged-in user."""
+    raw_token = current_user.generate_api_token()
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': 'New API token generated successfully!',
+        'api_token': raw_token,
+        'masked_token': current_user.get_masked_api_token(),
+        'created_at': current_user.api_token_created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if current_user.api_token_created_at else ''
+    })
+
+
+@auth.route('/revoke-api-token', methods=['POST'])
+@login_required
+def revoke_api_token():
+    """Revokes the active API token for the logged-in user."""
+    current_user.revoke_api_token()
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': 'API token revoked successfully!'
+    })
+
+
+@auth.route('/api-token-info', methods=['GET'])
+@login_required
+def get_api_token_info():
+    """Fetches the current API token status for the logged-in user."""
+    return jsonify({
+        'success': True,
+        'has_token': bool(current_user.api_token),
+        'masked_token': current_user.get_masked_api_token(),
+        'created_at': current_user.api_token_created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if current_user.api_token_created_at else ''
+    })
 
 
 @auth.route('/google/login')
