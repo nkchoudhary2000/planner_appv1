@@ -60,51 +60,6 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         finally:
             cursor.close()
 
-SWAGGER_TEMPLATE = {
-    "swagger": "2.0",
-    "info": {
-        "title": "Chronos Planner REST API",
-        "description": "Comprehensive REST API documentation for Chronos Planner. Authenticate using Bearer Token (Authorization: Bearer <token>) or X-API-Token header.",
-        "version": "1.0.0",
-        "contact": {
-            "name": "Chronos API Team"
-        }
-    },
-    "securityDefinitions": {
-        "Bearer": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header",
-            "description": "Enter API token in the format: Bearer <token>"
-        },
-        "ApiKeyAuth": {
-            "type": "apiKey",
-            "name": "X-API-Token",
-            "in": "header",
-            "description": "Enter API token in X-API-Token header"
-        }
-    },
-    "security": [
-        {"Bearer": []},
-        {"ApiKeyAuth": []}
-    ]
-}
-
-SWAGGER_CONFIG = {
-    "headers": [],
-    "specs": [
-        {
-            "endpoint": "apispec",
-            "route": "/apispec.json",
-            "rule_filter": lambda rule: True,
-            "model_filter": lambda tag: True,
-        }
-    ],
-    "static_url_path": "/flasgger_static",
-    "swagger_ui": True,
-    "specs_route": "/apidocs/"
-}
-
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -113,7 +68,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
-    Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
+    Swagger(app)
 
     from app.services.google_service import init_google_oauth
     init_google_oauth(app)
@@ -121,11 +76,8 @@ def create_app(config_class=Config):
     from app.auth.routes import auth as auth_blueprint
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
 
-    from app.planner_ui import planner_ui as planner_ui_blueprint
-    app.register_blueprint(planner_ui_blueprint)
-
-    from app.planner_api import planner_api as planner_api_blueprint
-    app.register_blueprint(planner_api_blueprint)
+    from app.planner.routes import planner as planner_blueprint
+    app.register_blueprint(planner_blueprint)
 
     from app.admin import admin as admin_blueprint
     app.register_blueprint(admin_blueprint, url_prefix='/admin')

@@ -20,7 +20,7 @@
         </div>
 
         <div class="flex items-center gap-3">
-            <a href="{{ url_for('planner.daily') }}" class="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-medium text-sm shadow-lg shadow-brand-500/20 transition-all flex items-center space-x-2">
+            <a href="{{ url_for('planner_ui.daily') }}" class="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-medium text-sm shadow-lg shadow-brand-500/20 transition-all flex items-center space-x-2">
                 <i class="fa-solid fa-plus"></i>
                 <span>Manage Today's Plan</span>
             </a>
@@ -254,7 +254,7 @@
                 <div class="text-center space-y-2">
                     <i class="fa-solid fa-chart-line text-2xl text-slate-600"></i>
                     <p class="text-sm text-slate-500" id="momentum-empty-msg">No habits tracked this month yet.</p>
-                    <a href="{{ url_for('planner.monthly') }}" id="momentum-empty-link" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Add habits in Monthly Planner →</a>
+                    <a href="{{ url_for('planner_ui.monthly') }}" id="momentum-empty-link" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Add habits in Monthly Planner →</a>
                 </div>
             </div>
             <canvas id="habitMomentumChart" class="w-full h-full"></canvas>
@@ -671,7 +671,7 @@
                                 <i class="fa-solid fa-sun text-amber-400"></i>
                                 <h2 class="text-lg font-bold text-white">Today's Focus Tasks</h2>
                             </div>
-                            <a href="{{ url_for('planner.daily') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium flex items-center space-x-1">
+                            <a href="{{ url_for('planner_ui.daily') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium flex items-center space-x-1">
                                 <span>View Full Schedule</span>
                                 <i class="fa-solid fa-chevron-right text-[10px]"></i>
                             </a>
@@ -713,7 +713,7 @@
                         <div class="text-center py-8 bg-slate-800/40 rounded-xl border border-dashed border-slate-700">
                             <i class="fa-solid fa-clipboard-check text-3xl text-slate-600 mb-2"></i>
                             <p class="text-sm text-slate-400">No tasks created for today yet.</p>
-                            <a href="{{ url_for('planner.daily') }}" class="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 hover:bg-brand-600/50 transition-colors">
+                            <a href="{{ url_for('planner_ui.daily') }}" class="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 hover:bg-brand-600/50 transition-colors">
                                 <i class="fa-solid fa-plus mr-1.5"></i> Add First Task
                             </a>
                         </div>
@@ -729,7 +729,7 @@
                                 <i class="fa-solid fa-fire text-rose-400"></i>
                                 <h2 class="text-lg font-bold text-white">{{ month_name }} Habit Tracker</h2>
                             </div>
-                            <a href="{{ url_for('planner.monthly') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium">
+                            <a href="{{ url_for('planner_ui.monthly') }}" class="text-xs text-brand-400 hover:text-brand-300 font-medium">
                                 Open Habit Grid
                             </a>
                         </div>
@@ -770,7 +770,7 @@
                                 <p class="text-[11px] text-slate-400">Cognitive slip tracking &amp; recovery metrics</p>
                             </div>
                         </div>
-                        <a href="{{ url_for('planner.daily') }}" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium">Log Details</a>
+                        <a href="{{ url_for('planner_ui.daily') }}" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium">Log Details</a>
                     </div>
 
                     <!-- Stats Counters -->
@@ -843,7 +843,7 @@
                                 <p class="text-[11px] text-slate-400">Sleep duration, quality ratings &amp; night wellness</p>
                             </div>
                         </div>
-                        <a href="{{ url_for('planner.daily') }}" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Log Details</a>
+                        <a href="{{ url_for('planner_ui.daily') }}" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Log Details</a>
                     </div>
 
                     <!-- Stats Counters -->
@@ -907,7 +907,7 @@
                             <p class="text-[11px] text-slate-400">Episode frequency, symptom intensity trends &amp; coping mechanism effectiveness</p>
                         </div>
                     </div>
-                    <a href="{{ url_for('planner.daily') }}" class="text-xs text-purple-400 hover:text-purple-300 font-medium">Log Details</a>
+                    <a href="{{ url_for('planner_ui.daily') }}" class="text-xs text-purple-400 hover:text-purple-300 font-medium">Log Details</a>
                 </div>
 
                 <!-- Stats Counters -->
@@ -981,7 +981,7 @@
                 <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-2">Planner Views</h2>
 
                 <div class="space-y-3">
-                    <a href="{{ url_for('planner.daily') }}" data-tab-link="true" data-tab-key="/daily" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                    <a href="{{ url_for('planner_ui.daily') }}" data-tab-link="true" data-tab-key="/daily" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
                         <div class="flex items-center space-x-3">
                             <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
                                 <i class="fa-solid fa-sun"></i>
@@ -994,7 +994,7 @@
                         <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
                     </a>
 
-                    <a href="{{ url_for('planner.weekly') }}" data-tab-link="true" data-tab-key="/weekly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                    <a href="{{ url_for('planner_ui.weekly') }}" data-tab-link="true" data-tab-key="/weekly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
                         <div class="flex items-center space-x-3">
                             <div class="w-9 h-9 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center">
                                 <i class="fa-solid fa-calendar-week"></i>
@@ -1007,7 +1007,7 @@
                         <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
                     </a>
 
-                    <a href="{{ url_for('planner.monthly') }}" data-tab-link="true" data-tab-key="/monthly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                    <a href="{{ url_for('planner_ui.monthly') }}" data-tab-link="true" data-tab-key="/monthly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
                         <div class="flex items-center space-x-3">
                             <div class="w-9 h-9 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
                                 <i class="fa-solid fa-calendar-days"></i>
@@ -1020,7 +1020,7 @@
                         <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition-colors"></i>
                     </a>
 
-                    <a href="{{ url_for('planner.yearly') }}" data-tab-link="true" data-tab-key="/yearly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
+                    <a href="{{ url_for('planner_ui.yearly') }}" data-tab-link="true" data-tab-key="/yearly" class="glass-panel-hover p-4 rounded-xl flex items-center justify-between border border-slate-700/50 group block">
                         <div class="flex items-center space-x-3">
                             <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                                 <i class="fa-solid fa-bullseye"></i>
@@ -1039,7 +1039,7 @@
             <div class="glass-panel p-6 rounded-2xl border border-slate-700/60">
                 <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50">
                     <h2 class="text-base font-bold text-white">{{ current_year }} Resolutions</h2>
-                    <a href="{{ url_for('planner.yearly') }}" class="text-xs text-brand-400 hover:text-brand-300">View All</a>
+                    <a href="{{ url_for('planner_ui.yearly') }}" class="text-xs text-brand-400 hover:text-brand-300">View All</a>
                 </div>
 
                 {% if yearly_resolutions %}

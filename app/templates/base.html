@@ -38,7 +38,7 @@
             <div class="flex items-center justify-between h-16">
                 <!-- Logo & Brand -->
                 <div class="flex items-center space-x-3">
-                    <a href="{{ url_for('planner.dashboard') if current_user.is_authenticated else url_for('auth.login') }}" class="flex items-center space-x-3 group">
+                    <a href="{{ url_for('planner_ui.dashboard') if current_user.is_authenticated else url_for('auth.login') }}" class="flex items-center space-x-3 group">
                         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
                             <i class="fa-solid fa-calendar-check text-white text-lg"></i>
                         </div>
@@ -51,27 +51,27 @@
                 <!-- Navigation Links (Logged In) -->
                 {% if current_user.is_authenticated %}
                 <div class="hidden lg:flex items-center space-x-1 lg:space-x-2" id="desktop-nav-tabs">
-                    <a href="{{ url_for('planner.dashboard') }}" data-tab-link="true" data-tab-key="/dashboard" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner.dashboard' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
+                    <a href="{{ url_for('planner_ui.dashboard') }}" data-tab-link="true" data-tab-key="/dashboard" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner_ui.dashboard' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
                         <i class="fa-solid fa-chart-pie"></i>
                         <span>Dashboard</span>
                     </a>
-                    <a href="{{ url_for('planner.daily') }}" data-tab-link="true" data-tab-key="/daily" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner.daily' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
+                    <a href="{{ url_for('planner_ui.daily') }}" data-tab-link="true" data-tab-key="/daily" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner_ui.daily' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
                         <i class="fa-solid fa-sun"></i>
                         <span>Daily</span>
                     </a>
-                    <a href="{{ url_for('planner.weekly') }}" data-tab-link="true" data-tab-key="/weekly" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner.weekly' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
+                    <a href="{{ url_for('planner_ui.weekly') }}" data-tab-link="true" data-tab-key="/weekly" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner_ui.weekly' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
                         <i class="fa-solid fa-calendar-week"></i>
                         <span>Weekly</span>
                     </a>
-                    <a href="{{ url_for('planner.monthly') }}" data-tab-link="true" data-tab-key="/monthly" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner.monthly' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
+                    <a href="{{ url_for('planner_ui.monthly') }}" data-tab-link="true" data-tab-key="/monthly" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner_ui.monthly' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
                         <i class="fa-solid fa-calendar-days"></i>
                         <span>Monthly</span>
                     </a>
-                    <a href="{{ url_for('planner.yearly') }}" data-tab-link="true" data-tab-key="/yearly" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner.yearly' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
+                    <a href="{{ url_for('planner_ui.yearly') }}" data-tab-link="true" data-tab-key="/yearly" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner_ui.yearly' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
                         <i class="fa-solid fa-bullseye"></i>
                         <span>Yearly</span>
                     </a>
-                    <a href="{{ url_for('planner.planning') }}" data-tab-link="true" data-tab-key="/planning" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner.planning' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
+                    <a href="{{ url_for('planner_ui.planning') }}" data-tab-link="true" data-tab-key="/planning" class="nav-tab-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 {{ 'bg-brand-600 text-white shadow-md shadow-brand-500/20' if request.endpoint == 'planner_ui.planning' else 'text-slate-300 hover:bg-slate-700/50 hover:text-white' }}">
                         <i class="fa-solid fa-clipboard-list"></i>
                         <span>Planning</span>
                     </a>
@@ -246,27 +246,27 @@
         <!-- Mobile & Tablet Navigation Subbar (All 5 Tabs) -->
         {% if current_user.is_authenticated %}
         <div class="lg:hidden border-t border-slate-700/50 px-2 py-2 flex items-center justify-between bg-slate-800/95 overflow-x-auto gap-1" id="mobile-nav-tabs">
-            <a href="{{ url_for('planner.dashboard') }}" data-tab-link="true" data-tab-key="/dashboard" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.dashboard' else 'text-slate-300 hover:bg-slate-700/60' }}">
+            <a href="{{ url_for('planner_ui.dashboard') }}" data-tab-link="true" data-tab-key="/dashboard" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner_ui.dashboard' else 'text-slate-300 hover:bg-slate-700/60' }}">
                 <i class="fa-solid fa-chart-pie text-[11px]"></i>
                 <span>Dashboard</span>
             </a>
-            <a href="{{ url_for('planner.daily') }}" data-tab-link="true" data-tab-key="/daily" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.daily' else 'text-slate-300 hover:bg-slate-700/60' }}">
+            <a href="{{ url_for('planner_ui.daily') }}" data-tab-link="true" data-tab-key="/daily" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner_ui.daily' else 'text-slate-300 hover:bg-slate-700/60' }}">
                 <i class="fa-solid fa-sun text-[11px]"></i>
                 <span>Daily</span>
             </a>
-            <a href="{{ url_for('planner.weekly') }}" data-tab-link="true" data-tab-key="/weekly" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.weekly' else 'text-slate-300 hover:bg-slate-700/60' }}">
+            <a href="{{ url_for('planner_ui.weekly') }}" data-tab-link="true" data-tab-key="/weekly" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner_ui.weekly' else 'text-slate-300 hover:bg-slate-700/60' }}">
                 <i class="fa-solid fa-calendar-week text-[11px]"></i>
                 <span>Weekly</span>
             </a>
-            <a href="{{ url_for('planner.monthly') }}" data-tab-link="true" data-tab-key="/monthly" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.monthly' else 'text-slate-300 hover:bg-slate-700/60' }}">
+            <a href="{{ url_for('planner_ui.monthly') }}" data-tab-link="true" data-tab-key="/monthly" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner_ui.monthly' else 'text-slate-300 hover:bg-slate-700/60' }}">
                 <i class="fa-solid fa-calendar-days text-[11px]"></i>
                 <span>Monthly</span>
             </a>
-            <a href="{{ url_for('planner.yearly') }}" data-tab-link="true" data-tab-key="/yearly" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.yearly' else 'text-slate-300 hover:bg-slate-700/60' }}">
+            <a href="{{ url_for('planner_ui.yearly') }}" data-tab-link="true" data-tab-key="/yearly" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner_ui.yearly' else 'text-slate-300 hover:bg-slate-700/60' }}">
                 <i class="fa-solid fa-bullseye text-[11px]"></i>
                 <span>Yearly</span>
             </a>
-            <a href="{{ url_for('planner.planning') }}" data-tab-link="true" data-tab-key="/planning" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner.planning' else 'text-slate-300 hover:bg-slate-700/60' }}">
+            <a href="{{ url_for('planner_ui.planning') }}" data-tab-link="true" data-tab-key="/planning" class="nav-tab-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center space-x-1 transition-colors {{ 'bg-brand-600 text-white shadow-sm' if request.endpoint == 'planner_ui.planning' else 'text-slate-300 hover:bg-slate-700/60' }}">
                 <i class="fa-solid fa-clipboard-list text-[11px]"></i>
                 <span>Planning</span>
             </a>

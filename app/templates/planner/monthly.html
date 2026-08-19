@@ -23,8 +23,8 @@
         </div>
 
         <!-- Month & Year Selectors -->
-        <form action="{{ url_for('planner.monthly') }}" method="GET" class="flex flex-wrap items-center gap-2 sm:gap-3">
-            <a href="{{ url_for('planner.monthly') }}"
+        <form action="{{ url_for('planner_ui.monthly') }}" method="GET" class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <a href="{{ url_for('planner_ui.monthly') }}"
                 class="px-3 py-2 rounded-xl border text-xs font-semibold transition-all flex items-center space-x-1.5 {{ 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20' if (selected_year == today.year and selected_month == today.month) else 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white' }}"
                 title="Jump to Current Month">
                 <i
@@ -50,7 +50,7 @@
                 {% endfor %}
             </select>
 
-            <a href="{{ url_for('planner.export_monthly_excel', year=selected_year, month=selected_month) }}"
+            <a href="{{ url_for('planner_ui.export_monthly_excel', year=selected_year, month=selected_month) }}"
                 class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5"
                 title="Export Monthly Plan to Excel">
                 <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
@@ -68,7 +68,7 @@
                 <i class="fa-solid fa-calendar-week"></i>
                 <span>Weekly Summaries Cascade ({{ month_name }})</span>
             </div>
-            <a href="{{ url_for('planner.weekly') }}"
+            <a href="{{ url_for('planner_ui.weekly') }}"
                 class="text-xs text-brand-400 hover:text-brand-300 font-medium">Open Weekly Planner</a>
         </div>
 
@@ -331,7 +331,7 @@
                             <!-- Top Row: Date Badge & Sticker / Image Indicator -->
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-1.5">
-                                    <a href="{{ url_for('planner.daily', date=d.strftime('%Y-%m-%d')) }}"
+                                    <a href="{{ url_for('planner_ui.daily', date=d.strftime('%Y-%m-%d')) }}"
                                         class="px-2 py-0.5 rounded-lg text-xs font-bold transition-all hover:scale-105 inline-flex items-center space-x-1 {{ 'bg-brand-600 text-white shadow-sm hover:bg-brand-500' if (is_curr and is_today) else ('bg-slate-700/80 text-slate-200 hover:bg-slate-600 hover:text-white' if is_curr else 'bg-slate-800/40 text-slate-500 hover:text-slate-300') }}"
                                         title="Open Daily Planner for {{ d.strftime('%Y-%m-%d') }}">
                                         {% if not is_curr %}
@@ -341,7 +341,7 @@
                                         {% endif %}
                                     </a>
                                     {% if is_curr and is_today %}
-                                    <a href="{{ url_for('planner.daily', date=d.strftime('%Y-%m-%d')) }}"
+                                    <a href="{{ url_for('planner_ui.daily', date=d.strftime('%Y-%m-%d')) }}"
                                         class="text-[10px] font-bold text-brand-400 hover:text-brand-300 uppercase tracking-tight"
                                         title="Open Today's Daily Planner">Today</a>
                                     {% endif %}

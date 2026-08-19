@@ -8,7 +8,7 @@ from app.models import User
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('planner.dashboard'))
+        return redirect(url_for('planner_ui.dashboard'))
 
     if request.method == 'POST':
         login_input = request.form.get('login_input', '').strip()
@@ -45,7 +45,7 @@ def login():
 
         next_page = request.args.get('next')
         if not next_page or not next_page.startswith('/'):
-            next_page = url_for('planner.dashboard')
+            next_page = url_for('planner_ui.dashboard')
         flash(f'Welcome back, {user.username}!', 'success')
         return redirect(next_page)
 
@@ -56,7 +56,7 @@ def login():
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('planner.dashboard'))
+        return redirect(url_for('planner_ui.dashboard'))
 
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
@@ -95,7 +95,7 @@ def register():
 
                 login_user(existing_email_user)
                 flash('Your account (previously created with Google Sign-In) has been merged with your local login password! You can now log in using either Google or your password.', 'success')
-                return redirect(url_for('planner.dashboard'))
+                return redirect(url_for('planner_ui.dashboard'))
             else:
                 # Case 2: Account exists and already has a password set
                 flash('An account with this email already exists. You can log in using your password or Google.', 'warning')
@@ -112,7 +112,7 @@ def register():
 
         login_user(new_user)
         flash('Registration successful! Your account has been created.', 'success')
-        return redirect(url_for('planner.dashboard'))
+        return redirect(url_for('planner_ui.dashboard'))
 
     return render_template('auth/register.html')
 
@@ -126,21 +126,21 @@ def set_password():
 
     if not new_password or not confirm_password:
         flash('Password fields cannot be empty.', 'danger')
-        return redirect(request.referrer or url_for('planner.dashboard'))
+        return redirect(request.referrer or url_for('planner_ui.dashboard'))
 
     if new_password != confirm_password:
         flash('Passwords do not match.', 'danger')
-        return redirect(request.referrer or url_for('planner.dashboard'))
+        return redirect(request.referrer or url_for('planner_ui.dashboard'))
 
     if len(new_password) < 6:
         flash('Password must be at least 6 characters long.', 'danger')
-        return redirect(request.referrer or url_for('planner.dashboard'))
+        return redirect(request.referrer or url_for('planner_ui.dashboard'))
 
     current_user.set_password(new_password)
     db.session.commit()
 
     flash('Local login password saved successfully! You can now log in with either Google or local password.', 'success')
-    return redirect(request.referrer or url_for('planner.dashboard'))
+    return redirect(request.referrer or url_for('planner_ui.dashboard'))
 
 
 @auth.route('/update-profile', methods=['POST'])
@@ -190,7 +190,7 @@ def update_profile():
         if is_ajax:
             return jsonify({'success': False, 'message': msg}), 400
         flash(msg, 'danger')
-        return redirect(request.referrer or url_for('planner.dashboard'))
+        return redirect(request.referrer or url_for('planner_ui.dashboard'))
 
     db.session.commit()
 
@@ -209,7 +209,7 @@ def update_profile():
         })
 
     flash('Profile updated successfully!', 'success')
-    return redirect(request.referrer or url_for('planner.dashboard'))
+    return redirect(request.referrer or url_for('planner_ui.dashboard'))
 
 
 @auth.route('/generate-api-token', methods=['POST'])
@@ -279,7 +279,7 @@ def google_login():
         db.session.commit()
         login_user(user)
         flash('Logged in via Google Account! Google Drive sync is enabled.', 'success')
-        return redirect(url_for('planner.dashboard'))
+        return redirect(url_for('planner_ui.dashboard'))
 
     scheme = 'https' if request.headers.get('X-Forwarded-Proto') == 'https' or not (request.host.startswith('127.0.0.1') or request.host.startswith('localhost')) else 'http'
     redirect_uri = url_for('auth.google_callback', _external=True, _scheme=scheme)
@@ -312,7 +312,7 @@ def google_callback():
 
         login_user(user)
         flash('Successfully authenticated with Google Account! Your accounts are merged.', 'success')
-        return redirect(url_for('planner.dashboard'))
+        return redirect(url_for('planner_ui.dashboard'))
 
     except Exception as e:
         db.session.rollback()

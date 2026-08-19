@@ -13,7 +13,7 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or (current_user.email or '').strip().lower() != ADMIN_EMAIL:
             flash('Access restricted. Admin privileges required.', 'danger')
-            return redirect(url_for('planner.dashboard'))
+            return redirect(url_for('planner_ui.dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 

@@ -20,8 +20,8 @@
         </div>
 
         <!-- Year Selector -->
-        <form action="{{ url_for('planner.yearly') }}" method="GET" class="flex flex-wrap items-center gap-2 sm:gap-3">
-            <a href="{{ url_for('planner.yearly') }}" class="px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all flex items-center space-x-1.5 {{ 'bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-500/20' if selected_year == today.year else 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white' }}" title="Jump to Current Year">
+        <form action="{{ url_for('planner_ui.yearly') }}" method="GET" class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <a href="{{ url_for('planner_ui.yearly') }}" class="px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all flex items-center space-x-1.5 {{ 'bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-500/20' if selected_year == today.year else 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white' }}" title="Jump to Current Year">
                 <i class="fa-solid fa-calendar text-xs {{ 'text-white' if selected_year == today.year else 'text-purple-400' }}"></i>
                 <span>Current Year</span>
             </a>
@@ -34,7 +34,7 @@
                 {% endfor %}
             </select>
 
-            <a href="{{ url_for('planner.export_yearly_excel', year=selected_year) }}" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5" title="Export Yearly Plan to Excel">
+            <a href="{{ url_for('planner_ui.export_yearly_excel', year=selected_year) }}" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5" title="Export Yearly Plan to Excel">
                 <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
                 <span>Export Excel</span>
             </a>
@@ -80,7 +80,7 @@
                     </div>
                 </div>
 
-                <a href="{{ url_for('planner.monthly', year=selected_year, month=mg.month_num) }}" class="mt-2 w-full py-1.5 px-3 rounded-lg bg-slate-900/60 hover:bg-purple-600/30 border border-slate-700/60 hover:border-purple-500/40 text-[11px] font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center space-x-1">
+                <a href="{{ url_for('planner_ui.monthly', year=selected_year, month=mg.month_num) }}" class="mt-2 w-full py-1.5 px-3 rounded-lg bg-slate-900/60 hover:bg-purple-600/30 border border-slate-700/60 hover:border-purple-500/40 text-[11px] font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center space-x-1">
                     <span>Open {{ mg.month_name }} Plan</span>
                     <i class="fa-solid fa-chevron-right text-[9px]"></i>
                 </a>
