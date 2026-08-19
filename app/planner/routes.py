@@ -2760,7 +2760,7 @@ def api_backup_restore_json():
             file = request.files['backup_file']
             if not file.filename or file.filename == '':
                 return jsonify({'success': False, 'message': 'No backup file selected'}), 400
-            content = file.read().decode('utf-8')
+            content = file.read().decode('utf-8-sig')
             payload = json.loads(content)
         elif request.is_json:
             payload = request.get_json()
@@ -2768,7 +2768,11 @@ def api_backup_restore_json():
             return jsonify({'success': False, 'message': 'No backup file or JSON payload provided'}), 400
 
         res = import_user_data_payload(current_user, payload)
-        if res:
+        if isinstance(res, dict):
+            msg = f"Local backup restored successfully! (Restored: {res.get('daily', 0)} Daily, {res.get('weekly', 0)} Weekly, {res.get('monthly', 0)} Monthly, {res.get('yearly', 0)} Yearly, {res.get('tasks', 0)} Tasks)"
+            flash(msg, 'success')
+            return jsonify({'success': True, 'message': msg, 'stats': res})
+        elif res:
             flash('Successfully restored planner data from local JSON backup across all tables!', 'success')
             return jsonify({'success': True, 'message': 'Local backup restored successfully across all tables!'})
         return jsonify({'success': False, 'message': 'Failed to restore local backup'}), 400

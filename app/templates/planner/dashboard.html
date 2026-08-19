@@ -217,6 +217,13 @@
                     </button>
                 </div>
 
+                <!-- Refresh Button -->
+                <button type="button" onclick="refreshMomentumChart(this)" title="Refresh Habit Momentum Chart"
+                    class="p-1.5 px-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-700 transition-all flex items-center justify-center space-x-1.5 text-xs font-semibold group shadow-sm">
+                    <i class="fa-solid fa-rotate-right text-xs text-indigo-400 group-hover:rotate-180 transition-transform duration-500"></i>
+                    <span class="hidden sm:inline text-xs">Refresh</span>
+                </button>
+
                 <!-- Monthly / Yearly Toggle Buttons -->
                 <div class="flex items-center space-x-1.5 bg-slate-800/80 border border-slate-700 rounded-xl p-1" id="momentum-view-toggle">
                     <button type="button" id="momentum-btn-monthly"
@@ -623,9 +630,26 @@
         // ── Boot ──────────────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', renderMonthlyView);
 
-        window.refreshMomentumChart = function () {
-            if (currentView === 'monthly') renderMonthlyView();
-            else renderYearlyView();
+        window.refreshMomentumChart = async function (btnElement) {
+            const icon = btnElement ? btnElement.querySelector('i') : null;
+            if (icon) icon.classList.add('animate-spin');
+
+            try {
+                if (currentView === 'monthly') {
+                    renderMonthlyView();
+                } else {
+                    await renderYearlyView();
+                }
+                if (typeof showToast === 'function') {
+                    showToast('Habit Momentum Chart refreshed!', 'success');
+                }
+            } catch (err) {
+                console.error('Refresh momentum chart error:', err);
+            } finally {
+                if (icon) {
+                    setTimeout(() => icon.classList.remove('animate-spin'), 400);
+                }
+            }
         };
 
     })();

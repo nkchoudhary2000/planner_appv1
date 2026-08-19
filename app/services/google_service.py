@@ -33,11 +33,12 @@ def init_google_oauth(app):
     )
 
 def export_user_data_payload(user):
-    """Serialize all plans (Daily, Weekly, Monthly, Yearly) for a user into a clean JSON structure."""
+    """Serialize all plans (Daily, Weekly, Monthly, Yearly), planning tasks, and tags for a user into a clean JSON structure."""
     daily_plans = DailyPlan.query.filter_by(user_id=user.id).all()
     weekly_plans = WeeklyPlan.query.filter_by(user_id=user.id).all()
     monthly_plans = MonthlyPlan.query.filter_by(user_id=user.id).all()
     yearly_plans = YearlyPlan.query.filter_by(user_id=user.id).all()
+    planning_tasks = PlanningTask.query.filter_by(user_id=user.id).all()
 
     payload = {
         "app": "Chronos Planner",
@@ -46,7 +47,8 @@ def export_user_data_payload(user):
         "user": {
             "username": user.username,
             "email": user.email,
-            "google_id": user.google_id
+            "google_id": user.google_id,
+            "custom_tags": user.custom_tags or []
         },
         "daily_plans": [
             {
@@ -90,9 +92,21 @@ def export_user_data_payload(user):
                 "year": yp.year,
                 "resolutions": yp.resolutions or [],
                 "objectives": yp.objectives or [],
+                "events": yp.events or [],
                 "reflections": yp.reflections or ''
             }
             for yp in yearly_plans
+        ],
+        "planning_tasks": [
+            {
+                "id": pt.id,
+                "text": pt.text,
+                "priority": pt.priority,
+                "tags": pt.tags or [],
+                "completed": pt.completed,
+                "sort_order": pt.sort_order
+            }
+            for pt in planning_tasks
         ]
     }
     return payload
@@ -210,8 +224,47 @@ def import_user_data_payload(user, payload):
     if not isinstance(payload, dict):
         raise ValueError("Invalid backup format: payload must be a JSON object")
 
+    # Resolve target user data dict from payload (handles full_database payloads with 'users' array)
+    user_payload = payload
+    if "users" in payload and isinstance(payload["users"], list):
+        matching_user = None
+        for u_item in payload["users"]:
+            if isinstance(u_item, dict):
+                u_email = (u_item.get('email') or '').strip().lower()
+                u_uname = (u_item.get('username') or '').strip().lower()
+                if (user.email and u_email == user.email.strip().lower()) or \
+                   (user.username and u_uname == user.username.strip().lower()):
+                    matching_user = u_item
+                    break
+        if not matching_user and len(payload["users"]) > 0 and isinstance(payload["users"][0], dict):
+            matching_user = payload["users"][0]
+        
+        if matching_user:
+            user_payload = matching_user
+
+    stats = {
+        'daily': 0,
+        'weekly': 0,
+        'monthly': 0,
+        'yearly': 0,
+        'tasks': 0,
+        'tags': 0
+    }
+
+    # Restore Custom Tags if present
+    custom_tags = None
+    if 'custom_tags' in user_payload:
+        custom_tags = user_payload.get('custom_tags')
+    elif 'user' in payload and isinstance(payload['user'], dict) and 'custom_tags' in payload['user']:
+        custom_tags = payload['user'].get('custom_tags')
+
+    if custom_tags is not None and isinstance(custom_tags, list):
+        user.custom_tags = custom_tags
+        flag_modified(user, 'custom_tags')
+        stats['tags'] = len(custom_tags)
+
     # Restore Daily Plans
-    for dp_data in payload.get('daily_plans', []):
+    for dp_data in user_payload.get('daily_plans', []):
         try:
             plan_date = datetime.strptime(dp_data['date'], '%Y-%m-%d').date()
         except (KeyError, ValueError, TypeError):
@@ -233,9 +286,10 @@ def import_user_data_payload(user, payload):
         flag_modified(dp, 'depression_episodes')
         flag_modified(dp, 'memory_logs')
         flag_modified(dp, 'sleep_log')
+        stats['daily'] += 1
 
     # Restore Weekly Plans
-    for wp_data in payload.get('weekly_plans', []):
+    for wp_data in user_payload.get('weekly_plans', []):
         year = wp_data.get('year')
         week_number = wp_data.get('week_number')
         if not year or not week_number:
@@ -268,9 +322,10 @@ def import_user_data_payload(user, payload):
         flag_modified(wp, 'daily_todos')
         flag_modified(wp, 'shopping_list')
         flag_modified(wp, 'meals_menu')
+        stats['weekly'] += 1
 
     # Restore Monthly Plans
-    for mp_data in payload.get('monthly_plans', []):
+    for mp_data in user_payload.get('monthly_plans', []):
         year = mp_data.get('year')
         month = mp_data.get('month')
         if not year or not month:
@@ -290,9 +345,10 @@ def import_user_data_payload(user, payload):
         flag_modified(mp, 'habits')
         flag_modified(mp, 'milestones')
         flag_modified(mp, 'calendar_days')
+        stats['monthly'] += 1
 
     # Restore Yearly Plans
-    for yp_data in payload.get('yearly_plans', []):
+    for yp_data in user_payload.get('yearly_plans', []):
         year = yp_data.get('year')
         if not year:
             continue
@@ -304,13 +360,35 @@ def import_user_data_payload(user, payload):
 
         yp.resolutions = yp_data.get('resolutions', [])
         yp.objectives = yp_data.get('objectives', [])
+        yp.events = yp_data.get('events', [])
         yp.reflections = yp_data.get('reflections', '')
         flag_modified(yp, 'resolutions')
         flag_modified(yp, 'objectives')
+        flag_modified(yp, 'events')
+        stats['yearly'] += 1
+
+    # Restore Planning Tasks
+    planning_tasks_data = user_payload.get('planning_tasks', [])
+    if planning_tasks_data:
+        for pt_data in planning_tasks_data:
+            pt_id = pt_data.get('id')
+            pt = None
+            if pt_id:
+                pt = PlanningTask.query.filter_by(id=pt_id, user_id=user.id).first()
+            if not pt:
+                pt = PlanningTask(user_id=user.id, text=pt_data.get('text', ''))
+                db.session.add(pt)
+            pt.text = pt_data.get('text', '')
+            pt.priority = pt_data.get('priority', 'Medium')
+            pt.tags = pt_data.get('tags', [])
+            pt.completed = bool(pt_data.get('completed', False))
+            pt.sort_order = int(pt_data.get('sort_order', 0))
+            flag_modified(pt, 'tags')
+            stats['tasks'] += 1
 
     user.last_drive_sync = datetime.utcnow()
     db.session.commit()
-    return True
+    return stats
 
 def list_google_drive_folders(user, parent_id='root'):
     """List subfolders inside parent_id in user's Google Drive via API, or return mock default list."""
@@ -430,6 +508,11 @@ def sync_to_google_drive(user):
     folder_name = user.google_drive_folder_name or "Root Folder"
 
     token = user.google_token
+    if isinstance(token, str):
+        try:
+            token = json.loads(token)
+        except Exception:
+            pass
     if token and isinstance(token, dict) and 'access_token' in token:
         access_token = token.get('access_token', '')
         if not access_token.startswith('mock_') and current_app.config.get('GOOGLE_CLIENT_ID') != 'MOCK_GOOGLE_CLIENT_ID':
@@ -511,6 +594,11 @@ def sync_to_google_drive(user):
 def restore_from_google_drive(user):
     """Fetch Chronos_Planner_Backup.json from specified Google Drive folder using OAuth token or return state."""
     token = user.google_token
+    if isinstance(token, str):
+        try:
+            token = json.loads(token)
+        except Exception:
+            pass
     folder_id = user.google_drive_folder_id
 
     if token and isinstance(token, dict) and 'access_token' in token:
@@ -532,19 +620,40 @@ def restore_from_google_drive(user):
 
                 service = build('drive', 'v3', credentials=creds)
 
-                backup_filename = f"Chronos_Planner_Backup_{user.username}.json"
-                query = f"name = '{backup_filename}' and trashed = false"
-                if folder_id and folder_id not in ['root', 'chronos_default_folder'] and not folder_id.startswith('folder_'):
-                    query = f"name = '{backup_filename}' and '{folder_id}' in parents and trashed = false"
+                candidate_names = [
+                    f"Chronos_Planner_Backup_{user.username}.json",
+                    "Chronos_Planner_FULL_DB_Backup.json",
+                    "Chronos_Planner_Backup.json"
+                ]
 
-                results = service.files().list(
-                    q=query,
-                    fields="files(id, name)"
-                ).execute()
-                files = results.get('files', [])
+                files = []
+                for fname in candidate_names:
+                    query = f"name = '{fname}' and trashed = false"
+                    if folder_id and folder_id not in ['root', 'chronos_default_folder'] and not folder_id.startswith('folder_'):
+                        query = f"name = '{fname}' and '{folder_id}' in parents and trashed = false"
+
+                    results = service.files().list(
+                        q=query,
+                        fields="files(id, name)"
+                    ).execute()
+                    f_list = results.get('files', [])
+                    if f_list:
+                        files.extend(f_list)
+                        break
+
+                if not files:
+                    fallback_query = "name contains 'Chronos_Planner_' and mimeType = 'application/json' and trashed = false"
+                    if folder_id and folder_id not in ['root', 'chronos_default_folder'] and not folder_id.startswith('folder_'):
+                        fallback_query = f"name contains 'Chronos_Planner_' and mimeType = 'application/json' and '{folder_id}' in parents and trashed = false"
+                    results = service.files().list(
+                        q=fallback_query,
+                        fields="files(id, name)"
+                    ).execute()
+                    files = results.get('files', [])
 
                 if files:
                     file_id = files[0]['id']
+                    matched_name = files[0].get('name', 'backup file')
                     request = service.files().get_media(fileId=file_id)
                     fh = io.BytesIO()
                     downloader = MediaIoBaseDownload(fh, request)
@@ -554,15 +663,21 @@ def restore_from_google_drive(user):
                     
                     payload_str = fh.getvalue().decode('utf-8')
                     payload = json.loads(payload_str)
-                    import_user_data_payload(user, payload)
+                    stats = import_user_data_payload(user, payload)
+                    
+                    msg = f"Planner data restored successfully from Google Drive ({matched_name})!"
+                    if isinstance(stats, dict):
+                        msg += f" (Restored: {stats.get('daily', 0)} Daily, {stats.get('weekly', 0)} Weekly, {stats.get('monthly', 0)} Monthly, {stats.get('yearly', 0)} Yearly, {stats.get('tasks', 0)} Tasks)"
+
                     return {
                         'success': True,
-                        'message': 'Planner data restored successfully from Google Drive!'
+                        'message': msg,
+                        'stats': stats if isinstance(stats, dict) else {}
                     }
                 else:
                     return {
                         'success': False,
-                        'message': f'Backup file "{backup_filename}" not found in Google Drive.'
+                        'message': 'No matching backup file found in Google Drive.'
                     }
             except Exception as e:
                 current_app.logger.warning(f"Google Drive API restore error: {e}")

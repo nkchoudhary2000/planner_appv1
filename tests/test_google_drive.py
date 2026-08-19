@@ -156,5 +156,64 @@ class GoogleDriveTestCase(unittest.TestCase):
         user_after = User.query.filter_by(username='autosyncuser').first()
         self.assertIsNotNone(user_after.last_drive_sync)
 
+    def test_json_import_full_db_payload(self):
+        self.register_and_login(username="fulluser", email="full@example.com")
+        user = User.query.filter_by(username='fulluser').first()
+
+        full_db_payload = {
+            "app": "Chronos Planner",
+            "backup_type": "full_database",
+            "total_users": 1,
+            "users": [
+                {
+                    "username": "fulluser",
+                    "email": "full@example.com",
+                    "custom_tags": [{"id": "t1", "name": "Projects", "color": "#00ff00"}],
+                    "daily_plans": [
+                        {
+                            "date": "2026-08-15",
+                            "schedule": {"10:00": "Code Review"},
+                            "tasks": [{"id": "t_1", "text": "Full DB Daily Task", "completed": False}]
+                        }
+                    ],
+                    "yearly_plans": [
+                        {
+                            "year": 2026,
+                            "resolutions": [],
+                            "events": [{"id": "e1", "title": "Birthday Celebration", "event_type": "birthday", "date": "2026-08-15"}]
+                        }
+                    ],
+                    "planning_tasks": [
+                        {
+                            "id": 100,
+                            "text": "Refactor Backup Module",
+                            "priority": "High",
+                            "completed": False
+                        }
+                    ]
+                }
+            ]
+        }
+
+        stats = import_user_data_payload(user, full_db_payload)
+        self.assertIsInstance(stats, dict)
+        self.assertEqual(stats['daily'], 1)
+        self.assertEqual(stats['yearly'], 1)
+        self.assertEqual(stats['tasks'], 1)
+
+        # Verify DB items were created
+        dp = DailyPlan.query.filter_by(user_id=user.id, date=date(2026, 8, 15)).first()
+        self.assertIsNotNone(dp)
+        self.assertEqual(dp.tasks[0]['text'], 'Full DB Daily Task')
+
+        yp = YearlyPlan.query.filter_by(user_id=user.id, year=2026).first()
+        self.assertIsNotNone(yp)
+        self.assertEqual(yp.events[0]['title'], 'Birthday Celebration')
+
+        from app.models import PlanningTask
+        pt = PlanningTask.query.filter_by(user_id=user.id).first()
+        self.assertIsNotNone(pt)
+        self.assertEqual(pt.text, 'Refactor Backup Module')
+
 if __name__ == '__main__':
     unittest.main()
