@@ -313,7 +313,11 @@
                         <i class="fa-solid fa-cloud-arrow-up text-emerald-400 text-xs"></i>
                         <span id="schedule-autosave-text">Auto-saved</span>
                     </span>
-                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 whitespace-nowrap">
+                    <button type="button" onclick="highlightAndScrollToCurrentTimeSlot(true)" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all flex items-center space-x-1.5 cursor-pointer group shadow-sm" title="Jump & Scroll to Current Time Slot">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block"></span>
+                        <span>Current Hour</span>
+                    </button>
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 whitespace-nowrap">
                         Hourly Schedule
                     </span>
                 </div>
@@ -330,30 +334,37 @@
 
                 <!-- Activity Tracker Container -->
                 <div class="overflow-x-auto pb-2 -mx-1 px-1">
-                    <div class="space-y-2.5 max-h-[640px] overflow-y-auto pr-1 min-w-[580px] sm:min-w-full">
+                    <div id="hourly-schedule-container" class="space-y-2.5 max-h-[640px] overflow-y-auto pr-1 min-w-[580px] sm:min-w-full scroll-smooth">
                         {% for slot in default_slots %}
+                        {% set slot_hour = loop.index0 %}
                         {% set slot_id = slot.replace(':', '_').replace(' ', '_').replace('-', '_') %}
                         {% set slot_data = schedule.get(slot, {}) %}
                         {% set act_text = slot_data.get('activity', '') if slot_data is mapping else slot_data %}
                         {% set current_mood = slot_data.get('mood', '') if slot_data is mapping else '' %}
 
-                        <div class="flex items-center gap-2 sm:gap-2.5 p-2 sm:p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/40 hover:border-slate-600 transition-all">
+                        <div id="slot-row-{{ slot_hour }}"
+                             data-slot-hour="{{ slot_hour }}"
+                             data-slot-name="{{ slot }}"
+                             class="slot-row flex items-center gap-2 sm:gap-2.5 p-2 sm:p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/40 hover:border-slate-600 transition-all duration-300">
                             <!-- Hour Range Badge -->
-                            <span class="px-2 sm:px-2.5 py-1 text-xs font-bold {{ 'text-indigo-300 bg-indigo-500/10 border-indigo-500/30' if slot_data.get('is_default') else 'text-amber-400 bg-amber-500/10 border-amber-500/20' }} rounded-lg border flex-shrink-0 whitespace-nowrap">
-                                {{ slot }}
+                            <span id="slot-badge-{{ slot_hour }}" class="slot-badge px-2 sm:px-2.5 py-1 text-xs font-bold {{ 'text-indigo-300 bg-indigo-500/10 border-indigo-500/30' if slot_data.get('is_default') else 'text-amber-400 bg-amber-500/10 border-amber-500/20' }} rounded-lg border flex-shrink-0 whitespace-nowrap flex items-center gap-1.5">
+                                <span>{{ slot }}</span>
+                                <span id="slot-now-tag-{{ slot_hour }}" class="hidden text-[9px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded shadow-sm animate-pulse">NOW</span>
                             </span>
 
                             <!-- Activity Field (Set to 35 character visible width, smoothly fitting in layout) -->
                             <input type="text" 
+                                   id="slot-input-{{ slot_hour }}"
                                    name="slot_act_{{ slot_id }}" 
                                    value="{{ act_text }}" 
                                    size="35"
                                    oninput="autoSaveSlot('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ slot }}', '{{ slot_id }}')"
                                    placeholder="Activity details (e.g. Deep Work, Team Meeting)..." 
-                                   class="flex-1 min-w-[200px] bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all">
+                                   class="slot-activity-input flex-1 min-w-[200px] bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all">
 
                             <!-- Mood Dropdown with Emoji (Just right to activity field, same row) -->
-                            <select name="slot_mood_{{ slot_id }}" 
+                            <select id="slot-mood-{{ slot_hour }}"
+                                    name="slot_mood_{{ slot_id }}" 
                                     onchange="autoSaveSlot('{{ selected_date.strftime('%Y-%m-%d') }}', '{{ slot }}', '{{ slot_id }}')"
                                     class="bg-slate-900/80 border border-slate-700/80 rounded-xl px-2 sm:px-2.5 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-slate-600 transition-all cursor-pointer flex-shrink-0">
                                 <option value="" class="bg-slate-900 text-slate-400">Mood 😶</option>
@@ -2100,8 +2111,74 @@ function calcSleepDuration() {
     }
 }
 
+function highlightAndScrollToCurrentTimeSlot(focusInput = false) {
+    const isToday = {{ 'true' if selected_date == today else 'false' }};
+    if (!isToday) return;
+
+    const currentHour = new Date().getHours(); // 0 to 23
+    const targetSlotRow = document.getElementById(`slot-row-${currentHour}`);
+    const targetNowTag  = document.getElementById(`slot-now-tag-${currentHour}`);
+    const targetInput   = document.getElementById(`slot-input-${currentHour}`);
+    const container     = document.getElementById('hourly-schedule-container');
+
+    if (!targetSlotRow || !container) return;
+
+    // Reset previous highlights on all rows & inputs
+    document.querySelectorAll('.slot-row-active-current').forEach(row => {
+        row.classList.remove(
+            'slot-row-active-current',
+            'bg-gradient-to-r', 'from-amber-500/20', 'via-slate-800/90', 'to-slate-800/80',
+            'border-amber-400', 'ring-2', 'ring-amber-400/40', 'shadow-lg', 'shadow-amber-500/10'
+        );
+        row.classList.add('bg-slate-800/60', 'border-slate-700/40');
+    });
+    document.querySelectorAll('[id^="slot-now-tag-"]').forEach(tag => tag.classList.add('hidden'));
+    document.querySelectorAll('.slot-input-active-current').forEach(inp => {
+        inp.classList.remove('slot-input-active-current', 'border-amber-400', 'ring-2', 'ring-amber-400/50', 'bg-amber-950/25', 'text-amber-100');
+        inp.classList.add('border-slate-700/80', 'bg-slate-900/80');
+    });
+
+    // Apply active glowing highlight to current hour slot row
+    targetSlotRow.classList.remove('bg-slate-800/60', 'border-slate-700/40');
+    targetSlotRow.classList.add(
+        'slot-row-active-current',
+        'bg-gradient-to-r', 'from-amber-500/20', 'via-slate-800/90', 'to-slate-800/80',
+        'border-amber-400', 'ring-2', 'ring-amber-400/40', 'shadow-lg', 'shadow-amber-500/10'
+    );
+
+    // Show NOW badge on time tag
+    if (targetNowTag) {
+        targetNowTag.classList.remove('hidden');
+    }
+
+    // Highlight input tab
+    if (targetInput) {
+        targetInput.classList.remove('border-slate-700/80', 'bg-slate-900/80');
+        targetInput.classList.add('slot-input-active-current', 'border-amber-400', 'ring-2', 'ring-amber-400/50', 'bg-amber-950/25', 'text-amber-100');
+        if (focusInput) {
+            targetInput.focus();
+        }
+    }
+
+    // Scroll to the middle of the slot container panel
+    setTimeout(() => {
+        const containerHeight = container.clientHeight;
+        const slotTop = targetSlotRow.offsetTop - container.offsetTop;
+        const slotHeight = targetSlotRow.offsetHeight;
+        const targetScrollTop = slotTop - (containerHeight / 2) + (slotHeight / 2);
+
+        container.scrollTo({
+            top: Math.max(0, targetScrollTop),
+            behavior: 'smooth'
+        });
+    }, 150);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     calcSleepDuration();
+    highlightAndScrollToCurrentTimeSlot(false);
+    // Refresh current active time slot every 60 seconds
+    setInterval(() => highlightAndScrollToCurrentTimeSlot(false), 60000);
 });
 </script>
 {% endblock %}
