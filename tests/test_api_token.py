@@ -188,5 +188,28 @@ class APITokenTestCase(unittest.TestCase):
         self.assertTrue(data2['success'])
         self.assertEqual(len(data2['tasks']), 1)
 
+    def test_cors_headers_and_preflight(self):
+        """Test CORS headers for cross-origin requests and OPTIONS preflight."""
+        # 1. Preflight OPTIONS request
+        res = self.client.open(
+            '/api/daily/today',
+            method='OPTIONS',
+            headers={
+                'Origin': 'https://planner-app.example.com',
+                'Access-Control-Request-Method': 'POST',
+                'Access-Control-Request-Headers': 'Authorization, X-API-Token, Content-Type'
+            }
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(res.headers.get('Access-Control-Allow-Origin'), ['*', 'https://planner-app.example.com'])
+        allow_headers = res.headers.get('Access-Control-Allow-Headers', '')
+        self.assertIn('Authorization', allow_headers)
+        self.assertIn('X-API-Token', allow_headers)
+
+        # 2. Cross-origin GET request
+        res_get = self.client.get('/api/daily/today', headers={'Origin': 'https://planner-app.example.com'})
+        self.assertIn(res_get.headers.get('Access-Control-Allow-Origin'), ['*', 'https://planner-app.example.com'])
+
 if __name__ == '__main__':
     unittest.main()
+
