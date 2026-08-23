@@ -2812,7 +2812,7 @@ def api_planning_get_events():
 @token_required
 def api_planning_add_event():
     """
-    Create a new dynamic event time-tracker (countdown/count-up).
+    Create a new dynamic event time-tracker (auto-expire countdown, recurring window, or count-up).
     ---
     tags:
       - Planning Event Time-Trackers
@@ -2826,7 +2826,6 @@ def api_planning_add_event():
           type: object
           required:
             - title
-            - target_datetime
           properties:
             title:
               type: string
@@ -2844,11 +2843,34 @@ def api_planning_add_event():
             icon:
               type: string
               default: "fa-calendar-check"
+            timer_type:
+              type: string
+              enum: ["auto_expire", "recurring", "count_up"]
+              default: "auto_expire"
+            completion_message:
+              type: string
+              default: "Your countdown is over!"
+            is_recurring:
+              type: boolean
+              default: false
+            recurrence_frequency:
+              type: string
+              enum: ["daily", "monthly", "yearly"]
+              default: "daily"
+            window_start_time:
+              type: string
+              example: "10:00"
+            window_end_time:
+              type: string
+              example: "19:00"
+            inactive_message:
+              type: string
+              default: "Counter paused for this period"
     responses:
       200:
         description: Event time-tracker created successfully
       400:
-        description: Missing required fields or invalid datetime format
+        description: Missing required fields or invalid format
       401:
         description: Unauthorized
     """
@@ -2861,24 +2883,57 @@ def api_planning_add_event():
     color = data.get('color', '#8b5cf6')
     icon = data.get('icon', 'fa-calendar-check')
 
+    timer_type = data.get('timer_type')
+    is_recurring = bool(data.get('is_recurring', False))
+    if not timer_type:
+        timer_type = 'recurring' if is_recurring else 'auto_expire'
+    if timer_type == 'recurring':
+        is_recurring = True
+
+    completion_message = data.get('completion_message', 'Your countdown is over!').strip() or 'Your countdown is over!'
+    recurrence_frequency = data.get('recurrence_frequency', 'daily')
+    if recurrence_frequency not in ['daily', 'monthly', 'yearly']:
+        recurrence_frequency = 'daily'
+
+    window_start_time = data.get('window_start_time')
+    window_end_time = data.get('window_end_time')
+    inactive_message = data.get('inactive_message', 'Counter paused for this period').strip() or 'Counter paused for this period'
+
     if not title:
         return jsonify({'success': False, 'message': 'Event title is required'}), 400
 
-    target_dt = _parse_event_datetime(target_dt_raw)
-    if not target_dt:
-        return jsonify({'success': False, 'message': 'Invalid target datetime format'}), 400
+    target_dt = None
+    if target_dt_raw:
+        target_dt = _parse_event_datetime(target_dt_raw)
+        if not target_dt and timer_type != 'recurring':
+            return jsonify({'success': False, 'message': 'Invalid target datetime format'}), 400
+    elif timer_type == 'recurring':
+        target_dt = datetime.utcnow()
+    else:
+        return jsonify({'success': False, 'message': 'Target datetime is required for one-time events'}), 400
+
+    if is_recurring or timer_type == 'recurring':
+        if not window_start_time or not window_end_time:
+            return jsonify({'success': False, 'message': 'Window start and end times are required for recurring events'}), 400
 
     max_order = db.session.query(db.func.max(PlanningEvent.sort_order)).filter_by(user_id=user.id).scalar() or 0
 
     event = PlanningEvent(
         user_id=user.id,
         title=title,
-        target_datetime=target_dt,
+        target_datetime=target_dt or datetime.utcnow(),
         category=category,
         notes=notes,
         color=color,
         icon=icon,
-        sort_order=max_order + 1
+        sort_order=max_order + 1,
+        timer_type=timer_type,
+        completion_message=completion_message,
+        is_recurring=is_recurring,
+        recurrence_frequency=recurrence_frequency,
+        window_start_time=window_start_time,
+        window_end_time=window_end_time,
+        inactive_message=inactive_message
     )
     db.session.add(event)
     db.session.commit()
@@ -2919,6 +2974,20 @@ def api_planning_edit_event():
               type: string
             icon:
               type: string
+            timer_type:
+              type: string
+            completion_message:
+              type: string
+            is_recurring:
+              type: boolean
+            recurrence_frequency:
+              type: string
+            window_start_time:
+              type: string
+            window_end_time:
+              type: string
+            inactive_message:
+              type: string
     responses:
       200:
         description: Event time-tracker updated successfully
@@ -2946,10 +3015,12 @@ def api_planning_edit_event():
         event.title = t
 
     if 'target_datetime' in data:
-        dt = _parse_event_datetime(data['target_datetime'])
-        if not dt:
-            return jsonify({'success': False, 'message': 'Invalid target datetime format'}), 400
-        event.target_datetime = dt
+        if data['target_datetime']:
+            dt = _parse_event_datetime(data['target_datetime'])
+            if not dt and data.get('timer_type', event.timer_type) != 'recurring':
+                return jsonify({'success': False, 'message': 'Invalid target datetime format'}), 400
+            if dt:
+                event.target_datetime = dt
 
     if 'category' in data:
         event.category = data['category']
@@ -2960,8 +3031,32 @@ def api_planning_edit_event():
     if 'icon' in data:
         event.icon = data['icon']
 
+    if 'timer_type' in data:
+        event.timer_type = data['timer_type']
+        if event.timer_type == 'recurring':
+            event.is_recurring = True
+        elif event.timer_type in ['auto_expire', 'count_up']:
+            event.is_recurring = False
+
+    if 'is_recurring' in data:
+        event.is_recurring = bool(data['is_recurring'])
+        if event.is_recurring and event.timer_type != 'recurring':
+            event.timer_type = 'recurring'
+
+    if 'completion_message' in data:
+        event.completion_message = data['completion_message'].strip() or 'Your countdown is over!'
+    if 'recurrence_frequency' in data:
+        event.recurrence_frequency = data['recurrence_frequency'] if data['recurrence_frequency'] in ['daily', 'monthly', 'yearly'] else 'daily'
+    if 'window_start_time' in data:
+        event.window_start_time = data['window_start_time']
+    if 'window_end_time' in data:
+        event.window_end_time = data['window_end_time']
+    if 'inactive_message' in data:
+        event.inactive_message = data['inactive_message'].strip() or 'Counter paused for this period'
+
     db.session.commit()
     return jsonify({'success': True, 'event': event.to_dict(), 'message': 'Event updated successfully'})
+
 
 
 @planner_api.route('/api/planning/event/delete', methods=['POST'])

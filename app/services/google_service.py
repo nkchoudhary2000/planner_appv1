@@ -118,11 +118,19 @@ def export_user_data_payload(user):
                 "notes": pe.notes or '',
                 "color": pe.color,
                 "icon": pe.icon,
-                "sort_order": pe.sort_order
+                "sort_order": pe.sort_order,
+                "timer_type": pe.timer_type or 'auto_expire',
+                "completion_message": pe.completion_message or 'Your countdown is over!',
+                "is_recurring": bool(pe.is_recurring),
+                "recurrence_frequency": pe.recurrence_frequency or 'daily',
+                "window_start_time": pe.window_start_time or '',
+                "window_end_time": pe.window_end_time or '',
+                "inactive_message": pe.inactive_message or 'Counter paused for this period',
             }
             for pe in planning_events
         ]
     }
+
     return payload
 
 
@@ -232,6 +240,13 @@ def export_full_db_payload():
                     "color": pe.color,
                     "icon": pe.icon,
                     "sort_order": pe.sort_order,
+                    "timer_type": pe.timer_type or 'auto_expire',
+                    "completion_message": pe.completion_message or 'Your countdown is over!',
+                    "is_recurring": bool(pe.is_recurring),
+                    "recurrence_frequency": pe.recurrence_frequency or 'daily',
+                    "window_start_time": pe.window_start_time or '',
+                    "window_end_time": pe.window_end_time or '',
+                    "inactive_message": pe.inactive_message or 'Counter paused for this period',
                     "created_at": pe.created_at.isoformat() if pe.created_at else None,
                     "updated_at": pe.updated_at.isoformat() if pe.updated_at else None,
                 }
@@ -440,6 +455,13 @@ def import_user_data_payload(user, payload):
             pe.color = pe_data.get('color', '#8b5cf6')
             pe.icon = pe_data.get('icon', 'fa-calendar-check')
             pe.sort_order = int(pe_data.get('sort_order', 0))
+            pe.timer_type = pe_data.get('timer_type', 'auto_expire')
+            pe.completion_message = pe_data.get('completion_message', 'Your countdown is over!')
+            pe.is_recurring = bool(pe_data.get('is_recurring', False))
+            pe.recurrence_frequency = pe_data.get('recurrence_frequency', 'daily')
+            pe.window_start_time = pe_data.get('window_start_time')
+            pe.window_end_time = pe_data.get('window_end_time')
+            pe.inactive_message = pe_data.get('inactive_message', 'Counter paused for this period')
             stats['events'] += 1
 
     user.last_drive_sync = datetime.utcnow()

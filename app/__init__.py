@@ -175,11 +175,30 @@ def create_app(config_class=Config):
                     with db.engine.begin() as conn:
                         conn.execute(text("ALTER TABLE yearly_plan ADD COLUMN events JSON DEFAULT '[]'"))
 
-            if 'planning_event' not in tables:
+            if 'planning_event' in tables:
+                columns = [c['name'] for c in inspector.get_columns('planning_event')]
+                
+                def add_column_if_missing(col_name, sql_stmt):
+                    if col_name not in columns:
+                        try:
+                            with db.engine.begin() as conn:
+                                conn.execute(text(sql_stmt))
+                        except Exception as col_err:
+                            app.logger.warning(f"Column migration warning for {col_name}: {col_err}")
+
+                add_column_if_missing('timer_type', "ALTER TABLE planning_event ADD COLUMN timer_type VARCHAR(32) DEFAULT 'auto_expire'")
+                add_column_if_missing('completion_message', "ALTER TABLE planning_event ADD COLUMN completion_message VARCHAR(255) DEFAULT 'Your countdown is over!'")
+                add_column_if_missing('is_recurring', "ALTER TABLE planning_event ADD COLUMN is_recurring BOOLEAN DEFAULT FALSE")
+                add_column_if_missing('recurrence_frequency', "ALTER TABLE planning_event ADD COLUMN recurrence_frequency VARCHAR(32) DEFAULT 'daily'")
+                add_column_if_missing('window_start_time', "ALTER TABLE planning_event ADD COLUMN window_start_time VARCHAR(16) NULL")
+                add_column_if_missing('window_end_time', "ALTER TABLE planning_event ADD COLUMN window_end_time VARCHAR(16) NULL")
+                add_column_if_missing('inactive_message', "ALTER TABLE planning_event ADD COLUMN inactive_message VARCHAR(255) DEFAULT 'Counter paused for this period'")
+            else:
                 db.create_all()
         except Exception as e:
             app.logger.error(f"Auto-migration check notice: {e}")
 
     return app
+
 
 

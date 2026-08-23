@@ -106,18 +106,23 @@
                     <span>Dynamic Event Time-Tracker</span>
                     <span id="events-total-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-semibold border border-violet-500/30">0 Events</span>
                 </h2>
-                <p class="text-xs text-slate-400 mt-1">Live countdowns for future milestones &amp; count-ups for past events with dynamic zero-suppression.</p>
+                <p class="text-xs text-slate-400 mt-1">Live countdowns, auto-expire completion timers, and recurring schedule windows with dynamic zero-suppression.</p>
             </div>
 
             <!-- Quick Action & Stats Badges -->
             <div class="flex items-center gap-2.5 flex-wrap">
                 <div class="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs shadow-inner">
-                    <span class="flex items-center gap-1.5 text-emerald-400 font-medium">
+                    <span class="flex items-center gap-1.5 text-emerald-400 font-medium" title="Active Countdowns & Auto-Expire">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span id="events-upcoming-count">0</span> Upcoming
+                        <span id="events-upcoming-count">0</span> Countdowns
                     </span>
                     <span class="text-slate-600">|</span>
-                    <span class="flex items-center gap-1.5 text-amber-400 font-medium">
+                    <span class="flex items-center gap-1.5 text-indigo-400 font-medium" title="Recurring Window Events">
+                        <i class="fa-solid fa-repeat text-[10px]"></i>
+                        <span id="events-recurring-count">0</span> Recurring
+                    </span>
+                    <span class="text-slate-600">|</span>
+                    <span class="flex items-center gap-1.5 text-amber-400 font-medium" title="Elapsed Count-ups">
                         <i class="fa-solid fa-clock-rotate-left text-[10px]"></i>
                         <span id="events-past-count">0</span> Elapsed
                     </span>
@@ -125,7 +130,7 @@
                 <button type="button" onclick="openPlanningEventModal()"
                     class="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-violet-500/25 transition-all flex items-center space-x-1.5 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
                     <i class="fa-solid fa-plus text-xs"></i>
-                    <span>Add Event</span>
+                    <span>Add Event Tracker</span>
                 </button>
             </div>
         </div>
@@ -133,20 +138,25 @@
         <!-- Filter & Search Controls -->
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
             <!-- Filter Tabs -->
-            <div class="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/60 text-xs">
+            <div class="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/60 text-xs overflow-x-auto">
                 <button type="button" onclick="setPlanningEventFilter('all')" id="ev-filter-all"
-                    class="px-3 py-1 rounded-md font-semibold transition-all bg-violet-600 text-white shadow-sm cursor-pointer">
+                    class="px-3 py-1 rounded-md font-semibold transition-all bg-violet-600 text-white shadow-sm cursor-pointer whitespace-nowrap">
                     All (<span id="ev-tab-all-count">0</span>)
                 </button>
                 <button type="button" onclick="setPlanningEventFilter('upcoming')" id="ev-filter-upcoming"
-                    class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer">
+                    class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                     ⏳ Countdowns (<span id="ev-tab-upcoming-count">0</span>)
                 </button>
+                <button type="button" onclick="setPlanningEventFilter('recurring')" id="ev-filter-recurring"
+                    class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer whitespace-nowrap">
+                    🔁 Recurring (<span id="ev-tab-recurring-count">0</span>)
+                </button>
                 <button type="button" onclick="setPlanningEventFilter('past')" id="ev-filter-past"
-                    class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer">
+                    class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                     ⏱️ Count-ups (<span id="ev-tab-past-count">0</span>)
                 </button>
             </div>
+
 
             <!-- Search, Category Filter, and Sort -->
             <div class="flex items-center gap-2 flex-1 sm:justify-end flex-wrap sm:flex-nowrap">
@@ -324,28 +334,125 @@
             <!-- Title -->
             <div>
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Event Title *</label>
-                <input type="text" id="planning-event-title-input" required placeholder="e.g., Product Launch, Trip to Tokyo, Started Job..."
+                <input type="text" id="planning-event-title-input" required placeholder="e.g., Product Launch, Work Shift, Daily Study Window..."
                     class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500">
             </div>
 
-            <!-- Target Datetime -->
+            <!-- Timer Mode Selection (Segmented Pills) -->
             <div>
-                <div class="flex items-center justify-between mb-1.5">
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Target Date &amp; Time *</label>
-                    <span class="text-[10px] font-mono text-indigo-300" id="event-modal-delta-preview">Select date &amp; time</span>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Timer Mode *</label>
+                <div class="grid grid-cols-3 gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 text-xs">
+                    <button type="button" id="event-mode-btn-auto_expire" onclick="setEventModalMode('auto_expire')"
+                        class="px-2.5 py-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center gap-1 bg-violet-600 text-white shadow-sm cursor-pointer">
+                        <span class="flex items-center gap-1"><i class="fa-solid fa-hourglass-end text-[11px]"></i> Auto-Expire</span>
+                        <span class="text-[9px] font-normal opacity-80">One-Time Event</span>
+                    </button>
+                    <button type="button" id="event-mode-btn-recurring" onclick="setEventModalMode('recurring')"
+                        class="px-2.5 py-2 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer">
+                        <span class="flex items-center gap-1"><i class="fa-solid fa-repeat text-[11px]"></i> Recurring</span>
+                        <span class="text-[9px] font-normal opacity-80">Daily / Window</span>
+                    </button>
+                    <button type="button" id="event-mode-btn-count_up" onclick="setEventModalMode('count_up')"
+                        class="px-2.5 py-2 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer">
+                        <span class="flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[11px]"></i> Elapsed</span>
+                        <span class="text-[9px] font-normal opacity-80">Count-Up / Past</span>
+                    </button>
                 </div>
-                <input type="datetime-local" id="planning-event-dt-input" required step="1" oninput="updateEventModalPreview()"
-                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                
-                <!-- Quick Date Presets -->
-                <div class="flex items-center gap-1.5 mt-2 flex-wrap text-[10px]">
-                    <span class="text-slate-500 font-medium mr-1">Presets:</span>
-                    <button type="button" onclick="setEventPresetOffset(0, 0, 0, 1)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Hr</button>
-                    <button type="button" onclick="setEventPresetOffset(0, 0, 1, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Day</button>
-                    <button type="button" onclick="setEventPresetOffset(0, 0, 7, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Week</button>
-                    <button type="button" onclick="setEventPresetOffset(0, 1, 0, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Month</button>
-                    <button type="button" onclick="setEventPresetOffset(1, 0, 0, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Year</button>
-                    <button type="button" onclick="setEventPresetNow()" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer">Now (Past/Elapsed)</button>
+                <input type="hidden" id="planning-event-mode-input" value="auto_expire">
+            </div>
+
+            <!-- Option 1: Auto-Expire / One-Time / Count-up Datetime container -->
+            <div id="event-modal-datetime-section" class="space-y-3">
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider" id="event-target-dt-label">Target Date &amp; Time *</label>
+                        <span class="text-[10px] font-mono text-indigo-300" id="event-modal-delta-preview">Select date &amp; time</span>
+                    </div>
+                    <input type="datetime-local" id="planning-event-dt-input" step="1" oninput="updateEventModalPreview()"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    
+                    <!-- Quick Date Presets -->
+                    <div class="flex items-center gap-1.5 mt-2 flex-wrap text-[10px]">
+                        <span class="text-slate-500 font-medium mr-1">Presets:</span>
+                        <button type="button" onclick="setEventPresetOffset(0, 0, 0, 1)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Hr</button>
+                        <button type="button" onclick="setEventPresetOffset(0, 0, 1, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Day</button>
+                        <button type="button" onclick="setEventPresetOffset(0, 0, 7, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Week</button>
+                        <button type="button" onclick="setEventPresetOffset(0, 1, 0, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Month</button>
+                        <button type="button" onclick="setEventPresetOffset(1, 0, 0, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Year</button>
+                        <button type="button" onclick="setEventPresetNow()" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer">Now (Past/Elapsed)</button>
+                    </div>
+                </div>
+
+                <!-- Auto-Expire Completion Message -->
+                <div id="event-modal-completion-msg-section">
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Completion Message</span>
+                        <span class="text-[10px] text-slate-500 font-normal">Replaces timer at zero</span>
+                    </label>
+                    <div class="relative">
+                        <i class="fa-solid fa-flag-checkered absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-xs"></i>
+                        <input type="text" id="planning-event-completion-msg-input" placeholder="e.g., Your countdown is over!"
+                            value="Your countdown is over!"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Option 2: Recurring Configuration Section -->
+            <div id="event-modal-recurring-section" class="hidden space-y-3 p-3.5 rounded-xl bg-slate-900/90 border border-indigo-500/30">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <span class="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-week text-indigo-400"></i>
+                        Recurring Schedule &amp; Active Window
+                    </span>
+                    <span class="text-[10px] font-mono text-emerald-400" id="event-modal-recurring-status-preview">Active Window</span>
+                </div>
+
+                <!-- Frequency -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Frequency</label>
+                        <select id="planning-event-freq-input" onchange="updateEventModalPreview()"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer">
+                            <option value="daily">🔁 Daily</option>
+                            <option value="monthly">📅 Monthly</option>
+                            <option value="yearly">🎆 Yearly</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Window Description</label>
+                        <div class="text-[11px] text-slate-400 flex items-center h-[34px]">
+                            Counts down inside window
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Window Start and End Time -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Window Start Time *</label>
+                        <input type="time" id="planning-event-window-start-input" value="10:00" oninput="updateEventModalPreview()"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Window End Time *</label>
+                        <input type="time" id="planning-event-window-end-input" value="19:00" oninput="updateEventModalPreview()"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    </div>
+                </div>
+
+                <!-- Custom Inactive Message -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Inactive / Paused Message</span>
+                        <span class="text-[10px] text-slate-500 font-normal">Shown outside window</span>
+                    </label>
+                    <div class="relative">
+                        <i class="fa-solid fa-moon absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-xs"></i>
+                        <input type="text" id="planning-event-inactive-msg-input" placeholder="e.g., Counter paused for this period"
+                            value="Counter paused for this period"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    </div>
                 </div>
             </div>
 
@@ -402,6 +509,7 @@
         </form>
     </div>
 </div>
+
 
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Styles                                                     -->
@@ -508,10 +616,18 @@ window.planningEvents = [
         notes: {{ (e.notes or '') | tojson }},
         color: {{ (e.color or '#8b5cf6') | tojson }},
         icon: {{ (e.icon or 'fa-calendar-check') | tojson }},
-        sort_order: {{ e.sort_order or 0 }}
+        sort_order: {{ e.sort_order or 0 }},
+        timer_type: {{ (e.timer_type or 'auto_expire') | tojson }},
+        completion_message: {{ (e.completion_message or 'Your countdown is over!') | tojson }},
+        is_recurring: {{ 'true' if e.is_recurring else 'false' }},
+        recurrence_frequency: {{ (e.recurrence_frequency or 'daily') | tojson }},
+        window_start_time: {{ (e.window_start_time or '') | tojson }},
+        window_end_time: {{ (e.window_end_time or '') | tojson }},
+        inactive_message: {{ (e.inactive_message or 'Counter paused for this period') | tojson }}
     }{% if not loop.last %},{% endif %}
     {% endfor %}
 ];
+
 
 window.planningEventFilter = 'all';
 window.planningEventCategoryFilter = '';
@@ -984,20 +1100,24 @@ function _planningRefreshTags(tags) {
 
 /* ─────────────────────────────────────────────────────────────
    Dynamic Event Time-Tracker Engine & Zero-Suppression Logic
+   Option 1: Auto-Expire (One-Time Event) & Option 2: Recurring Mode
    ───────────────────────────────────────────────────────────── */
 
-function calculatePlanningEventDelta(targetDateStr, now = new Date()) {
-    if (!targetDateStr) return null;
-    const target = new Date(targetDateStr);
-    if (isNaN(target.getTime())) return null;
+function formatTimeDisplay(h, m) {
+    const period = h >= 12 ? 'PM' : 'AM';
+    const displayH = h % 12 === 0 ? 12 : h % 12;
+    const displayM = String(m).padStart(2, '0');
+    return `${displayH}:${displayM} ${period}`;
+}
 
-    const targetMs = target.getTime();
-    const nowMs = now.getTime();
-    const isFuture = targetMs > nowMs;
+function calculateDateDifference(startDate, endDate, isFuture = true) {
+    if (!startDate || !endDate) return null;
+    const startMs = startDate.getTime();
+    const endMs = endDate.getTime();
+    if (isNaN(startMs) || isNaN(endMs)) return null;
 
-    let start = new Date(isFuture ? nowMs : targetMs);
-    let end = new Date(isFuture ? targetMs : nowMs);
-
+    let start = new Date(startMs);
+    let end = new Date(endMs);
     let cur = new Date(start.getTime());
 
     // 1. Full calendar years
@@ -1047,7 +1167,7 @@ function calculatePlanningEventDelta(targetDateStr, now = new Date()) {
     let minutes = Math.floor((totalSecs % 3600) / 60);
     let seconds = totalSecs % 60;
 
-    const totalDiffMs = Math.abs(targetMs - nowMs);
+    const totalDiffMs = Math.abs(endMs - startMs);
     const totalDays = Math.floor(totalDiffMs / (1000 * 60 * 60 * 24));
 
     return {
@@ -1063,10 +1183,128 @@ function calculatePlanningEventDelta(targetDateStr, now = new Date()) {
     };
 }
 
+function calculatePlanningEventState(event, now = new Date()) {
+    if (!event) return null;
+
+    const timerType = event.timer_type || (event.is_recurring ? 'recurring' : 'auto_expire');
+    const isRecurring = timerType === 'recurring' || event.is_recurring;
+
+    // Option 2: Recurring Mode (Scheduled Repeats within Active Time Window)
+    if (isRecurring) {
+        const freq = event.recurrence_frequency || 'daily';
+        const startStr = event.window_start_time || '10:00';
+        const endStr = event.window_end_time || '19:00';
+        const inactiveMsg = event.inactive_message || 'Counter paused for this period';
+
+        const [startH, startM] = startStr.split(':').map(Number);
+        const [endH, endM] = endStr.split(':').map(Number);
+
+        let windowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM, 0, 0);
+        let windowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM, 0, 0);
+
+        let isActive = false;
+        let targetForDelta = null;
+        let nextResumeText = '';
+        let nextResumeDate = null;
+
+        if (windowEnd > windowStart) {
+            // Standard daytime window, e.g. 10:00 AM to 7:00 PM
+            if (now >= windowStart && now < windowEnd) {
+                isActive = true;
+                targetForDelta = windowEnd;
+            } else if (now < windowStart) {
+                isActive = false;
+                nextResumeText = `Resumes today at ${formatTimeDisplay(startH, startM)}`;
+                nextResumeDate = windowStart;
+            } else {
+                isActive = false;
+                const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, startH, startM, 0, 0);
+                nextResumeText = `Resumes tomorrow at ${formatTimeDisplay(startH, startM)}`;
+                nextResumeDate = tomorrowStart;
+            }
+        } else {
+            // Overnight window, e.g. 22:00 to 06:00
+            if (now >= windowStart) {
+                isActive = true;
+                targetForDelta = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, endH, endM, 0, 0);
+            } else if (now < windowEnd) {
+                isActive = true;
+                targetForDelta = windowEnd;
+            } else {
+                isActive = false;
+                nextResumeText = `Resumes today at ${formatTimeDisplay(startH, startM)}`;
+                nextResumeDate = windowStart;
+            }
+        }
+
+        let delta = null;
+        if (isActive && targetForDelta) {
+            delta = calculateDateDifference(now, targetForDelta, true);
+        }
+
+        return {
+            mode: 'recurring',
+            isActive,
+            isExpired: false,
+            delta,
+            inactiveMessage: inactiveMsg,
+            nextResumeText,
+            nextResumeDate,
+            windowDisplay: `${formatTimeDisplay(startH, startM)} - ${formatTimeDisplay(endH, endM)}`,
+            frequency: freq
+        };
+    }
+
+    // Option 1: Auto-Expire (One-Time Event) or Count-Up (Elapsed)
+    const targetDateStr = event.target_datetime;
+    if (!targetDateStr) return null;
+    const target = new Date(targetDateStr);
+    if (isNaN(target.getTime())) return null;
+
+    const targetMs = target.getTime();
+    const nowMs = now.getTime();
+    const isFuture = targetMs > nowMs;
+
+    if (timerType === 'auto_expire' && !isFuture) {
+        // Auto-Expire: Timer stops automatically when it reaches zero; replaced with completion message
+        return {
+            mode: 'auto_expire',
+            isActive: false,
+            isExpired: true,
+            delta: null,
+            completionMessage: event.completion_message || 'Your countdown is over!',
+            targetDate: target
+        };
+    }
+
+    if (timerType === 'count_up' || (!isFuture && timerType !== 'auto_expire')) {
+        // Count-up / Elapsed past event
+        const delta = calculateDateDifference(target, now, false);
+        return {
+            mode: 'count_up',
+            isActive: false,
+            isExpired: false,
+            isElapsed: true,
+            delta,
+            targetDate: target
+        };
+    }
+
+    // Active One-time Countdown
+    const delta = calculateDateDifference(now, target, true);
+    return {
+        mode: 'auto_expire',
+        isActive: true,
+        isExpired: false,
+        delta,
+        completionMessage: event.completion_message || 'Your countdown is over!',
+        targetDate: target
+    };
+}
+
 /**
  * Get active unit blocks with leading zero-suppression.
  * If all higher units are 0, display only seconds (e.g. 45s).
- * Dynamically surface larger units (minutes, hours, days, months, years) as values > 0.
  */
 function getZeroSuppressedUnits(delta) {
     if (!delta) return [];
@@ -1079,13 +1317,10 @@ function getZeroSuppressedUnits(delta) {
         { key: 'seconds', label: 'Seconds', short: 'SEC', value: delta.seconds }
     ];
 
-    // Find highest non-zero unit index
     let firstIdx = all.findIndex(u => u.value > 0);
     if (firstIdx === -1) {
-        // If all higher units are zero, display only seconds
         firstIdx = all.length - 1;
     }
-
     return all.slice(firstIdx);
 }
 
@@ -1095,7 +1330,28 @@ function formatZeroSuppressedString(delta) {
     return units.map(u => `${u.value}${u.key === 'months' ? 'mo' : (u.key === 'years' ? 'y' : (u.key === 'days' ? 'd' : (u.key === 'hours' ? 'h' : (u.key === 'minutes' ? 'm' : 's'))))}`).join(' ');
 }
 
-function renderPlanningEventTotalDaysBadgeHtml(delta) {
+function renderPlanningEventTotalDaysBadgeHtml(delta, state) {
+    if (state && state.mode === 'recurring') {
+        if (state.isActive) {
+            return `<span class="event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30 flex items-center gap-1 shadow-sm" title="Active Window">
+                <i class="fa-solid fa-bolt text-[9px]"></i>
+                <span>Active</span>
+            </span>`;
+        } else {
+            return `<span class="event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-300 border-amber-500/30 flex items-center gap-1 shadow-sm" title="Window Paused">
+                <i class="fa-solid fa-moon text-[9px]"></i>
+                <span>Paused</span>
+            </span>`;
+        }
+    }
+
+    if (state && state.isExpired) {
+        return `<span class="event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-purple-500/20 text-purple-300 border-purple-500/40 flex items-center gap-1 shadow-sm" title="Completed">
+            <i class="fa-solid fa-flag-checkered text-[9px]"></i>
+            <span>Done</span>
+        </span>`;
+    }
+
     if (!delta) return '';
     const isFuture = delta.isFuture;
     const sign = isFuture ? '-' : '+';
@@ -1120,6 +1376,7 @@ function getPlanningEventGridClass(count) {
 }
 
 function renderEventTickerTilesHtml(delta) {
+    if (!delta) return '';
     const units = getZeroSuppressedUnits(delta);
     const valColor = delta.isFuture ? 'text-emerald-300' : 'text-amber-300';
     const gridColsClass = getPlanningEventGridClass(units.length);
@@ -1137,13 +1394,71 @@ function renderEventTickerTilesHtml(delta) {
     return `<div class="grid ${gridColsClass} gap-1 sm:gap-1.5 w-full pt-1">${tiles}</div>`;
 }
 
-function renderEventTickerStringHtml(delta) {
-    const str = formatZeroSuppressedString(delta);
-    if (delta.isFuture) {
-        return `<span class="text-emerald-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In ${escHtml(str)}</span>`;
-    } else {
-        return `<span class="text-amber-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i>${escHtml(str)} ago</span>`;
+function renderEventTickerBodyHtml(state, event) {
+    if (!state) return '';
+
+    // 1. Auto-Expired Completion State
+    if (state.mode === 'auto_expire' && state.isExpired) {
+        const msg = state.completionMessage || 'Your countdown is over!';
+        return `
+        <div class="p-3.5 rounded-xl bg-gradient-to-r from-purple-950/70 via-indigo-950/60 to-purple-950/70 border border-purple-500/40 text-center space-y-1 shadow-inner my-1">
+            <div class="text-xs sm:text-sm font-bold text-purple-200 flex items-center justify-center gap-1.5 break-words">
+                <i class="fa-solid fa-flag-checkered text-purple-400"></i>
+                <span>${escHtml(msg)}</span>
+            </div>
+            <div class="text-[10px] text-purple-300/70">Countdown reached zero • Auto-expired</div>
+        </div>`;
     }
+
+    // 2. Recurring Mode (Paused / Inactive State)
+    if (state.mode === 'recurring' && !state.isActive) {
+        const msg = state.inactiveMessage || 'Counter paused for this period';
+        return `
+        <div class="p-3.5 rounded-xl bg-slate-950/85 border border-amber-500/30 text-center space-y-1.5 shadow-inner my-1">
+            <div class="text-xs sm:text-sm font-bold text-amber-300 flex items-center justify-center gap-1.5 break-words">
+                <i class="fa-solid fa-moon text-amber-400"></i>
+                <span>${escHtml(msg)}</span>
+            </div>
+            <div class="text-[11px] text-slate-400 font-mono flex items-center justify-center gap-1.5">
+                <i class="fa-regular fa-clock text-[10px] text-indigo-400"></i>
+                <span>${escHtml(state.nextResumeText || 'Resumes in next window')}</span>
+            </div>
+        </div>`;
+    }
+
+    // 3. Active Recurring Countdown
+    if (state.mode === 'recurring' && state.isActive && state.delta) {
+        const tilesHtml = renderEventTickerTilesHtml(state.delta);
+        const str = formatZeroSuppressedString(state.delta);
+        return `
+        <div class="event-ticker-tiles w-full">
+            ${tilesHtml}
+        </div>
+        <div class="event-ticker-string text-xs font-semibold pt-1">
+            <span class="text-emerald-400 font-mono flex items-center gap-1.5">
+                <i class="fa-solid fa-hourglass-half text-[10px]"></i>Window ends in ${escHtml(str)}
+            </span>
+        </div>`;
+    }
+
+    // 4. Standard Active Countdown / Count-up
+    if (state.delta) {
+        const tilesHtml = renderEventTickerTilesHtml(state.delta);
+        const str = formatZeroSuppressedString(state.delta);
+        const stringHtml = state.delta.isFuture
+            ? `<span class="text-emerald-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In ${escHtml(str)}</span>`
+            : `<span class="text-amber-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i>${escHtml(str)} ago</span>`;
+
+        return `
+        <div class="event-ticker-tiles w-full">
+            ${tilesHtml}
+        </div>
+        <div class="event-ticker-string text-xs font-semibold pt-1">
+            ${stringHtml}
+        </div>`;
+    }
+
+    return '';
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1158,37 +1473,50 @@ function renderPlanningEvents() {
     const now = new Date();
     const total = window.planningEvents.length;
 
-    // Count upcoming vs past
-    let upcomingCount = 0;
+    // Counts across modes
+    let countdownCount = 0;
+    let recurringCount = 0;
     let pastCount = 0;
+
     window.planningEvents.forEach(e => {
-        const delta = calculatePlanningEventDelta(e.target_datetime, now);
-        if (delta && delta.isFuture) upcomingCount++;
-        else pastCount++;
+        const state = calculatePlanningEventState(e, now);
+        if (!state) return;
+        if (state.mode === 'recurring') {
+            recurringCount++;
+        } else if (state.mode === 'auto_expire') {
+            countdownCount++;
+        } else {
+            pastCount++;
+        }
     });
 
-    // Update stats badges
+    // Update stats badges in header
     const totalBadge = document.getElementById('events-total-badge');
     const upEl = document.getElementById('events-upcoming-count');
+    const recEl = document.getElementById('events-recurring-count');
     const pastEl = document.getElementById('events-past-count');
     const tabAll = document.getElementById('ev-tab-all-count');
     const tabUp = document.getElementById('ev-tab-upcoming-count');
+    const tabRec = document.getElementById('ev-tab-recurring-count');
     const tabPast = document.getElementById('ev-tab-past-count');
 
     if (totalBadge) totalBadge.textContent = `${total} Event${total !== 1 ? 's' : ''}`;
-    if (upEl) upEl.textContent = upcomingCount;
+    if (upEl) upEl.textContent = countdownCount;
+    if (recEl) recEl.textContent = recurringCount;
     if (pastEl) pastEl.textContent = pastCount;
     if (tabAll) tabAll.textContent = total;
-    if (tabUp) tabUp.textContent = upcomingCount;
+    if (tabUp) tabUp.textContent = countdownCount;
+    if (tabRec) tabRec.textContent = recurringCount;
     if (tabPast) tabPast.textContent = pastCount;
 
     // Filter events
     let filtered = window.planningEvents.filter(e => {
-        const delta = calculatePlanningEventDelta(e.target_datetime, now);
-        const isFut = delta ? delta.isFuture : true;
+        const state = calculatePlanningEventState(e, now);
+        if (!state) return false;
 
-        if (window.planningEventFilter === 'upcoming' && !isFut) return false;
-        if (window.planningEventFilter === 'past' && isFut) return false;
+        if (window.planningEventFilter === 'upcoming' && state.mode !== 'auto_expire') return false;
+        if (window.planningEventFilter === 'recurring' && state.mode !== 'recurring') return false;
+        if (window.planningEventFilter === 'past' && state.mode !== 'count_up') return false;
 
         if (window.planningEventCategoryFilter && e.category !== window.planningEventCategoryFilter) {
             return false;
@@ -1208,12 +1536,11 @@ function renderPlanningEvents() {
     // Sort events
     filtered.sort((a, b) => {
         if (window.planningEventSort === 'target_desc') {
-            return new Date(b.target_datetime).getTime() - new Date(a.target_datetime).getTime();
+            return new Date(b.target_datetime || 0).getTime() - new Date(a.target_datetime || 0).getTime();
         } else if (window.planningEventSort === 'title_asc') {
             return (a.title || '').localeCompare(b.title || '');
         } else {
-            // target_asc default
-            return new Date(a.target_datetime).getTime() - new Date(b.target_datetime).getTime();
+            return new Date(a.target_datetime || 0).getTime() - new Date(b.target_datetime || 0).getTime();
         }
     });
 
@@ -1234,25 +1561,42 @@ function renderPlanningEvents() {
 }
 
 function buildPlanningEventCard(event, now = new Date()) {
-    const delta = calculatePlanningEventDelta(event.target_datetime, now);
-    const isFuture = delta ? delta.isFuture : true;
+    const state = calculatePlanningEventState(event, now);
     const color = event.color || '#8b5cf6';
     const icon = event.icon || 'fa-calendar-check';
     const category = event.category || 'General';
 
-    const statusPill = isFuture
-        ? `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span></span>`
-        : `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span></span>`;
+    let statusPill = '';
+    if (state.mode === 'recurring') {
+        statusPill = state.isActive
+            ? `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>🟢 Active Window</span></span>`
+            : `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-pause text-[9px]"></i><span>⏸️ Paused</span></span>`;
+    } else if (state.mode === 'auto_expire') {
+        statusPill = state.isExpired
+            ? `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1"><i class="fa-solid fa-flag-checkered text-[9px]"></i><span>✨ Completed</span></span>`
+            : `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span></span>`;
+    } else {
+        statusPill = `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span></span>`;
+    }
 
-    const totalDaysBadge = renderPlanningEventTotalDaysBadgeHtml(delta);
-    const tilesHtml = renderEventTickerTilesHtml(delta);
-    const stringHtml = renderEventTickerStringHtml(delta);
+    const totalDaysBadge = renderPlanningEventTotalDaysBadgeHtml(state.delta, state);
+    const bodyContentHtml = renderEventTickerBodyHtml(state, event);
 
-    // Format target date for display
-    let displayDt = event.target_datetime_display;
-    if (!displayDt && event.target_datetime) {
-        const d = new Date(event.target_datetime);
-        displayDt = d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    // Format subtitle / footer details
+    let footerLeftHtml = '';
+    let footerRightText = '';
+
+    if (state.mode === 'recurring') {
+        footerLeftHtml = `<span class="flex items-center gap-1.5 text-indigo-300 font-mono text-[11px]"><i class="fa-solid fa-repeat text-indigo-400 text-[10px]"></i>${state.frequency ? state.frequency.toUpperCase() : 'DAILY'}: ${state.windowDisplay}</span>`;
+        footerRightText = state.isActive ? 'Active Window' : 'Next Window Pending';
+    } else {
+        let displayDt = event.target_datetime_display;
+        if (!displayDt && event.target_datetime) {
+            const d = new Date(event.target_datetime);
+            displayDt = d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+        footerLeftHtml = `<span class="flex items-center gap-1.5 text-slate-400 text-[11px]"><i class="fa-regular fa-calendar text-slate-500"></i><span>${escHtml(displayDt || 'No target date')}</span></span>`;
+        footerRightText = state.isExpired ? 'Auto-Expired' : (state.mode === 'count_up' ? 'Achieved' : 'Target');
     }
 
     return `
@@ -1265,7 +1609,7 @@ function buildPlanningEventCard(event, now = new Date()) {
             <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
                 <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1"
                       style="background-color: ${escAttr(color)}20; color: ${escAttr(color)}; border: 1px solid ${escAttr(color)}40;">
-                <i class="fa-solid ${escAttr(icon)} text-[9px]"></i>
+                    <i class="fa-solid ${escAttr(icon)} text-[9px]"></i>
                     <span>${escHtml(category)}</span>
                 </span>
                 ${statusPill}
@@ -1287,33 +1631,25 @@ function buildPlanningEventCard(event, now = new Date()) {
             </div>
         </div>
 
-        <!-- Title & Time Delta Readout -->
+        <!-- Title & Content -->
         <div class="space-y-2 flex-1">
             <h3 class="text-sm sm:text-base font-bold text-white leading-snug break-words">${escHtml(event.title)}</h3>
             
-            <!-- Dynamic Zero-Suppressed Digital Ticker Blocks -->
-            <div class="event-ticker-tiles w-full">
-                ${tilesHtml}
-            </div>
-
-            <!-- Text readout -->
-            <div class="event-ticker-string text-xs font-semibold pt-0.5">
-                ${stringHtml}
+            <!-- Dynamic Body (Tiles, Completion message, or Paused message) -->
+            <div class="event-card-body w-full">
+                ${bodyContentHtml}
             </div>
 
             ${event.notes ? `
-            <div class="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed break-words">
+            <div class="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed break-words mt-2">
                 ${escHtml(event.notes)}
             </div>` : ''}
         </div>
 
-        <!-- Footer / Target Datetime -->
+        <!-- Footer -->
         <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-            <span class="flex items-center gap-1.5">
-                <i class="fa-regular fa-calendar text-slate-500"></i>
-                <span>${escHtml(displayDt || 'No target date')}</span>
-            </span>
-            <span class="text-[10px] text-slate-500 font-medium">${isFuture ? 'Target' : 'Achieved'}</span>
+            ${footerLeftHtml}
+            <span class="text-[10px] text-slate-500 font-medium">${footerRightText}</span>
         </div>
     </div>`;
 }
@@ -1325,44 +1661,44 @@ function updatePlanningEventTimers() {
         const ev = window.planningEvents.find(e => e.id === id);
         if (!ev) return;
 
-        const delta = calculatePlanningEventDelta(ev.target_datetime, now);
-        if (!delta) return;
+        const state = calculatePlanningEventState(ev, now);
+        if (!state) return;
 
-        // Update tiles
-        const tilesEl = card.querySelector('.event-ticker-tiles');
-        if (tilesEl) {
-            tilesEl.innerHTML = renderEventTickerTilesHtml(delta);
+        // Update body
+        const bodyEl = card.querySelector('.event-card-body');
+        if (bodyEl) {
+            bodyEl.innerHTML = renderEventTickerBodyHtml(state, ev);
         }
 
-        // Update string
-        const strEl = card.querySelector('.event-ticker-string');
-        if (strEl) {
-            strEl.innerHTML = renderEventTickerStringHtml(delta);
-        }
-
-        // Update status pill if isFuture changed
+        // Update status pill
         const pillEl = card.querySelector('.event-status-pill');
         if (pillEl) {
-            if (delta.isFuture) {
-                pillEl.className = 'event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
-                pillEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span>';
+            if (state.mode === 'recurring') {
+                if (state.isActive) {
+                    pillEl.className = 'event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+                    pillEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>🟢 Active Window</span>';
+                } else {
+                    pillEl.className = 'event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1';
+                    pillEl.innerHTML = '<i class="fa-solid fa-pause text-[9px]"></i><span>⏸️ Paused</span>';
+                }
+            } else if (state.mode === 'auto_expire') {
+                if (state.isExpired) {
+                    pillEl.className = 'event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1';
+                    pillEl.innerHTML = '<i class="fa-solid fa-flag-checkered text-[9px]"></i><span>✨ Completed</span>';
+                } else {
+                    pillEl.className = 'event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+                    pillEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span>';
+                }
             } else {
                 pillEl.className = 'event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1';
                 pillEl.innerHTML = '<i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span>';
             }
         }
 
-        // Update total days badge
+        // Update badge
         const totalDaysEl = card.querySelector('.event-total-days-badge');
         if (totalDaysEl) {
-            const sign = delta.isFuture ? '-' : '+';
-            const totalDays = delta.totalDays || 0;
-            const badgeColor = delta.isFuture 
-                ? 'event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30 flex items-center gap-1 shadow-sm' 
-                : 'event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-300 border-amber-500/30 flex items-center gap-1 shadow-sm';
-            totalDaysEl.className = badgeColor;
-            totalDaysEl.title = `Total Days: ${sign}${totalDays}`;
-            totalDaysEl.innerHTML = `<i class="fa-regular fa-calendar-days text-[9px]"></i><span>${sign}${totalDays}d</span>`;
+            totalDaysEl.outerHTML = renderPlanningEventTotalDaysBadgeHtml(state.delta, state);
         }
     });
 }
@@ -1376,6 +1712,47 @@ function formatForDateTimeInput(d) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+function setEventModalMode(mode) {
+    const modeInput = document.getElementById('planning-event-mode-input');
+    const btnAuto = document.getElementById('event-mode-btn-auto_expire');
+    const btnRec = document.getElementById('event-mode-btn-recurring');
+    const btnCount = document.getElementById('event-mode-btn-count_up');
+    const dtSection = document.getElementById('event-modal-datetime-section');
+    const recSection = document.getElementById('event-modal-recurring-section');
+    const compSection = document.getElementById('event-modal-completion-msg-section');
+    const dtLabel = document.getElementById('event-target-dt-label');
+
+    if (modeInput) modeInput.value = mode;
+
+    // Reset button styling
+    [btnAuto, btnRec, btnCount].forEach(b => {
+        if (b) {
+            b.className = 'px-2.5 py-2 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer';
+        }
+    });
+
+    if (mode === 'recurring') {
+        btnRec && (btnRec.className = 'px-2.5 py-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center gap-1 bg-indigo-600 text-white shadow-sm cursor-pointer');
+        dtSection && dtSection.classList.add('hidden');
+        recSection && recSection.classList.remove('hidden');
+    } else if (mode === 'count_up') {
+        btnCount && (btnCount.className = 'px-2.5 py-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center gap-1 bg-amber-600 text-white shadow-sm cursor-pointer');
+        dtSection && dtSection.classList.remove('hidden');
+        recSection && recSection.classList.add('hidden');
+        compSection && compSection.classList.add('hidden');
+        dtLabel && (dtLabel.textContent = 'Past Event Date & Time *');
+    } else {
+        // auto_expire
+        btnAuto && (btnAuto.className = 'px-2.5 py-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center gap-1 bg-violet-600 text-white shadow-sm cursor-pointer');
+        dtSection && dtSection.classList.remove('hidden');
+        recSection && recSection.classList.add('hidden');
+        compSection && compSection.classList.remove('hidden');
+        dtLabel && (dtLabel.textContent = 'Target Date & Time *');
+    }
+
+    updateEventModalPreview();
+}
+
 function openPlanningEventModal(eventId = null) {
     const modal = document.getElementById('planning-event-modal');
     const titleHeader = document.getElementById('event-modal-title');
@@ -1387,6 +1764,12 @@ function openPlanningEventModal(eventId = null) {
     const catInput = document.getElementById('planning-event-category-input');
     const colorInput = document.getElementById('planning-event-color-input');
     const notesInput = document.getElementById('planning-event-notes-input');
+
+    const compMsgInput = document.getElementById('planning-event-completion-msg-input');
+    const freqInput = document.getElementById('planning-event-freq-input');
+    const startInput = document.getElementById('planning-event-window-start-input');
+    const endInput = document.getElementById('planning-event-window-end-input');
+    const inactMsgInput = document.getElementById('planning-event-inactive-msg-input');
 
     if (!modal) return;
 
@@ -1404,6 +1787,16 @@ function openPlanningEventModal(eventId = null) {
         catInput.value = ev.category || 'General';
         colorInput.value = ev.color || '#8b5cf6';
         notesInput.value = ev.notes || '';
+
+        compMsgInput && (compMsgInput.value = ev.completion_message || 'Your countdown is over!');
+        freqInput && (freqInput.value = ev.recurrence_frequency || 'daily');
+        startInput && (startInput.value = ev.window_start_time || '10:00');
+        endInput && (endInput.value = ev.window_end_time || '19:00');
+        inactMsgInput && (inactMsgInput.value = ev.inactive_message || 'Counter paused for this period');
+
+        const mode = ev.timer_type || (ev.is_recurring ? 'recurring' : 'auto_expire');
+        setEventModalMode(mode);
+
         titleHeader.textContent = 'Edit Event Tracker';
         iconHeader.className = 'fa-solid fa-pen-to-square text-lg text-violet-400';
         saveBtn.textContent = 'Save Changes';
@@ -1417,6 +1810,15 @@ function openPlanningEventModal(eventId = null) {
         catInput.value = 'Milestone';
         colorInput.value = '#8b5cf6';
         notesInput.value = '';
+
+        compMsgInput && (compMsgInput.value = 'Your countdown is over!');
+        freqInput && (freqInput.value = 'daily');
+        startInput && (startInput.value = '10:00');
+        endInput && (endInput.value = '19:00');
+        inactMsgInput && (inactMsgInput.value = 'Counter paused for this period');
+
+        setEventModalMode('auto_expire');
+
         titleHeader.textContent = 'Add Event Tracker';
         iconHeader.className = 'fa-solid fa-stopwatch text-lg text-violet-400';
         saveBtn.textContent = 'Create Event Tracker';
@@ -1473,8 +1875,34 @@ function setEventPresetNow() {
 }
 
 function updateEventModalPreview() {
-    const dtInput = document.getElementById('planning-event-dt-input');
+    const mode = (document.getElementById('planning-event-mode-input') || {}).value || 'auto_expire';
     const previewEl = document.getElementById('event-modal-delta-preview');
+    const recPreviewEl = document.getElementById('event-modal-recurring-status-preview');
+
+    if (mode === 'recurring') {
+        const startVal = (document.getElementById('planning-event-window-start-input') || {}).value || '10:00';
+        const endVal = (document.getElementById('planning-event-window-end-input') || {}).value || '19:00';
+        const dummyEvent = {
+            timer_type: 'recurring',
+            is_recurring: true,
+            recurrence_frequency: (document.getElementById('planning-event-freq-input') || {}).value || 'daily',
+            window_start_time: startVal,
+            window_end_time: endVal,
+            inactive_message: (document.getElementById('planning-event-inactive-msg-input') || {}).value || ''
+        };
+        const state = calculatePlanningEventState(dummyEvent, new Date());
+        if (recPreviewEl) {
+            if (state && state.isActive) {
+                const str = formatZeroSuppressedString(state.delta);
+                recPreviewEl.innerHTML = `<span class="text-emerald-400 font-semibold">🟢 Active Window (ends in ${escHtml(str)})</span>`;
+            } else if (state) {
+                recPreviewEl.innerHTML = `<span class="text-amber-400 font-semibold">⏸️ Paused (${escHtml(state.nextResumeText)})</span>`;
+            }
+        }
+        return;
+    }
+
+    const dtInput = document.getElementById('planning-event-dt-input');
     if (!dtInput || !previewEl) return;
 
     if (!dtInput.value) {
@@ -1482,45 +1910,121 @@ function updateEventModalPreview() {
         return;
     }
 
-    const delta = calculatePlanningEventDelta(dtInput.value, new Date());
-    if (delta) {
-        const str = formatZeroSuppressedString(delta);
-        if (delta.isFuture) {
-            previewEl.innerHTML = `<span class="text-emerald-400 font-semibold">⏳ In ${escHtml(str)}</span>`;
-        } else {
-            previewEl.innerHTML = `<span class="text-amber-400 font-semibold">⏱️ ${escHtml(str)} ago</span>`;
+    const dummyEvent = {
+        timer_type: mode,
+        target_datetime: dtInput.value,
+        completion_message: (document.getElementById('planning-event-completion-msg-input') || {}).value || ''
+    };
+    const state = calculatePlanningEventState(dummyEvent, new Date());
+    if (state) {
+        if (state.mode === 'auto_expire' && state.isExpired) {
+            previewEl.innerHTML = `<span class="text-purple-400 font-semibold">✨ Reached 0 (Auto-Expired)</span>`;
+        } else if (state.delta) {
+            const str = formatZeroSuppressedString(state.delta);
+            if (state.delta.isFuture) {
+                previewEl.innerHTML = `<span class="text-emerald-400 font-semibold">⏳ In ${escHtml(str)}</span>`;
+            } else {
+                previewEl.innerHTML = `<span class="text-amber-400 font-semibold">⏱️ ${escHtml(str)} ago</span>`;
+            }
         }
     } else {
         previewEl.textContent = 'Invalid date';
     }
 }
 
+function setPlanningEventFilter(filter) {
+    window.planningEventFilter = filter;
+    ['all', 'upcoming', 'recurring', 'past'].forEach(f => {
+        const btn = document.getElementById(`ev-filter-${f}`);
+        if (!btn) return;
+        if (f === filter) {
+            btn.className = 'px-3 py-1 rounded-md font-semibold transition-all bg-violet-600 text-white shadow-sm cursor-pointer whitespace-nowrap';
+        } else {
+            btn.className = 'px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer whitespace-nowrap';
+        }
+    });
+    renderPlanningEvents();
+}
+
+function handlePlanningEventSearch(val) {
+    window.planningEventSearch = val.trim();
+    renderPlanningEvents();
+}
+
+function handlePlanningEventCategoryChange(val) {
+    window.planningEventCategoryFilter = val;
+    renderPlanningEvents();
+}
+
+function handlePlanningEventSortChange(val) {
+    window.planningEventSort = val;
+    renderPlanningEvents();
+}
+
 async function handlePlanningEventSubmit(e) {
     e.preventDefault();
     const idInput = document.getElementById('planning-event-id');
     const titleInput = document.getElementById('planning-event-title-input');
+    const modeInput = document.getElementById('planning-event-mode-input');
     const dtInput = document.getElementById('planning-event-dt-input');
     const catInput = document.getElementById('planning-event-category-input');
     const colorInput = document.getElementById('planning-event-color-input');
     const notesInput = document.getElementById('planning-event-notes-input');
 
+    const compMsgInput = document.getElementById('planning-event-completion-msg-input');
+    const freqInput = document.getElementById('planning-event-freq-input');
+    const startInput = document.getElementById('planning-event-window-start-input');
+    const endInput = document.getElementById('planning-event-window-end-input');
+    const inactMsgInput = document.getElementById('planning-event-inactive-msg-input');
+
     const eventId = idInput.value ? parseInt(idInput.value) : null;
     const title = titleInput.value.trim();
-    const target_datetime = dtInput.value;
+    const timer_type = modeInput ? modeInput.value : 'auto_expire';
     const category = catInput.value;
     const color = colorInput.value || '#8b5cf6';
     const icon = updateEventCategoryIcon(category);
     const notes = notesInput.value.trim();
 
-    if (!title || !target_datetime) {
-        showToast('Please provide an event title and target datetime', 'warning');
+    const is_recurring = timer_type === 'recurring';
+    const completion_message = compMsgInput ? compMsgInput.value.trim() : 'Your countdown is over!';
+    const recurrence_frequency = freqInput ? freqInput.value : 'daily';
+    const window_start_time = startInput ? startInput.value : '10:00';
+    const window_end_time = endInput ? endInput.value : '19:00';
+    const inactive_message = inactMsgInput ? inactMsgInput.value.trim() : 'Counter paused for this period';
+    const target_datetime = is_recurring ? null : (dtInput ? dtInput.value : null);
+
+    if (!title) {
+        showToast('Please provide an event title', 'warning');
+        return;
+    }
+
+    if (!is_recurring && !target_datetime) {
+        showToast('Please provide a target date and time', 'warning');
+        return;
+    }
+
+    if (is_recurring && (!window_start_time || !window_end_time)) {
+        showToast('Please specify start and end times for the recurring window', 'warning');
         return;
     }
 
     const url = eventId ? '/api/planning/event/edit' : '/api/planning/event/add';
-    const payload = eventId
-        ? { event_id: eventId, title, target_datetime, category, color, icon, notes }
-        : { title, target_datetime, category, color, icon, notes };
+    const payload = {
+        title,
+        timer_type,
+        completion_message,
+        is_recurring,
+        recurrence_frequency,
+        window_start_time,
+        window_end_time,
+        inactive_message,
+        target_datetime,
+        category,
+        color,
+        icon,
+        notes
+    };
+    if (eventId) payload.event_id = eventId;
 
     try {
         const res = await fetch(url, {
@@ -1550,6 +2054,7 @@ async function handlePlanningEventSubmit(e) {
         showToast('Server error saving event tracker', 'danger');
     }
 }
+
 
 async function deletePlanningEvent(eventId) {
     if (!confirm('Are you sure you want to delete this event time-tracker?')) return;

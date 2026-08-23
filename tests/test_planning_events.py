@@ -274,5 +274,150 @@ class PlanningEventsTestCase(unittest.TestCase):
         self.assertEqual(restored.color, '#f59e0b')
 
 
+    def test_auto_expire_countdown_mode(self):
+        user = self.register_and_login()
+
+        dt = (datetime.utcnow() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%S')
+        res = self.client.post('/api/planning/event/add', json={
+            'title': 'Flash Sale Deadline',
+            'target_datetime': dt,
+            'timer_type': 'auto_expire',
+            'completion_message': 'Flash sale has concluded!',
+            'category': 'Deadline'
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['event']['timer_type'], 'auto_expire')
+        self.assertEqual(data['event']['completion_message'], 'Flash sale has concluded!')
+        self.assertFalse(data['event']['is_recurring'])
+
+        # Edit completion message
+        event_id = data['event']['id']
+        res_edit = self.client.post('/api/planning/event/edit', json={
+            'event_id': event_id,
+            'completion_message': 'Offer expired! Check back next season.'
+        })
+        self.assertEqual(res_edit.status_code, 200)
+        data_edit = res_edit.get_json()
+        self.assertEqual(data_edit['event']['completion_message'], 'Offer expired! Check back next season.')
+
+        # Verify in DB
+        db_ev = db.session.get(PlanningEvent, event_id)
+        self.assertEqual(db_ev.timer_type, 'auto_expire')
+        self.assertEqual(db_ev.completion_message, 'Offer expired! Check back next season.')
+
+    def test_recurring_mode_event(self):
+        user = self.register_and_login()
+
+        # Create daily recurring timer (10:00 to 19:00)
+        res = self.client.post('/api/planning/event/add', json={
+            'title': 'Daily Focus Block',
+            'timer_type': 'recurring',
+            'is_recurring': True,
+            'recurrence_frequency': 'daily',
+            'window_start_time': '10:00',
+            'window_end_time': '19:00',
+            'inactive_message': 'Focus hours ended for today! Resumes at 10:00 AM.',
+            'category': 'Work'
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['event']['timer_type'], 'recurring')
+        self.assertTrue(data['event']['is_recurring'])
+        self.assertEqual(data['event']['recurrence_frequency'], 'daily')
+        self.assertEqual(data['event']['window_start_time'], '10:00')
+        self.assertEqual(data['event']['window_end_time'], '19:00')
+        self.assertEqual(data['event']['inactive_message'], 'Focus hours ended for today! Resumes at 10:00 AM.')
+
+        # Edit to monthly recurring
+        event_id = data['event']['id']
+        res_edit = self.client.post('/api/planning/event/edit', json={
+            'event_id': event_id,
+            'recurrence_frequency': 'monthly',
+            'window_start_time': '09:00',
+            'window_end_time': '17:00',
+            'inactive_message': 'Monthly review paused.'
+        })
+        self.assertEqual(res_edit.status_code, 200)
+        data_edit = res_edit.get_json()
+        self.assertEqual(data_edit['event']['recurrence_frequency'], 'monthly')
+        self.assertEqual(data_edit['event']['window_start_time'], '09:00')
+        self.assertEqual(data_edit['event']['window_end_time'], '17:00')
+        self.assertEqual(data_edit['event']['inactive_message'], 'Monthly review paused.')
+
+        # Verify DB
+        db_ev = db.session.get(PlanningEvent, event_id)
+        self.assertEqual(db_ev.recurrence_frequency, 'monthly')
+        self.assertEqual(db_ev.window_start_time, '09:00')
+        self.assertEqual(db_ev.window_end_time, '17:00')
+
+    def test_recurring_validation_errors(self):
+        user = self.register_and_login()
+
+        # Recurring without window times
+        res = self.client.post('/api/planning/event/add', json={
+            'title': 'Missing Window Times',
+            'timer_type': 'recurring',
+            'is_recurring': True
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('Window start and end times are required', res.get_json()['message'])
+
+    def test_backup_and_restore_auto_expire_and_recurring(self):
+        user = self.register_and_login()
+
+        # 1. Auto-expire event
+        self.client.post('/api/planning/event/add', json={
+            'title': 'New Year 2027 Countdown',
+            'target_datetime': '2027-01-01T00:00:00',
+            'timer_type': 'auto_expire',
+            'completion_message': 'Happy New Year 2027!',
+            'category': 'Celebration',
+            'color': '#8b5cf6'
+        })
+
+        # 2. Recurring event
+        self.client.post('/api/planning/event/add', json={
+            'title': 'Trading Session Window',
+            'timer_type': 'recurring',
+            'is_recurring': True,
+            'recurrence_frequency': 'daily',
+            'window_start_time': '09:15',
+            'window_end_time': '15:30',
+            'inactive_message': 'Market is closed.',
+            'category': 'Work',
+            'color': '#10b981'
+        })
+
+        payload = export_user_data_payload(user)
+        self.assertIn('planning_events', payload)
+        self.assertEqual(len(payload['planning_events']), 2)
+
+        # Clear DB
+        PlanningEvent.query.filter_by(user_id=user.id).delete()
+        db.session.commit()
+        self.assertEqual(PlanningEvent.query.filter_by(user_id=user.id).count(), 0)
+
+        # Restore
+        stats = import_user_data_payload(user, payload)
+        self.assertEqual(stats.get('events'), 2)
+
+        ev_ae = PlanningEvent.query.filter_by(user_id=user.id, title='New Year 2027 Countdown').first()
+        self.assertIsNotNone(ev_ae)
+        self.assertEqual(ev_ae.timer_type, 'auto_expire')
+        self.assertEqual(ev_ae.completion_message, 'Happy New Year 2027!')
+
+        ev_rec = PlanningEvent.query.filter_by(user_id=user.id, title='Trading Session Window').first()
+        self.assertIsNotNone(ev_rec)
+        self.assertEqual(ev_rec.timer_type, 'recurring')
+        self.assertTrue(ev_rec.is_recurring)
+        self.assertEqual(ev_rec.window_start_time, '09:15')
+        self.assertEqual(ev_rec.window_end_time, '15:30')
+        self.assertEqual(ev_rec.inactive_message, 'Market is closed.')
+
+
 if __name__ == '__main__':
     unittest.main()
+

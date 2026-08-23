@@ -1057,23 +1057,33 @@ window.dashboardEvents = [
         category: {{ (e.category or 'General') | tojson }},
         notes: {{ (e.notes or '') | tojson }},
         color: {{ (e.color or '#8b5cf6') | tojson }},
-        icon: {{ (e.icon or 'fa-calendar-check') | tojson }}
+        icon: {{ (e.icon or 'fa-calendar-check') | tojson }},
+        timer_type: {{ (e.timer_type or 'auto_expire') | tojson }},
+        completion_message: {{ (e.completion_message or 'Your countdown is over!') | tojson }},
+        is_recurring: {{ 'true' if e.is_recurring else 'false' }},
+        recurrence_frequency: {{ (e.recurrence_frequency or 'daily') | tojson }},
+        window_start_time: {{ (e.window_start_time or '') | tojson }},
+        window_end_time: {{ (e.window_end_time or '') | tojson }},
+        inactive_message: {{ (e.inactive_message or 'Counter paused for this period') | tojson }}
     }{% if not loop.last %},{% endif %}
     {% endfor %}
 ];
 
-function calculateDashboardEventDelta(targetDateStr, now = new Date()) {
-    if (!targetDateStr) return null;
-    const target = new Date(targetDateStr);
-    if (isNaN(target.getTime())) return null;
+function formatDashboardTimeDisplay(h, m) {
+    const period = h >= 12 ? 'PM' : 'AM';
+    const displayH = h % 12 === 0 ? 12 : h % 12;
+    const displayM = String(m).padStart(2, '0');
+    return `${displayH}:${displayM} ${period}`;
+}
 
-    const targetMs = target.getTime();
-    const nowMs = now.getTime();
-    const isFuture = targetMs > nowMs;
+function calculateDashboardDateDifference(startDate, endDate, isFuture = true) {
+    if (!startDate || !endDate) return null;
+    const startMs = startDate.getTime();
+    const endMs = endDate.getTime();
+    if (isNaN(startMs) || isNaN(endMs)) return null;
 
-    let start = new Date(isFuture ? nowMs : targetMs);
-    let end = new Date(isFuture ? targetMs : nowMs);
-
+    let start = new Date(startMs);
+    let end = new Date(endMs);
     let cur = new Date(start.getTime());
 
     // 1. Years
@@ -1123,7 +1133,7 @@ function calculateDashboardEventDelta(targetDateStr, now = new Date()) {
     let minutes = Math.floor((totalSecs % 3600) / 60);
     let seconds = totalSecs % 60;
 
-    const totalDiffMs = Math.abs(targetMs - nowMs);
+    const totalDiffMs = Math.abs(endMs - startMs);
     const totalDays = Math.floor(totalDiffMs / (1000 * 60 * 60 * 24));
 
     return {
@@ -1136,6 +1146,118 @@ function calculateDashboardEventDelta(targetDateStr, now = new Date()) {
         seconds,
         totalDays,
         totalDiffMs
+    };
+}
+
+function calculateDashboardEventState(event, now = new Date()) {
+    if (!event) return null;
+
+    const timerType = event.timer_type || (event.is_recurring ? 'recurring' : 'auto_expire');
+    const isRecurring = timerType === 'recurring' || event.is_recurring;
+
+    if (isRecurring) {
+        const freq = event.recurrence_frequency || 'daily';
+        const startStr = event.window_start_time || '10:00';
+        const endStr = event.window_end_time || '19:00';
+        const inactiveMsg = event.inactive_message || 'Counter paused for this period';
+
+        const [startH, startM] = startStr.split(':').map(Number);
+        const [endH, endM] = endStr.split(':').map(Number);
+
+        let windowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM, 0, 0);
+        let windowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM, 0, 0);
+
+        let isActive = false;
+        let targetForDelta = null;
+        let nextResumeText = '';
+        let nextResumeDate = null;
+
+        if (windowEnd > windowStart) {
+            if (now >= windowStart && now < windowEnd) {
+                isActive = true;
+                targetForDelta = windowEnd;
+            } else if (now < windowStart) {
+                isActive = false;
+                nextResumeText = `Resumes today at ${formatDashboardTimeDisplay(startH, startM)}`;
+                nextResumeDate = windowStart;
+            } else {
+                isActive = false;
+                const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, startH, startM, 0, 0);
+                nextResumeText = `Resumes tomorrow at ${formatDashboardTimeDisplay(startH, startM)}`;
+                nextResumeDate = tomorrowStart;
+            }
+        } else {
+            if (now >= windowStart) {
+                isActive = true;
+                targetForDelta = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, endH, endM, 0, 0);
+            } else if (now < windowEnd) {
+                isActive = true;
+                targetForDelta = windowEnd;
+            } else {
+                isActive = false;
+                nextResumeText = `Resumes today at ${formatDashboardTimeDisplay(startH, startM)}`;
+                nextResumeDate = windowStart;
+            }
+        }
+
+        let delta = null;
+        if (isActive && targetForDelta) {
+            delta = calculateDashboardDateDifference(now, targetForDelta, true);
+        }
+
+        return {
+            mode: 'recurring',
+            isActive,
+            isExpired: false,
+            delta,
+            inactiveMessage: inactiveMsg,
+            nextResumeText,
+            nextResumeDate,
+            windowDisplay: `${formatDashboardTimeDisplay(startH, startM)} - ${formatDashboardTimeDisplay(endH, endM)}`,
+            frequency: freq
+        };
+    }
+
+    const targetDateStr = event.target_datetime;
+    if (!targetDateStr) return null;
+    const target = new Date(targetDateStr);
+    if (isNaN(target.getTime())) return null;
+
+    const targetMs = target.getTime();
+    const nowMs = now.getTime();
+    const isFuture = targetMs > nowMs;
+
+    if (timerType === 'auto_expire' && !isFuture) {
+        return {
+            mode: 'auto_expire',
+            isActive: false,
+            isExpired: true,
+            delta: null,
+            completionMessage: event.completion_message || 'Your countdown is over!',
+            targetDate: target
+        };
+    }
+
+    if (timerType === 'count_up' || (!isFuture && timerType !== 'auto_expire')) {
+        const delta = calculateDashboardDateDifference(target, now, false);
+        return {
+            mode: 'count_up',
+            isActive: false,
+            isExpired: false,
+            isElapsed: true,
+            delta,
+            targetDate: target
+        };
+    }
+
+    const delta = calculateDashboardDateDifference(now, target, true);
+    return {
+        mode: 'auto_expire',
+        isActive: true,
+        isExpired: false,
+        delta,
+        completionMessage: event.completion_message || 'Your countdown is over!',
+        targetDate: target
     };
 }
 
@@ -1163,7 +1285,28 @@ function formatDashboardZeroSuppressedString(delta) {
     return units.map(u => `${u.value}${u.key === 'months' ? 'mo' : (u.key === 'years' ? 'y' : (u.key === 'days' ? 'd' : (u.key === 'hours' ? 'h' : (u.key === 'minutes' ? 'm' : 's'))))}`).join(' ');
 }
 
-function renderDashboardEventTotalDaysBadgeHtml(delta) {
+function renderDashboardEventTotalDaysBadgeHtml(delta, state) {
+    if (state && state.mode === 'recurring') {
+        if (state.isActive) {
+            return `<span class="dash-event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30 flex items-center gap-1 shadow-sm" title="Active Window">
+                <i class="fa-solid fa-bolt text-[9px]"></i>
+                <span>Active</span>
+            </span>`;
+        } else {
+            return `<span class="dash-event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-300 border-amber-500/30 flex items-center gap-1 shadow-sm" title="Paused">
+                <i class="fa-solid fa-moon text-[9px]"></i>
+                <span>Paused</span>
+            </span>`;
+        }
+    }
+
+    if (state && state.isExpired) {
+        return `<span class="dash-event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-purple-500/20 text-purple-300 border-purple-500/40 flex items-center gap-1 shadow-sm" title="Completed">
+            <i class="fa-solid fa-flag-checkered text-[9px]"></i>
+            <span>Done</span>
+        </span>`;
+    }
+
     if (!delta) return '';
     const isFuture = delta.isFuture;
     const sign = isFuture ? '-' : '+';
@@ -1188,6 +1331,7 @@ function getDashboardEventGridClass(count) {
 }
 
 function renderDashboardEventTickerTiles(delta) {
+    if (!delta) return '';
     const units = getDashboardZeroSuppressedUnits(delta);
     const valColor = delta.isFuture ? 'text-emerald-300' : 'text-amber-300';
     const gridColsClass = getDashboardEventGridClass(units.length);
@@ -1205,28 +1349,105 @@ function renderDashboardEventTickerTiles(delta) {
     return `<div class="grid ${gridColsClass} gap-1.5 sm:gap-2 w-full pt-1">${tiles}</div>`;
 }
 
+function renderDashboardEventBodyHtml(state, event) {
+    if (!state) return '';
+
+    if (state.mode === 'auto_expire' && state.isExpired) {
+        const msg = state.completionMessage || 'Your countdown is over!';
+        return `
+        <div class="p-4 rounded-xl bg-gradient-to-r from-purple-950/70 via-indigo-950/60 to-purple-950/70 border border-purple-500/40 text-center space-y-1 shadow-inner my-1">
+            <div class="text-sm font-bold text-purple-200 flex items-center justify-center gap-1.5 break-words">
+                <i class="fa-solid fa-flag-checkered text-purple-400"></i>
+                <span>${escapeHtml(msg)}</span>
+            </div>
+            <div class="text-[11px] text-purple-300/70">Countdown reached zero • Auto-expired</div>
+        </div>`;
+    }
+
+    if (state.mode === 'recurring' && !state.isActive) {
+        const msg = state.inactiveMessage || 'Counter paused for this period';
+        return `
+        <div class="p-4 rounded-xl bg-slate-950/85 border border-amber-500/30 text-center space-y-1.5 shadow-inner my-1">
+            <div class="text-sm font-bold text-amber-300 flex items-center justify-center gap-1.5 break-words">
+                <i class="fa-solid fa-moon text-amber-400"></i>
+                <span>${escapeHtml(msg)}</span>
+            </div>
+            <div class="text-xs text-slate-400 font-mono flex items-center justify-center gap-1.5">
+                <i class="fa-regular fa-clock text-[11px] text-indigo-400"></i>
+                <span>${escapeHtml(state.nextResumeText || 'Resumes in next window')}</span>
+            </div>
+        </div>`;
+    }
+
+    if (state.mode === 'recurring' && state.isActive && state.delta) {
+        const tilesHtml = renderDashboardEventTickerTiles(state.delta);
+        const str = formatDashboardZeroSuppressedString(state.delta);
+        return `
+        <div class="dash-event-ticker-tiles w-full">
+            ${tilesHtml}
+        </div>
+        <div class="dash-event-ticker-string text-xs font-semibold pt-1">
+            <span class="text-emerald-400 font-mono flex items-center gap-1.5">
+                <i class="fa-solid fa-hourglass-half text-[10px]"></i>Window ends in ${escapeHtml(str)}
+            </span>
+        </div>`;
+    }
+
+    if (state.delta) {
+        const tilesHtml = renderDashboardEventTickerTiles(state.delta);
+        const str = formatDashboardZeroSuppressedString(state.delta);
+        const stringHtml = state.delta.isFuture
+            ? `<span class="text-emerald-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In ${escapeHtml(str)}</span>`
+            : `<span class="text-amber-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i>${escapeHtml(str)} ago</span>`;
+
+        return `
+        <div class="dash-event-ticker-tiles w-full">
+            ${tilesHtml}
+        </div>
+        <div class="dash-event-ticker-string text-xs font-semibold pt-1">
+            ${stringHtml}
+        </div>`;
+    }
+
+    return '';
+}
+
 function renderDashboardEventCard(event, now = new Date()) {
-    const delta = calculateDashboardEventDelta(event.target_datetime, now);
-    const isFuture = delta ? delta.isFuture : true;
+    const state = calculateDashboardEventState(event, now);
     const color = event.color || '#8b5cf6';
     const icon = event.icon || 'fa-calendar-check';
     const category = event.category || 'General';
 
-    const statusPill = isFuture
-        ? `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span></span>`
-        : `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span></span>`;
+    let statusPill = '';
+    if (state.mode === 'recurring') {
+        statusPill = state.isActive
+            ? `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>🟢 Active Window</span></span>`
+            : `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-pause text-[9px]"></i><span>⏸️ Paused</span></span>`;
+    } else if (state.mode === 'auto_expire') {
+        statusPill = state.isExpired
+            ? `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1"><i class="fa-solid fa-flag-checkered text-[9px]"></i><span>✨ Completed</span></span>`
+            : `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span></span>`;
+    } else {
+        statusPill = `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span></span>`;
+    }
 
-    const totalDaysBadge = renderDashboardEventTotalDaysBadgeHtml(delta);
-    const tilesHtml = renderDashboardEventTickerTiles(delta);
-    const str = formatDashboardZeroSuppressedString(delta);
-    const stringHtml = isFuture
-        ? `<span class="text-emerald-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In ${escapeHtml(str)}</span>`
-        : `<span class="text-amber-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i>${escapeHtml(str)} ago</span>`;
+    const totalDaysBadge = renderDashboardEventTotalDaysBadgeHtml(state.delta, state);
+    const bodyContentHtml = renderDashboardEventBodyHtml(state, event);
 
-    let displayDt = event.target_datetime_display;
-    if (!displayDt && event.target_datetime) {
-        const d = new Date(event.target_datetime);
-        displayDt = d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    let footerLeftHtml = '';
+    let footerRightText = '';
+
+    if (state.mode === 'recurring') {
+        footerLeftHtml = `<span class="flex items-center gap-1.5 text-indigo-300 font-mono text-[11px]"><i class="fa-solid fa-repeat text-indigo-400 text-[10px]"></i>${state.frequency ? state.frequency.toUpperCase() : 'DAILY'}: ${state.windowDisplay}</span>`;
+        footerRightText = state.isActive ? 'Active Window' : 'Next Window Pending';
+    } else {
+        let displayDt = event.target_datetime_display;
+        if (!displayDt && event.target_datetime) {
+            const d = new Date(event.target_datetime);
+            displayDt = d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+        footerLeftHtml = `<span class="flex items-center gap-1.5 text-slate-400 text-[11px]"><i class="fa-regular fa-calendar text-slate-500"></i><span>${escapeHtml(displayDt || 'No target date')}</span></span>`;
+        footerRightText = state.isExpired ? 'Auto-Expired' : (state.mode === 'count_up' ? 'Achieved' : 'Target');
     }
 
     return `
@@ -1253,24 +1474,16 @@ function renderDashboardEventCard(event, now = new Date()) {
                 ${escapeHtml(event.title)}
             </h3>
 
-            <!-- Big Visual Count Timer -->
-            <div class="dash-event-ticker-tiles w-full">
-                ${tilesHtml}
-            </div>
-
-            <!-- Readout -->
-            <div class="dash-event-ticker-string text-xs font-semibold pt-0.5">
-                ${stringHtml}
+            <!-- Big Visual Count Timer / Completion Box / Paused Box -->
+            <div class="dash-event-card-body w-full">
+                ${bodyContentHtml}
             </div>
         </div>
 
-        <!-- Target Date -->
+        <!-- Target Date / Window Details -->
         <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-            <span class="flex items-center gap-1.5">
-                <i class="fa-regular fa-calendar text-slate-500"></i>
-                <span>${escapeHtml(displayDt || 'No target date')}</span>
-            </span>
-            <span class="text-[10px] text-slate-500 font-medium">${isFuture ? 'Target' : 'Achieved'}</span>
+            ${footerLeftHtml}
+            <span class="text-[10px] text-slate-500 font-medium">${footerRightText}</span>
         </div>
     </div>`;
 }
@@ -1282,27 +1495,32 @@ function updateDashboardEventTimers() {
         const ev = (window.dashboardEvents || []).find(e => e.id === id);
         if (!ev) return;
 
-        const delta = calculateDashboardEventDelta(ev.target_datetime, now);
-        if (!delta) return;
+        const state = calculateDashboardEventState(ev, now);
+        if (!state) return;
 
-        const tilesEl = card.querySelector('.dash-event-ticker-tiles');
-        if (tilesEl) {
-            tilesEl.innerHTML = renderDashboardEventTickerTiles(delta);
-        }
-
-        const strEl = card.querySelector('.dash-event-ticker-string');
-        if (strEl) {
-            const str = formatDashboardZeroSuppressedString(delta);
-            strEl.innerHTML = delta.isFuture
-                ? `<span class="text-emerald-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In ${escapeHtml(str)}</span>`
-                : `<span class="text-amber-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i>${escapeHtml(str)} ago</span>`;
+        const bodyEl = card.querySelector('.dash-event-card-body');
+        if (bodyEl) {
+            bodyEl.innerHTML = renderDashboardEventBodyHtml(state, ev);
         }
 
         const pillEl = card.querySelector('.dash-event-pill');
         if (pillEl) {
-            if (delta.isFuture) {
-                pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
-                pillEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span>';
+            if (state.mode === 'recurring') {
+                if (state.isActive) {
+                    pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+                    pillEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>🟢 Active Window</span>';
+                } else {
+                    pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1';
+                    pillEl.innerHTML = '<i class="fa-solid fa-pause text-[9px]"></i><span>⏸️ Paused</span>';
+                }
+            } else if (state.mode === 'auto_expire') {
+                if (state.isExpired) {
+                    pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1';
+                    pillEl.innerHTML = '<i class="fa-solid fa-flag-checkered text-[9px]"></i><span>✨ Completed</span>';
+                } else {
+                    pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+                    pillEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span>';
+                }
             } else {
                 pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1';
                 pillEl.innerHTML = '<i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span>';
@@ -1311,17 +1529,11 @@ function updateDashboardEventTimers() {
 
         const totalDaysEl = card.querySelector('.dash-event-total-days-badge');
         if (totalDaysEl) {
-            const sign = delta.isFuture ? '-' : '+';
-            const totalDays = delta.totalDays || 0;
-            const badgeColor = delta.isFuture 
-                ? 'dash-event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30 flex items-center gap-1 shadow-sm' 
-                : 'dash-event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-300 border-amber-500/30 flex items-center gap-1 shadow-sm';
-            totalDaysEl.className = badgeColor;
-            totalDaysEl.title = `Total Days: ${sign}${totalDays}`;
-            totalDaysEl.innerHTML = `<i class="fa-regular fa-calendar-days text-[9px]"></i><span>${sign}${totalDays}d</span>`;
+            totalDaysEl.outerHTML = renderDashboardEventTotalDaysBadgeHtml(state.delta, state);
         }
     });
 }
+
 
 function initDashboardEvents() {
     const grid = document.getElementById('dashboard-events-grid');

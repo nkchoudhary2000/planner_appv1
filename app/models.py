@@ -186,19 +186,30 @@ class PlanningTask(db.Model):
 
 
 class PlanningEvent(db.Model):
-    """Dynamic Event Time-Tracker entity for countdowns and count-ups.
+    """Dynamic Event Time-Tracker entity for countdowns, recurring windows, and count-ups.
 
-    Tracks target timestamps, dynamic time deltas, categories, colors, and notes.
+    Tracks target timestamps, recurrence schedules, active time windows, completion/pause messages,
+    dynamic time deltas, categories, colors, and notes.
     """
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
-    target_datetime = db.Column(db.DateTime, nullable=False, index=True)
+    target_datetime = db.Column(db.DateTime, nullable=True, index=True)
     category = db.Column(db.String(64), default='General')  # e.g., Milestone, Deadline, Personal, Work, Celebration
     notes = db.Column(db.Text, default='')
     color = db.Column(db.String(32), default='#8b5cf6')     # Hex accent color
     icon = db.Column(db.String(64), default='fa-calendar-check') # FontAwesome icon class
     sort_order = db.Column(db.Integer, default=0)
+
+    # Option 1: Auto-Expire (One-Time Event) & Option 2: Recurring Mode (Scheduled Repeats)
+    timer_type = db.Column(db.String(32), default='auto_expire')  # 'auto_expire', 'recurring', 'count_up'
+    completion_message = db.Column(db.String(255), default='Your countdown is over!')
+    is_recurring = db.Column(db.Boolean, default=False)
+    recurrence_frequency = db.Column(db.String(32), default='daily')  # 'daily', 'monthly', 'yearly'
+    window_start_time = db.Column(db.String(16), nullable=True)  # e.g., "10:00"
+    window_end_time = db.Column(db.String(16), nullable=True)    # e.g., "19:00"
+    inactive_message = db.Column(db.String(255), default='Counter paused for this period')
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -213,10 +224,18 @@ class PlanningEvent(db.Model):
             'color': self.color or '#8b5cf6',
             'icon': self.icon or 'fa-calendar-check',
             'sort_order': self.sort_order or 0,
+            'timer_type': self.timer_type or 'auto_expire',
+            'completion_message': self.completion_message or 'Your countdown is over!',
+            'is_recurring': bool(self.is_recurring),
+            'recurrence_frequency': self.recurrence_frequency or 'daily',
+            'window_start_time': self.window_start_time or '',
+            'window_end_time': self.window_end_time or '',
+            'inactive_message': self.inactive_message or 'Counter paused for this period',
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else '',
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else '',
         }
 
     def __repr__(self):
         return f'<PlanningEvent User:{self.user_id} id:{self.id} Title:{self.title}>'
+
 
