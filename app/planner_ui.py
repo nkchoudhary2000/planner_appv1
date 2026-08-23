@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from sqlalchemy.orm.attributes import flag_modified
 from app import db
-from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, User, PlanningTask
+from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, User, PlanningTask, PlanningEvent
 from app.services.cascade_service import (
     get_yearly_events_for_month,
     get_monthly_items_for_date,
@@ -277,6 +277,13 @@ def dashboard():
                                 'text': f'Deadline / Event scheduled today: "{citem.get("text")}"'
                             })
 
+    planning_events = (
+        PlanningEvent.query
+        .filter_by(user_id=current_user.id)
+        .order_by(PlanningEvent.sort_order.asc(), PlanningEvent.target_datetime.asc())
+        .all()
+    )
+
     return render_template(
         'planner/dashboard.html',
         today=today,
@@ -309,7 +316,8 @@ def dashboard():
         avg_sleep_hours=avg_sleep_hours,
         avg_sleep_quality=avg_sleep_quality,
         sleep_days_count=sleep_days_count,
-        marquee_alerts=marquee_alerts
+        marquee_alerts=marquee_alerts,
+        planning_events=planning_events
     )
 
 
@@ -788,9 +796,18 @@ def planning():
     )
 
     tasks = pending_tasks + recent_completed
+
+    events = (
+        PlanningEvent.query
+        .filter_by(user_id=current_user.id)
+        .order_by(PlanningEvent.sort_order.asc(), PlanningEvent.target_datetime.asc())
+        .all()
+    )
+
     return render_template(
         'planner/planning.html',
         tasks=tasks,
+        events=events,
         user_tags=user_tags,
         today=get_today_date(),
         total_completed=total_completed,

@@ -174,6 +174,9 @@ def create_app(config_class=Config):
                 if 'events' not in columns:
                     with db.engine.begin() as conn:
                         conn.execute(text("ALTER TABLE yearly_plan ADD COLUMN events JSON DEFAULT '[]'"))
+
+            if 'planning_event' not in tables:
+                db.create_all()
         except Exception as e:
             app.logger.error(f"Auto-migration check notice: {e}")
 

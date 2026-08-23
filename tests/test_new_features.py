@@ -160,33 +160,23 @@ class NewFeaturesTestCase(unittest.TestCase):
         self.assertEqual(item['item'], 'Organic Almond Milk')
         self.assertEqual(item['added_date'], today.strftime('%Y-%m-%d'))
 
-    def test_dashboard_reminder_marquee_alerts(self):
-        """Feature 5: Test dashboard reminder panel marquee alert generation."""
+    def test_dashboard_event_countdowns_panel(self):
+        """Feature 5: Test dashboard event countdowns & timers panel."""
         self.register_and_login()
-        today = date.today()
-        today_str = today.strftime('%Y-%m-%d')
 
-        # 1. Add unchecked shopping item
-        year, week, _ = today.isocalendar()
-        self.client.post(f'/weekly?year={year}&week={week}', data={
-            'action': 'add_shopping_item',
-            'item_name': 'Fresh Coffee Beans',
-            'category': 'Groceries'
+        # Add planning event
+        self.client.post('/api/planning/event/add', json={
+            'title': 'Grand Product Launch 2026',
+            'target_datetime': '2026-12-31T20:00:00',
+            'category': 'Milestone'
         })
 
-        # 2. Add high priority task for today
-        self.client.post('/api/daily/task/add', json={
-            'date': today_str,
-            'text': 'Critical Client Meeting',
-            'priority': 'High'
-        })
-
-        # 3. Fetch Dashboard and verify active alerts in response HTML
+        # Fetch Dashboard and verify event panel and title in response HTML
         dash_res = self.client.get('/dashboard')
         self.assertEqual(dash_res.status_code, 200)
-        self.assertIn(b'Active Reminders', dash_res.data)
-        self.assertIn(b'Fresh Coffee Beans', dash_res.data)
-        self.assertIn(b'Critical Client Meeting', dash_res.data)
+        self.assertIn(b'Event Countdowns &amp; Timers', dash_res.data)
+        self.assertIn(b'Grand Product Launch 2026', dash_res.data)
+        self.assertIn(b'dashboard-events-panel', dash_res.data)
 
     def test_weekly_unbought_shopping_list_move_to_next_week(self):
         """Feature 6: Test that unbought weekly shopping list items are moved to next week and removed from prior week."""

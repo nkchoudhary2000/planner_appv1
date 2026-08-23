@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify, redirect, url_for, flash, send_file
 from sqlalchemy.orm.attributes import flag_modified
 from app import db
-from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, User, PlanningTask
+from app.models import DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, User, PlanningTask, PlanningEvent
 from app.auth_middleware import token_required
 from app.services.cascade_service import (
     get_yearly_events_for_month,
@@ -2742,6 +2742,321 @@ def api_planning_reorder_tasks():
             continue
         if tid_int in task_map:
             task_map[tid_int].sort_order = idx
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ============================================================================
+# PLANNING EVENT TIME-TRACKER REST API ENDPOINTS
+# ============================================================================
+
+def _parse_event_datetime(dt_str):
+    """Safely parse user-supplied datetime string in ISO, HTML5 datetime-local or standard formats."""
+    if not dt_str:
+        return None
+    if isinstance(dt_str, datetime):
+        return dt_str
+    dt_str = str(dt_str).strip()
+    formats = [
+        '%Y-%m-%dT%H:%M:%S',
+        '%Y-%m-%dT%H:%M',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%d %H:%M',
+        '%Y-%m-%d'
+    ]
+    for fmt in formats:
+        try:
+            return datetime.strptime(dt_str, fmt)
+        except ValueError:
+            pass
+    try:
+        # Handle ISO format with potential timezone offset or Z
+        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+        return dt.replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+@planner_api.route('/api/planning/events', methods=['GET'])
+@token_required
+def api_planning_get_events():
+    """
+    Get all dynamic planning event time-trackers for the user.
+    ---
+    tags:
+      - Planning Event Time-Trackers
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    responses:
+      200:
+        description: List of tracked planning events
+      401:
+        description: Unauthorized
+    """
+    user = get_current_user_safe()
+    events = (
+        PlanningEvent.query
+        .filter_by(user_id=user.id)
+        .order_by(PlanningEvent.sort_order.asc(), PlanningEvent.target_datetime.asc())
+        .all()
+    )
+    return jsonify({
+        'success': True,
+        'events': [e.to_dict() for e in events]
+    })
+
+
+@planner_api.route('/api/planning/event/add', methods=['POST'])
+@token_required
+def api_planning_add_event():
+    """
+    Create a new dynamic event time-tracker (countdown/count-up).
+    ---
+    tags:
+      - Planning Event Time-Trackers
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - title
+            - target_datetime
+          properties:
+            title:
+              type: string
+            target_datetime:
+              type: string
+              example: "2026-12-31T23:59:59"
+            category:
+              type: string
+              default: "General"
+            notes:
+              type: string
+            color:
+              type: string
+              default: "#8b5cf6"
+            icon:
+              type: string
+              default: "fa-calendar-check"
+    responses:
+      200:
+        description: Event time-tracker created successfully
+      400:
+        description: Missing required fields or invalid datetime format
+      401:
+        description: Unauthorized
+    """
+    user = get_current_user_safe()
+    data = request.get_json() or {}
+    title = data.get('title', '').strip()
+    target_dt_raw = data.get('target_datetime')
+    category = data.get('category', 'General')
+    notes = data.get('notes', '').strip()
+    color = data.get('color', '#8b5cf6')
+    icon = data.get('icon', 'fa-calendar-check')
+
+    if not title:
+        return jsonify({'success': False, 'message': 'Event title is required'}), 400
+
+    target_dt = _parse_event_datetime(target_dt_raw)
+    if not target_dt:
+        return jsonify({'success': False, 'message': 'Invalid target datetime format'}), 400
+
+    max_order = db.session.query(db.func.max(PlanningEvent.sort_order)).filter_by(user_id=user.id).scalar() or 0
+
+    event = PlanningEvent(
+        user_id=user.id,
+        title=title,
+        target_datetime=target_dt,
+        category=category,
+        notes=notes,
+        color=color,
+        icon=icon,
+        sort_order=max_order + 1
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    return jsonify({'success': True, 'event': event.to_dict(), 'message': 'Event created successfully'})
+
+
+@planner_api.route('/api/planning/event/edit', methods=['POST'])
+@token_required
+def api_planning_edit_event():
+    """
+    Edit an existing dynamic event time-tracker.
+    ---
+    tags:
+      - Planning Event Time-Trackers
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - event_id
+          properties:
+            event_id:
+              type: integer
+            title:
+              type: string
+            target_datetime:
+              type: string
+            category:
+              type: string
+            notes:
+              type: string
+            color:
+              type: string
+            icon:
+              type: string
+    responses:
+      200:
+        description: Event time-tracker updated successfully
+      400:
+        description: Invalid inputs
+      401:
+        description: Unauthorized
+      404:
+        description: Event not found
+    """
+    user = get_current_user_safe()
+    data = request.get_json() or {}
+    event_id = data.get('event_id')
+    if not event_id:
+        return jsonify({'success': False, 'message': 'Missing event_id'}), 400
+
+    event = PlanningEvent.query.filter_by(id=event_id, user_id=user.id).first()
+    if not event:
+        return jsonify({'success': False, 'message': 'Event not found'}), 404
+
+    if 'title' in data:
+        t = data['title'].strip()
+        if not t:
+            return jsonify({'success': False, 'message': 'Event title cannot be empty'}), 400
+        event.title = t
+
+    if 'target_datetime' in data:
+        dt = _parse_event_datetime(data['target_datetime'])
+        if not dt:
+            return jsonify({'success': False, 'message': 'Invalid target datetime format'}), 400
+        event.target_datetime = dt
+
+    if 'category' in data:
+        event.category = data['category']
+    if 'notes' in data:
+        event.notes = data['notes'].strip()
+    if 'color' in data:
+        event.color = data['color']
+    if 'icon' in data:
+        event.icon = data['icon']
+
+    db.session.commit()
+    return jsonify({'success': True, 'event': event.to_dict(), 'message': 'Event updated successfully'})
+
+
+@planner_api.route('/api/planning/event/delete', methods=['POST'])
+@token_required
+def api_planning_delete_event():
+    """
+    Delete a planning event time-tracker.
+    ---
+    tags:
+      - Planning Event Time-Trackers
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - event_id
+          properties:
+            event_id:
+              type: integer
+    responses:
+      200:
+        description: Event deleted successfully
+      400:
+        description: Missing event_id
+      401:
+        description: Unauthorized
+      404:
+        description: Event not found
+    """
+    user = get_current_user_safe()
+    data = request.get_json() or {}
+    event_id = data.get('event_id')
+    if not event_id:
+        return jsonify({'success': False, 'message': 'Missing event_id'}), 400
+
+    event = PlanningEvent.query.filter_by(id=event_id, user_id=user.id).first()
+    if not event:
+        return jsonify({'success': False, 'message': 'Event not found'}), 404
+
+    db.session.delete(event)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Event deleted successfully'})
+
+
+@planner_api.route('/api/planning/event/reorder', methods=['POST'])
+@token_required
+def api_planning_reorder_events():
+    """
+    Reorder planning event time-trackers.
+    ---
+    tags:
+      - Planning Event Time-Trackers
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - event_ids
+          properties:
+            event_ids:
+              type: array
+              items:
+                type: integer
+    responses:
+      200:
+        description: Events reordered successfully
+      400:
+        description: Invalid event_ids array
+      401:
+        description: Unauthorized
+    """
+    user = get_current_user_safe()
+    data = request.get_json() or {}
+    event_ids = data.get('event_ids', [])
+    if not isinstance(event_ids, list):
+        return jsonify({'success': False, 'message': 'event_ids must be a list'}), 400
+
+    events = PlanningEvent.query.filter_by(user_id=user.id).all()
+    event_map = {e.id: e for e in events}
+
+    for idx, eid in enumerate(event_ids):
+        try:
+            eid_int = int(eid)
+        except (ValueError, TypeError):
+            continue
+        if eid_int in event_map:
+            event_map[eid_int].sort_order = idx
 
     db.session.commit()
     return jsonify({'success': True})

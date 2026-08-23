@@ -37,6 +37,7 @@ class User(UserMixin, db.Model):
     monthly_plans = db.relationship('MonthlyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     yearly_plans = db.relationship('YearlyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     planning_tasks = db.relationship('PlanningTask', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
+    planning_events = db.relationship('PlanningEvent', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
 
     @property
     def name(self):
@@ -182,3 +183,40 @@ class PlanningTask(db.Model):
 
     def __repr__(self):
         return f'<PlanningTask User:{self.user_id} id:{self.id}>'
+
+
+class PlanningEvent(db.Model):
+    """Dynamic Event Time-Tracker entity for countdowns and count-ups.
+
+    Tracks target timestamps, dynamic time deltas, categories, colors, and notes.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    title = db.Column(db.String(255), nullable=False)
+    target_datetime = db.Column(db.DateTime, nullable=False, index=True)
+    category = db.Column(db.String(64), default='General')  # e.g., Milestone, Deadline, Personal, Work, Celebration
+    notes = db.Column(db.Text, default='')
+    color = db.Column(db.String(32), default='#8b5cf6')     # Hex accent color
+    icon = db.Column(db.String(64), default='fa-calendar-check') # FontAwesome icon class
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'target_datetime': self.target_datetime.strftime('%Y-%m-%dT%H:%M:%S') if self.target_datetime else '',
+            'target_datetime_display': self.target_datetime.strftime('%b %d, %Y • %I:%M %p') if self.target_datetime else '',
+            'category': self.category or 'General',
+            'notes': self.notes or '',
+            'color': self.color or '#8b5cf6',
+            'icon': self.icon or 'fa-calendar-check',
+            'sort_order': self.sort_order or 0,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else '',
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else '',
+        }
+
+    def __repr__(self):
+        return f'<PlanningEvent User:{self.user_id} id:{self.id} Title:{self.title}>'
+

@@ -89,6 +89,112 @@
                 or delete it.</p>
         </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Dynamic Event Time-Tracker Panel (Positioned Below Tasks)   -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 space-y-6 shadow-xl relative overflow-hidden" id="planning-event-tracker-panel">
+        
+        <!-- Header & Stats Bar -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-700/60">
+            <div>
+                <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-stopwatch-20"></i>
+                    Time Delta Engine
+                </span>
+                <h2 class="text-xl font-bold text-white mt-0.5 flex items-center gap-2.5">
+                    <span>Dynamic Event Time-Tracker</span>
+                    <span id="events-total-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-semibold border border-violet-500/30">0 Events</span>
+                </h2>
+                <p class="text-xs text-slate-400 mt-1">Live countdowns for future milestones &amp; count-ups for past events with dynamic zero-suppression.</p>
+            </div>
+
+            <!-- Quick Action & Stats Badges -->
+            <div class="flex items-center gap-2.5 flex-wrap">
+                <div class="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs shadow-inner">
+                    <span class="flex items-center gap-1.5 text-emerald-400 font-medium">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="events-upcoming-count">0</span> Upcoming
+                    </span>
+                    <span class="text-slate-600">|</span>
+                    <span class="flex items-center gap-1.5 text-amber-400 font-medium">
+                        <i class="fa-solid fa-clock-rotate-left text-[10px]"></i>
+                        <span id="events-past-count">0</span> Elapsed
+                    </span>
+                </div>
+                <button type="button" onclick="openPlanningEventModal()"
+                    class="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-violet-500/25 transition-all flex items-center space-x-1.5 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Add Event</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+            <!-- Filter Tabs -->
+            <div class="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/60 text-xs">
+                <button type="button" onclick="setPlanningEventFilter('all')" id="ev-filter-all"
+                    class="px-3 py-1 rounded-md font-semibold transition-all bg-violet-600 text-white shadow-sm cursor-pointer">
+                    All (<span id="ev-tab-all-count">0</span>)
+                </button>
+                <button type="button" onclick="setPlanningEventFilter('upcoming')" id="ev-filter-upcoming"
+                    class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer">
+                    ⏳ Countdowns (<span id="ev-tab-upcoming-count">0</span>)
+                </button>
+                <button type="button" onclick="setPlanningEventFilter('past')" id="ev-filter-past"
+                    class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer">
+                    ⏱️ Count-ups (<span id="ev-tab-past-count">0</span>)
+                </button>
+            </div>
+
+            <!-- Search, Category Filter, and Sort -->
+            <div class="flex items-center gap-2 flex-1 sm:justify-end flex-wrap sm:flex-nowrap">
+                <div class="relative flex-1 sm:max-w-xs min-w-[140px]">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input type="text" id="planning-event-search-input" oninput="handlePlanningEventSearch(this.value)"
+                        placeholder="Search events..."
+                        class="w-full bg-slate-800/90 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500">
+                </div>
+                <select id="planning-event-category-filter" onchange="handlePlanningEventCategoryChange(this.value)"
+                    class="bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer">
+                    <option value="">All Categories</option>
+                    <option value="Milestone">🚀 Milestone</option>
+                    <option value="Deadline">⚠️ Deadline</option>
+                    <option value="Personal">🌟 Personal</option>
+                    <option value="Work">💼 Work</option>
+                    <option value="Celebration">🎂 Celebration</option>
+                    <option value="Goal">🎯 Goal</option>
+                    <option value="General">📌 General</option>
+                </select>
+                <select id="planning-event-sort-select" onchange="handlePlanningEventSortChange(this.value)"
+                    class="bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer">
+                    <option value="target_asc">Date (Soonest)</option>
+                    <option value="target_desc">Date (Furthest)</option>
+                    <option value="title_asc">Title (A-Z)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Events Grid -->
+        <div id="planning-events-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+
+        <!-- Empty State for Events -->
+        <div id="planning-events-empty-state" class="hidden text-center py-12 bg-slate-900/40 rounded-xl border border-dashed border-slate-700/70 p-6 space-y-3">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-2xl shadow-inner">
+                <i class="fa-solid fa-hourglass-start"></i>
+            </div>
+            <div>
+                <h3 class="text-sm font-bold text-white">No Tracked Events</h3>
+                <p class="text-xs text-slate-400 max-w-sm mx-auto mt-1">Track target milestones, deadlines, trips, birthdays, or days elapsed since key achievements.</p>
+            </div>
+            <button type="button" onclick="openPlanningEventModal()"
+                class="px-4 py-2 bg-slate-800 hover:bg-violet-600 text-slate-200 hover:text-white rounded-xl text-xs font-semibold border border-slate-700 hover:border-violet-500 transition-all inline-flex items-center space-x-1.5 cursor-pointer">
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Add Your First Event</span>
+            </button>
+        </div>
+    </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -196,6 +302,108 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Add / Edit Planning Event Modal                            -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="planning-event-modal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
+    <div class="glass-panel max-w-lg w-full p-6 rounded-2xl border border-violet-500/40 shadow-2xl space-y-5 my-8">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+            <div class="flex items-center space-x-2 text-violet-400">
+                <i class="fa-solid fa-stopwatch text-lg" id="event-modal-icon-header"></i>
+                <h3 class="text-lg font-bold text-white" id="event-modal-title">Add Event Tracker</h3>
+            </div>
+            <button type="button" onclick="closePlanningEventModal()"
+                class="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form id="planning-event-form" onsubmit="handlePlanningEventSubmit(event)" class="space-y-4">
+            <input type="hidden" id="planning-event-id">
+
+            <!-- Title -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Event Title *</label>
+                <input type="text" id="planning-event-title-input" required placeholder="e.g., Product Launch, Trip to Tokyo, Started Job..."
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500">
+            </div>
+
+            <!-- Target Datetime -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Target Date &amp; Time *</label>
+                    <span class="text-[10px] font-mono text-indigo-300" id="event-modal-delta-preview">Select date &amp; time</span>
+                </div>
+                <input type="datetime-local" id="planning-event-dt-input" required step="1" oninput="updateEventModalPreview()"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                
+                <!-- Quick Date Presets -->
+                <div class="flex items-center gap-1.5 mt-2 flex-wrap text-[10px]">
+                    <span class="text-slate-500 font-medium mr-1">Presets:</span>
+                    <button type="button" onclick="setEventPresetOffset(0, 0, 0, 1)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Hr</button>
+                    <button type="button" onclick="setEventPresetOffset(0, 0, 1, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Day</button>
+                    <button type="button" onclick="setEventPresetOffset(0, 0, 7, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Week</button>
+                    <button type="button" onclick="setEventPresetOffset(0, 1, 0, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Month</button>
+                    <button type="button" onclick="setEventPresetOffset(1, 0, 0, 0)" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">+1 Year</button>
+                    <button type="button" onclick="setEventPresetNow()" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer">Now (Past/Elapsed)</button>
+                </div>
+            </div>
+
+            <!-- Category & Icon & Color -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Category</label>
+                    <select id="planning-event-category-input" onchange="updateEventCategoryIcon(this.value)"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer">
+                        <option value="Milestone">🚀 Milestone</option>
+                        <option value="Deadline">⚠️ Deadline</option>
+                        <option value="Personal">🌟 Personal</option>
+                        <option value="Work">💼 Work</option>
+                        <option value="Celebration">🎂 Celebration</option>
+                        <option value="Goal">🎯 Goal</option>
+                        <option value="General">📌 General</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Accent Color</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="planning-event-color-input" value="#8b5cf6"
+                            class="w-10 h-9 p-1 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer"
+                            title="Choose Event Color">
+                        <div class="flex items-center gap-1.5">
+                            <span onclick="setEventColorQuick('#8b5cf6')" class="w-5 h-5 rounded-full bg-[#8b5cf6] cursor-pointer hover:scale-110 transition-transform shadow-sm"></span>
+                            <span onclick="setEventColorQuick('#3b82f6')" class="w-5 h-5 rounded-full bg-[#3b82f6] cursor-pointer hover:scale-110 transition-transform shadow-sm"></span>
+                            <span onclick="setEventColorQuick('#10b981')" class="w-5 h-5 rounded-full bg-[#10b981] cursor-pointer hover:scale-110 transition-transform shadow-sm"></span>
+                            <span onclick="setEventColorQuick('#f59e0b')" class="w-5 h-5 rounded-full bg-[#f59e0b] cursor-pointer hover:scale-110 transition-transform shadow-sm"></span>
+                            <span onclick="setEventColorQuick('#f43f5e')" class="w-5 h-5 rounded-full bg-[#f43f5e] cursor-pointer hover:scale-110 transition-transform shadow-sm"></span>
+                            <span onclick="setEventColorQuick('#06b6d4')" class="w-5 h-5 rounded-full bg-[#06b6d4] cursor-pointer hover:scale-110 transition-transform shadow-sm"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Notes (Optional)</label>
+                <textarea id="planning-event-notes-input" rows="2" placeholder="Key details, location, URL or milestones..."
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"></textarea>
+            </div>
+
+            <!-- Buttons -->
+            <div class="pt-2 flex items-center justify-end space-x-3">
+                <button type="button" onclick="closePlanningEventModal()"
+                    class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
+                <button type="submit"
+                    class="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg shadow-violet-500/25 transition-all flex items-center space-x-1.5 cursor-pointer">
+                    <i class="fa-solid fa-check text-xs"></i>
+                    <span id="event-modal-save-btn">Save Event Tracker</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Styles                                                     -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <style>
@@ -227,6 +435,27 @@
 
     .planning-group-header:first-child {
         margin-top: 0;
+    }
+
+    .event-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .event-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(139, 92, 246, 0.1);
+    }
+
+    .event-unit-block {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(51, 65, 85, 0.7);
+        border-radius: 0.6rem;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
     }
 </style>
 
@@ -267,6 +496,28 @@ window.planningUserTagsMap[{{ tag.id | tojson }}] = {
     color: {{ tag.color | tojson }}
 };
 {% endfor %}
+
+window.planningEvents = [
+    {% for e in events %}
+    {
+        id: {{ e.id }},
+        title: {{ e.title | tojson }},
+        target_datetime: {{ (e.target_datetime.strftime('%Y-%m-%dT%H:%M:%S') if e.target_datetime else '') | tojson }},
+        target_datetime_display: {{ (e.target_datetime.strftime('%b %d, %Y • %I:%M %p') if e.target_datetime else '') | tojson }},
+        category: {{ (e.category or 'General') | tojson }},
+        notes: {{ (e.notes or '') | tojson }},
+        color: {{ (e.color or '#8b5cf6') | tojson }},
+        icon: {{ (e.icon or 'fa-calendar-check') | tojson }},
+        sort_order: {{ e.sort_order or 0 }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+window.planningEventFilter = 'all';
+window.planningEventCategoryFilter = '';
+window.planningEventSearch = '';
+window.planningEventSort = 'target_asc';
+window.planningEventTimerInterval = window.planningEventTimerInterval || null;
 
 /* ─────────────────────────────────────────────────────────────
    Render
@@ -732,25 +983,616 @@ function _planningRefreshTags(tags) {
     }
 
 /* ─────────────────────────────────────────────────────────────
+   Dynamic Event Time-Tracker Engine & Zero-Suppression Logic
+   ───────────────────────────────────────────────────────────── */
+
+function calculatePlanningEventDelta(targetDateStr, now = new Date()) {
+    if (!targetDateStr) return null;
+    const target = new Date(targetDateStr);
+    if (isNaN(target.getTime())) return null;
+
+    const targetMs = target.getTime();
+    const nowMs = now.getTime();
+    const isFuture = targetMs > nowMs;
+
+    let start = new Date(isFuture ? nowMs : targetMs);
+    let end = new Date(isFuture ? targetMs : nowMs);
+
+    let cur = new Date(start.getTime());
+
+    // 1. Full calendar years
+    let years = 0;
+    while (true) {
+        let next = new Date(cur.getTime());
+        next.setFullYear(next.getFullYear() + 1);
+        if (next.getTime() <= end.getTime()) {
+            cur = next;
+            years++;
+        } else {
+            break;
+        }
+    }
+
+    // 2. Full calendar months
+    let months = 0;
+    while (true) {
+        let next = new Date(cur.getTime());
+        next.setMonth(next.getMonth() + 1);
+        if (next.getTime() <= end.getTime()) {
+            cur = next;
+            months++;
+        } else {
+            break;
+        }
+    }
+
+    // 3. Full calendar days
+    let days = 0;
+    while (true) {
+        let next = new Date(cur.getTime());
+        next.setDate(next.getDate() + 1);
+        if (next.getTime() <= end.getTime()) {
+            cur = next;
+            days++;
+        } else {
+            break;
+        }
+    }
+
+    // Remainder in milliseconds
+    let remMs = end.getTime() - cur.getTime();
+    if (remMs < 0) remMs = 0;
+    let totalSecs = Math.floor(remMs / 1000);
+    let hours = Math.floor(totalSecs / 3600);
+    let minutes = Math.floor((totalSecs % 3600) / 60);
+    let seconds = totalSecs % 60;
+
+    return {
+        isFuture,
+        years,
+        months,
+        days,
+        hours,
+        minutes,
+        seconds,
+        totalDiffMs: Math.abs(targetMs - nowMs)
+    };
+}
+
+/**
+ * Get active unit blocks with leading zero-suppression.
+ * If all higher units are 0, display only seconds (e.g. 45s).
+ * Dynamically surface larger units (minutes, hours, days, months, years) as values > 0.
+ */
+function getZeroSuppressedUnits(delta) {
+    if (!delta) return [];
+    const all = [
+        { key: 'years', label: 'Years', short: 'YRS', value: delta.years },
+        { key: 'months', label: 'Months', short: 'MO', value: delta.months },
+        { key: 'days', label: 'Days', short: 'DAYS', value: delta.days },
+        { key: 'hours', label: 'Hours', short: 'HRS', value: delta.hours },
+        { key: 'minutes', label: 'Minutes', short: 'MIN', value: delta.minutes },
+        { key: 'seconds', label: 'Seconds', short: 'SEC', value: delta.seconds }
+    ];
+
+    // Find highest non-zero unit index
+    let firstIdx = all.findIndex(u => u.value > 0);
+    if (firstIdx === -1) {
+        // If all higher units are zero, display only seconds
+        firstIdx = all.length - 1;
+    }
+
+    return all.slice(firstIdx);
+}
+
+function formatZeroSuppressedString(delta) {
+    if (!delta) return '';
+    const units = getZeroSuppressedUnits(delta);
+    return units.map(u => `${u.value}${u.key === 'months' ? 'mo' : (u.key === 'years' ? 'y' : (u.key === 'days' ? 'd' : (u.key === 'hours' ? 'h' : (u.key === 'minutes' ? 'm' : 's'))))}`).join(' ');
+}
+
+function getPlanningEventGridClass(count) {
+    if (count <= 1) return 'grid-cols-1 max-w-[100px]';
+    if (count === 2) return 'grid-cols-2 max-w-[200px]';
+    if (count === 3) return 'grid-cols-3 max-w-[300px]';
+    if (count === 4) return 'grid-cols-4';
+    if (count === 5) return 'grid-cols-5 max-sm:grid-cols-3';
+    return 'grid-cols-3 sm:grid-cols-6';
+}
+
+function renderEventTickerTilesHtml(delta) {
+    const units = getZeroSuppressedUnits(delta);
+    const valColor = delta.isFuture ? 'text-emerald-300' : 'text-amber-300';
+    const gridColsClass = getPlanningEventGridClass(units.length);
+    const valFontSize = units.length >= 5 ? 'text-sm sm:text-base md:text-lg' : 'text-base sm:text-lg md:text-xl';
+    const labelFontSize = 'text-[7px] sm:text-[8px]';
+    const tilePadding = units.length >= 5 ? 'px-1 py-1 sm:px-1.5 sm:py-1.5' : 'px-1.5 py-1.5 sm:px-2 sm:py-2';
+
+    const tiles = units.map(u => `
+        <div class="event-unit-block flex flex-col items-center justify-center bg-slate-950/85 border border-slate-700/70 rounded-lg ${tilePadding} min-w-0 flex-1 shadow-sm overflow-hidden">
+            <span class="font-mono ${valFontSize} font-black ${valColor} leading-none tracking-tight truncate w-full text-center">${String(u.value).padStart(2, '0')}</span>
+            <span class="${labelFontSize} font-bold uppercase tracking-wider text-slate-400 mt-0.5 truncate w-full text-center">${u.short}</span>
+        </div>
+    `).join('');
+
+    return `<div class="grid ${gridColsClass} gap-1 sm:gap-1.5 w-full pt-1">${tiles}</div>`;
+}
+
+function renderEventTickerStringHtml(delta) {
+    const str = formatZeroSuppressedString(delta);
+    if (delta.isFuture) {
+        return `<span class="text-emerald-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In ${escHtml(str)}</span>`;
+    } else {
+        return `<span class="text-amber-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i>${escHtml(str)} ago</span>`;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Render Planning Events
+   ───────────────────────────────────────────────────────────── */
+
+function renderPlanningEvents() {
+    const grid = document.getElementById('planning-events-grid');
+    const emptyState = document.getElementById('planning-events-empty-state');
+    if (!grid) return;
+
+    const now = new Date();
+    const total = window.planningEvents.length;
+
+    // Count upcoming vs past
+    let upcomingCount = 0;
+    let pastCount = 0;
+    window.planningEvents.forEach(e => {
+        const delta = calculatePlanningEventDelta(e.target_datetime, now);
+        if (delta && delta.isFuture) upcomingCount++;
+        else pastCount++;
+    });
+
+    // Update stats badges
+    const totalBadge = document.getElementById('events-total-badge');
+    const upEl = document.getElementById('events-upcoming-count');
+    const pastEl = document.getElementById('events-past-count');
+    const tabAll = document.getElementById('ev-tab-all-count');
+    const tabUp = document.getElementById('ev-tab-upcoming-count');
+    const tabPast = document.getElementById('ev-tab-past-count');
+
+    if (totalBadge) totalBadge.textContent = `${total} Event${total !== 1 ? 's' : ''}`;
+    if (upEl) upEl.textContent = upcomingCount;
+    if (pastEl) pastEl.textContent = pastCount;
+    if (tabAll) tabAll.textContent = total;
+    if (tabUp) tabUp.textContent = upcomingCount;
+    if (tabPast) tabPast.textContent = pastCount;
+
+    // Filter events
+    let filtered = window.planningEvents.filter(e => {
+        const delta = calculatePlanningEventDelta(e.target_datetime, now);
+        const isFut = delta ? delta.isFuture : true;
+
+        if (window.planningEventFilter === 'upcoming' && !isFut) return false;
+        if (window.planningEventFilter === 'past' && isFut) return false;
+
+        if (window.planningEventCategoryFilter && e.category !== window.planningEventCategoryFilter) {
+            return false;
+        }
+
+        if (window.planningEventSearch) {
+            const q = window.planningEventSearch.toLowerCase();
+            const matchTitle = (e.title || '').toLowerCase().includes(q);
+            const matchNotes = (e.notes || '').toLowerCase().includes(q);
+            const matchCat = (e.category || '').toLowerCase().includes(q);
+            if (!matchTitle && !matchNotes && !matchCat) return false;
+        }
+
+        return true;
+    });
+
+    // Sort events
+    filtered.sort((a, b) => {
+        if (window.planningEventSort === 'target_desc') {
+            return new Date(b.target_datetime).getTime() - new Date(a.target_datetime).getTime();
+        } else if (window.planningEventSort === 'title_asc') {
+            return (a.title || '').localeCompare(b.title || '');
+        } else {
+            // target_asc default
+            return new Date(a.target_datetime).getTime() - new Date(b.target_datetime).getTime();
+        }
+    });
+
+    if (!filtered.length) {
+        grid.innerHTML = '';
+        emptyState && emptyState.classList.remove('hidden');
+    } else {
+        emptyState && emptyState.classList.add('hidden');
+        grid.innerHTML = filtered.map(e => buildPlanningEventCard(e, now)).join('');
+    }
+
+    // Ensure 1-second ticker interval is running
+    if (window.planningEventTimerInterval) {
+        clearInterval(window.planningEventTimerInterval);
+        window.planningEventTimerInterval = null;
+    }
+    window.planningEventTimerInterval = setInterval(updatePlanningEventTimers, 1000);
+}
+
+function buildPlanningEventCard(event, now = new Date()) {
+    const delta = calculatePlanningEventDelta(event.target_datetime, now);
+    const isFuture = delta ? delta.isFuture : true;
+    const color = event.color || '#8b5cf6';
+    const icon = event.icon || 'fa-calendar-check';
+    const category = event.category || 'General';
+
+    const statusPill = isFuture
+        ? `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span></span>`
+        : `<span class="event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span></span>`;
+
+    const tilesHtml = renderEventTickerTilesHtml(delta);
+    const stringHtml = renderEventTickerStringHtml(delta);
+
+    // Format target date for display
+    let displayDt = event.target_datetime_display;
+    if (!displayDt && event.target_datetime) {
+        const d = new Date(event.target_datetime);
+        displayDt = d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    return `
+    <div class="event-card relative rounded-2xl bg-slate-900/80 border border-slate-700/60 hover:border-violet-500/40 p-4 space-y-3.5 shadow-lg flex flex-col justify-between"
+         style="border-top: 3px solid ${escAttr(color)};"
+         data-event-id="${event.id}">
+        
+        <!-- Card Header -->
+        <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center space-x-2">
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1"
+                      style="background-color: ${escAttr(color)}20; color: ${escAttr(color)}; border: 1px solid ${escAttr(color)}40;">
+                <i class="fa-solid ${escAttr(icon)} text-[9px]"></i>
+                    <span>${escHtml(category)}</span>
+                </span>
+                ${statusPill}
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center space-x-1">
+                <button type="button" onclick="openPlanningEventModal(${event.id})"
+                    class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-violet-600/30 text-slate-400 hover:text-violet-300 border border-slate-700/60 transition-colors cursor-pointer"
+                    title="Edit Event">
+                    <i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i>
+                </button>
+                <button type="button" onclick="deletePlanningEvent(${event.id})"
+                    class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-600/30 text-slate-400 hover:text-rose-300 border border-slate-700/60 transition-colors cursor-pointer"
+                    title="Delete Event">
+                    <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Title & Time Delta Readout -->
+        <div class="space-y-2 flex-1">
+            <h3 class="text-sm sm:text-base font-bold text-white leading-snug break-words">${escHtml(event.title)}</h3>
+            
+            <!-- Dynamic Zero-Suppressed Digital Ticker Blocks -->
+            <div class="event-ticker-tiles w-full">
+                ${tilesHtml}
+            </div>
+
+            <!-- Text readout -->
+            <div class="event-ticker-string text-xs font-semibold pt-0.5">
+                ${stringHtml}
+            </div>
+
+            ${event.notes ? `
+            <div class="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed break-words">
+                ${escHtml(event.notes)}
+            </div>` : ''}
+        </div>
+
+        <!-- Footer / Target Datetime -->
+        <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+            <span class="flex items-center gap-1.5">
+                <i class="fa-regular fa-calendar text-slate-500"></i>
+                <span>${escHtml(displayDt || 'No target date')}</span>
+            </span>
+            <span class="text-[10px] text-slate-500 font-medium">${isFuture ? 'Target' : 'Achieved'}</span>
+        </div>
+    </div>`;
+}
+
+function updatePlanningEventTimers() {
+    const now = new Date();
+    document.querySelectorAll('.event-card[data-event-id]').forEach(card => {
+        const id = parseInt(card.getAttribute('data-event-id'));
+        const ev = window.planningEvents.find(e => e.id === id);
+        if (!ev) return;
+
+        const delta = calculatePlanningEventDelta(ev.target_datetime, now);
+        if (!delta) return;
+
+        // Update tiles
+        const tilesEl = card.querySelector('.event-ticker-tiles');
+        if (tilesEl) {
+            tilesEl.innerHTML = renderEventTickerTilesHtml(delta);
+        }
+
+        // Update string
+        const strEl = card.querySelector('.event-ticker-string');
+        if (strEl) {
+            strEl.innerHTML = renderEventTickerStringHtml(delta);
+        }
+
+        // Update status pill if isFuture changed
+        const pillEl = card.querySelector('.event-status-pill');
+        if (pillEl) {
+            if (delta.isFuture) {
+                pillEl.className = 'event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+                pillEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span>';
+            } else {
+                pillEl.className = 'event-status-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1';
+                pillEl.innerHTML = '<i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span>';
+            }
+        }
+    });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Modal & Event Management Handlers
+   ───────────────────────────────────────────────────────────── */
+
+function formatForDateTimeInput(d) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function openPlanningEventModal(eventId = null) {
+    const modal = document.getElementById('planning-event-modal');
+    const titleHeader = document.getElementById('event-modal-title');
+    const iconHeader = document.getElementById('event-modal-icon-header');
+    const saveBtn = document.getElementById('event-modal-save-btn');
+    const idInput = document.getElementById('planning-event-id');
+    const titleInput = document.getElementById('planning-event-title-input');
+    const dtInput = document.getElementById('planning-event-dt-input');
+    const catInput = document.getElementById('planning-event-category-input');
+    const colorInput = document.getElementById('planning-event-color-input');
+    const notesInput = document.getElementById('planning-event-notes-input');
+
+    if (!modal) return;
+
+    if (eventId) {
+        const ev = window.planningEvents.find(e => e.id === eventId);
+        if (!ev) return;
+        idInput.value = ev.id;
+        titleInput.value = ev.title;
+        if (ev.target_datetime) {
+            const d = new Date(ev.target_datetime);
+            dtInput.value = !isNaN(d.getTime()) ? formatForDateTimeInput(d) : '';
+        } else {
+            dtInput.value = '';
+        }
+        catInput.value = ev.category || 'General';
+        colorInput.value = ev.color || '#8b5cf6';
+        notesInput.value = ev.notes || '';
+        titleHeader.textContent = 'Edit Event Tracker';
+        iconHeader.className = 'fa-solid fa-pen-to-square text-lg text-violet-400';
+        saveBtn.textContent = 'Save Changes';
+    } else {
+        idInput.value = '';
+        titleInput.value = '';
+        // Default target: 1 month in future
+        const defTarget = new Date();
+        defTarget.setMonth(defTarget.getMonth() + 1);
+        dtInput.value = formatForDateTimeInput(defTarget);
+        catInput.value = 'Milestone';
+        colorInput.value = '#8b5cf6';
+        notesInput.value = '';
+        titleHeader.textContent = 'Add Event Tracker';
+        iconHeader.className = 'fa-solid fa-stopwatch text-lg text-violet-400';
+        saveBtn.textContent = 'Create Event Tracker';
+    }
+
+    updateEventModalPreview();
+    modal.classList.remove('hidden');
+    titleInput.focus();
+}
+
+function closePlanningEventModal() {
+    const modal = document.getElementById('planning-event-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function setEventColorQuick(color) {
+    const colorInput = document.getElementById('planning-event-color-input');
+    if (colorInput) {
+        colorInput.value = color;
+        updateEventModalPreview();
+    }
+}
+
+function updateEventCategoryIcon(cat) {
+    const iconMap = {
+        'Milestone': 'fa-rocket',
+        'Deadline': 'fa-triangle-exclamation',
+        'Personal': 'fa-star',
+        'Work': 'fa-briefcase',
+        'Celebration': 'fa-cake-candles',
+        'Goal': 'fa-bullseye',
+        'General': 'fa-calendar-check'
+    };
+    return iconMap[cat] || 'fa-calendar-check';
+}
+
+function setEventPresetOffset(years, months, days, hours) {
+    const dtInput = document.getElementById('planning-event-dt-input');
+    if (!dtInput) return;
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + years);
+    d.setMonth(d.getMonth() + months);
+    d.setDate(d.getDate() + days);
+    d.setHours(d.getHours() + hours);
+    dtInput.value = formatForDateTimeInput(d);
+    updateEventModalPreview();
+}
+
+function setEventPresetNow() {
+    const dtInput = document.getElementById('planning-event-dt-input');
+    if (!dtInput) return;
+    dtInput.value = formatForDateTimeInput(new Date());
+    updateEventModalPreview();
+}
+
+function updateEventModalPreview() {
+    const dtInput = document.getElementById('planning-event-dt-input');
+    const previewEl = document.getElementById('event-modal-delta-preview');
+    if (!dtInput || !previewEl) return;
+
+    if (!dtInput.value) {
+        previewEl.textContent = 'Select date & time';
+        return;
+    }
+
+    const delta = calculatePlanningEventDelta(dtInput.value, new Date());
+    if (delta) {
+        const str = formatZeroSuppressedString(delta);
+        if (delta.isFuture) {
+            previewEl.innerHTML = `<span class="text-emerald-400 font-semibold">⏳ In ${escHtml(str)}</span>`;
+        } else {
+            previewEl.innerHTML = `<span class="text-amber-400 font-semibold">⏱️ ${escHtml(str)} ago</span>`;
+        }
+    } else {
+        previewEl.textContent = 'Invalid date';
+    }
+}
+
+async function handlePlanningEventSubmit(e) {
+    e.preventDefault();
+    const idInput = document.getElementById('planning-event-id');
+    const titleInput = document.getElementById('planning-event-title-input');
+    const dtInput = document.getElementById('planning-event-dt-input');
+    const catInput = document.getElementById('planning-event-category-input');
+    const colorInput = document.getElementById('planning-event-color-input');
+    const notesInput = document.getElementById('planning-event-notes-input');
+
+    const eventId = idInput.value ? parseInt(idInput.value) : null;
+    const title = titleInput.value.trim();
+    const target_datetime = dtInput.value;
+    const category = catInput.value;
+    const color = colorInput.value || '#8b5cf6';
+    const icon = updateEventCategoryIcon(category);
+    const notes = notesInput.value.trim();
+
+    if (!title || !target_datetime) {
+        showToast('Please provide an event title and target datetime', 'warning');
+        return;
+    }
+
+    const url = eventId ? '/api/planning/event/edit' : '/api/planning/event/add';
+    const payload = eventId
+        ? { event_id: eventId, title, target_datetime, category, color, icon, notes }
+        : { title, target_datetime, category, color, icon, notes };
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (eventId) {
+                const idx = window.planningEvents.findIndex(ev => ev.id === eventId);
+                if (idx !== -1) {
+                    window.planningEvents[idx] = { ...window.planningEvents[idx], ...data.event };
+                }
+                showToast('Event tracker updated!', 'success');
+            } else {
+                window.planningEvents.push(data.event);
+                showToast('Event tracker created!', 'success');
+            }
+            closePlanningEventModal();
+            renderPlanningEvents();
+        } else {
+            showToast(data.message || 'Failed to save event tracker', 'danger');
+        }
+    } catch (err) {
+        console.error('Event save error:', err);
+        showToast('Server error saving event tracker', 'danger');
+    }
+}
+
+async function deletePlanningEvent(eventId) {
+    if (!confirm('Are you sure you want to delete this event time-tracker?')) return;
+
+    try {
+        const res = await fetch('/api/planning/event/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event_id: eventId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.planningEvents = window.planningEvents.filter(e => e.id !== eventId);
+            renderPlanningEvents();
+            showToast('Event tracker deleted', 'info');
+        } else {
+            showToast(data.message || 'Failed to delete event', 'danger');
+        }
+    } catch {
+        showToast('Server error deleting event', 'danger');
+    }
+}
+
+function setPlanningEventFilter(filter) {
+    window.planningEventFilter = filter;
+    ['all', 'upcoming', 'past'].forEach(f => {
+        const btn = document.getElementById(`ev-filter-${f}`);
+        if (!btn) return;
+        if (f === filter) {
+            btn.className = 'px-3 py-1 rounded-md font-semibold transition-all bg-violet-600 text-white shadow-sm cursor-pointer';
+        } else {
+            btn.className = 'px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition-all cursor-pointer';
+        }
+    });
+    renderPlanningEvents();
+}
+
+function handlePlanningEventSearch(val) {
+    window.planningEventSearch = (val || '').trim();
+    renderPlanningEvents();
+}
+
+function handlePlanningEventCategoryChange(val) {
+    window.planningEventCategoryFilter = val || '';
+    renderPlanningEvents();
+}
+
+function handlePlanningEventSortChange(val) {
+    window.planningEventSort = val || 'target_asc';
+    renderPlanningEvents();
+}
+
+/* ─────────────────────────────────────────────────────────────
    Utility Helpers
    ───────────────────────────────────────────────────────────── */
 function escHtml(str) {
-    return String(str)
+    return String(str || '')
         .replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function escAttr(str) {
-    return String(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    return String(str || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 /* ─────────────────────────────────────────────────────────────
    Boot — works on initial load AND AJAX tab-switch re-injection.
    DOMContentLoaded already fired on tab-switch, so call directly.
    ───────────────────────────────────────────────────────────── */
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderPlanningTasks);
-} else {
+function bootPlanningPage() {
     renderPlanningTasks();
+    renderPlanningEvents();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootPlanningPage);
+} else {
+    bootPlanningPage();
 }
 </script>
 {% endblock %}

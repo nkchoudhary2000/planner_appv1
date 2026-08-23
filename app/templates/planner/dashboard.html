@@ -27,97 +27,54 @@
         </div>
     </div>
 
-    <!-- 2-Column Banner Row: Active Reminders & Daily Motivational Quote -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <!-- Active Reminders & Alerts Carousel Card -->
-        <div class="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-slate-900/90 relative overflow-hidden shadow-xl shadow-amber-500/5 space-y-3 flex flex-col justify-between" id="reminder-carousel-container">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
-                <div class="flex items-center space-x-2">
-                    <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                        <i class="fa-solid fa-bullhorn text-xs animate-pulse"></i>
-                    </div>
-                    <h2 class="text-sm font-bold uppercase tracking-wider text-white">Active Reminders</h2>
+    <!-- Dynamic Event Countdowns & Timers Panel -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/60 relative overflow-hidden shadow-xl space-y-4" id="dashboard-events-panel">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700/60">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400 flex-shrink-0">
+                    <i class="fa-solid fa-stopwatch text-sm"></i>
                 </div>
-
-                {% if marquee_alerts %}
-                <div class="flex items-center space-x-1.5">
-                    <!-- Carousel Counter -->
-                    <span class="text-xs text-slate-400 font-mono font-medium px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">
-                        <span id="reminder-current-slide">1</span>/<span id="reminder-total-slides">{{ marquee_alerts|length }}</span>
-                    </span>
-                    <!-- Carousel Navigation Controls -->
-                    <button type="button" onclick="slideReminderCarousel(-1)" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Previous Reminder">
-                        <i class="fa-solid fa-chevron-left text-[10px]"></i>
-                    </button>
-                    <button type="button" onclick="slideReminderCarousel(1)" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Next Reminder">
-                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                    </button>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h2 class="text-base font-bold text-white tracking-wide">Event Countdowns &amp; Timers</h2>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30 font-mono" id="dash-events-count-badge">
+                            {{ (planning_events or [])|length }} Event{{ 's' if (planning_events or [])|length != 1 else '' }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">Live countdowns &amp; count-up timers with zero-suppression</p>
                 </div>
-                {% endif %}
             </div>
 
-            <!-- Carousel Slide Track (No Duplicate Entries) -->
-            <div class="relative overflow-hidden min-h-[60px] flex items-center" id="reminder-carousel-wrapper">
-                {% if marquee_alerts %}
-                    <div class="w-full transition-transform duration-500 ease-in-out flex" id="reminder-carousel-track">
-                        {% for alert in marquee_alerts %}
-                        <div class="w-full flex-shrink-0 space-y-2 p-3 rounded-xl bg-slate-800/70 border border-slate-700/50">
-                            <div class="flex items-center justify-between">
-                                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider border {{ alert.badge_color }} flex items-center space-x-1">
-                                    <i class="{{ alert.icon }} text-[9px]"></i>
-                                    <span>{{ alert.badge }}</span>
-                                </span>
-                            </div>
-                            <p class="text-xs font-semibold text-slate-100 break-words leading-relaxed">{{ alert.text }}</p>
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="w-full p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-center space-x-2.5 text-slate-300 text-xs">
-                        <i class="fa-solid fa-circle-check text-emerald-400 text-base flex-shrink-0"></i>
-                        <div>
-                            <span class="font-bold text-emerald-300">All Caught Up!</span>
-                            <p class="text-[11px] text-slate-400">No active alerts for today.</p>
-                        </div>
-                    </div>
-                {% endif %}
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('planner_ui.planning') }}"
+                    class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer">
+                    <span>Manage in Planning</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-slate-400"></i>
+                </a>
             </div>
-
-            <!-- Dots Bar -->
-            {% if marquee_alerts and marquee_alerts|length > 1 %}
-            <div class="flex items-center justify-center space-x-1.5 pt-1" id="reminder-dots-bar">
-                {% for alert in marquee_alerts %}
-                <button type="button" onclick="goToReminderSlide({{ loop.index0 }})" class="reminder-dot w-2 h-2 rounded-full transition-all bg-slate-600 hover:bg-slate-400 cursor-pointer" data-slide-index="{{ loop.index0 }}"></button>
-                {% endfor %}
-            </div>
-            {% endif %}
         </div>
 
-        <!-- Daily Motivational Quote Card -->
-        <div class="glass-panel p-5 rounded-2xl border border-indigo-500/30 bg-slate-900/90 relative overflow-hidden shadow-xl shadow-indigo-500/5 space-y-3 flex flex-col justify-between" id="quote-container">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
-                <div class="flex items-center space-x-2">
-                    <div class="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
-                        <i class="fa-solid fa-quote-left text-xs"></i>
-                    </div>
-                    <h2 class="text-sm font-bold uppercase tracking-wider text-white">Daily Inspiration</h2>
-                </div>
-                <button type="button" onclick="fetchNextQuote()" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Refresh Quote">
-                    <i class="fa-solid fa-rotate text-[10px]" id="quote-refresh-icon"></i>
-                </button>
-            </div>
+        <!-- Grid of Event Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="dashboard-events-grid">
+            <!-- Rendered dynamically via JavaScript for live ticking -->
+        </div>
 
-            <div class="flex items-center space-x-3.5 p-3.5 rounded-xl bg-slate-800/70 border border-slate-700/50 min-h-[75px]">
-                <img id="quote-author-img" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" alt="Author" class="w-12 h-12 rounded-full object-cover border-2 border-indigo-400/40 flex-shrink-0 shadow-md">
-                <div class="min-w-0 flex-1 space-y-1">
-                    <p id="quote-text" class="text-xs font-semibold text-slate-100 italic leading-relaxed line-clamp-3">
-                        "The only way to do great work is to love what you do."
-                    </p>
-                    <p id="quote-author" class="text-[11px] font-bold text-indigo-300 flex items-center space-x-1">
-                        — <span id="quote-author-name">Steve Jobs</span>
-                    </p>
-                </div>
+        <!-- Empty State -->
+        <div id="dashboard-events-empty" class="{% if planning_events %}hidden{% endif %} p-8 rounded-2xl bg-slate-900/60 border border-dashed border-slate-700/80 text-center space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-violet-500/10 text-violet-400 border border-violet-500/20 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-stopwatch"></i>
             </div>
+            <div class="space-y-1">
+                <h4 class="text-sm font-bold text-slate-200">No Events Tracked Yet</h4>
+                <p class="text-xs text-slate-400 max-w-sm mx-auto">
+                    Track future milestones, deadlines, launches, or past achievements with live zero-suppressed countdowns.
+                </p>
+            </div>
+            <a href="{{ url_for('planner_ui.planning') }}"
+                class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-lg shadow-violet-500/20 transition-all cursor-pointer">
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Add Event in Planning</span>
+            </a>
         </div>
     </div>
 
@@ -1087,163 +1044,284 @@
 </div>
 
 <script>
-(function() {
-    let currentSlide = 0;
-    const totalSlides = {{ marquee_alerts|length if marquee_alerts else 0 }};
-    let autoSlideInterval = null;
-
-    if (totalSlides <= 1) return;
-
-    function updateCarouselState() {
-        const track = document.getElementById('reminder-carousel-track');
-        const slideCounter = document.getElementById('reminder-current-slide');
-        const dots = document.querySelectorAll('.reminder-dot');
-
-        if (track) {
-            track.style.transform = `translateX(-${currentSlide * 100}%)`;
-        }
-        if (slideCounter) {
-            slideCounter.innerText = currentSlide + 1;
-        }
-
-        dots.forEach((dot, idx) => {
-            if (idx === currentSlide) {
-                dot.className = 'reminder-dot w-5 h-2 rounded-full transition-all bg-amber-400 cursor-pointer';
-            } else {
-                dot.className = 'reminder-dot w-2 h-2 rounded-full transition-all bg-slate-600 hover:bg-slate-400 cursor-pointer';
-            }
-        });
-    }
-
-    window.slideReminderCarousel = function(direction) {
-        currentSlide = (currentSlide + direction + totalSlides) % totalSlides;
-        updateCarouselState();
-    };
-
-    window.goToReminderSlide = function(index) {
-        currentSlide = index;
-        updateCarouselState();
-    };
-
-    function startAutoSlide() {
-        stopAutoSlide();
-        autoSlideInterval = setInterval(() => {
-            slideReminderCarousel(1);
-        }, 4000);
-    }
-
-    function stopAutoSlide() {
-        if (autoSlideInterval) {
-            clearInterval(autoSlideInterval);
-            autoSlideInterval = null;
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        updateCarouselState();
-        startAutoSlide();
-
-        const container = document.getElementById('reminder-carousel-container');
-        if (container) {
-            container.addEventListener('mouseenter', stopAutoSlide);
-            container.addEventListener('mouseleave', startAutoSlide);
-        }
-
-        // Initialize Motivational Quote
-        fetchNextQuote();
-    });
-})();
-
-// Online & Curated Motivational Quote Handler
-const FALLBACK_QUOTES = [
+/* ─────────────────────────────────────────────────────────────
+   Dashboard Event Time-Tracker & Big Visual Countdown Engine
+   ───────────────────────────────────────────────────────────── */
+window.dashboardEvents = [
+    {% for e in planning_events or [] %}
     {
-        quote: "The only way to do great work is to love what you do.",
-        author: "Steve Jobs",
-        image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
-        author: "Winston Churchill",
-        image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "Believe you can and you're halfway there.",
-        author: "Theodore Roosevelt",
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "The future belongs to those who believe in the beauty of their dreams.",
-        author: "Eleanor Roosevelt",
-        image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "It always seems impossible until it's done.",
-        author: "Nelson Mandela",
-        image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "In the middle of every difficulty lies opportunity.",
-        author: "Albert Einstein",
-        image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "Do what you can, with what you have, where you are.",
-        author: "Theodore Roosevelt",
-        image: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "What you get by achieving your goals is not as important as what you become by achieving your goals.",
-        author: "Zig Ziglar",
-        image: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "Act as if what you do makes a difference. It does.",
-        author: "William James",
-        image: "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=150&auto=format&fit=crop&q=80"
-    },
-    {
-        quote: "Keep your face always toward the sunshine—and shadows will fall behind you.",
-        author: "Walt Whitman",
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80"
-    }
+        id: {{ e.id }},
+        title: {{ e.title | tojson }},
+        target_datetime: {{ (e.target_datetime.strftime('%Y-%m-%dT%H:%M:%S') if e.target_datetime else '') | tojson }},
+        target_datetime_display: {{ (e.target_datetime.strftime('%b %d, %Y • %I:%M %p') if e.target_datetime else '') | tojson }},
+        category: {{ (e.category or 'General') | tojson }},
+        notes: {{ (e.notes or '') | tojson }},
+        color: {{ (e.color or '#8b5cf6') | tojson }},
+        icon: {{ (e.icon or 'fa-calendar-check') | tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
 ];
 
-async function fetchNextQuote() {
-    const refreshBtn = document.getElementById('quote-refresh-icon');
-    if (refreshBtn) refreshBtn.classList.add('animate-spin');
+function calculateDashboardEventDelta(targetDateStr, now = new Date()) {
+    if (!targetDateStr) return null;
+    const target = new Date(targetDateStr);
+    if (isNaN(target.getTime())) return null;
 
-    const quoteTextElem = document.getElementById('quote-text');
-    const authorNameElem = document.getElementById('quote-author-name');
-    const authorImgElem = document.getElementById('quote-author-img');
+    const targetMs = target.getTime();
+    const nowMs = now.getTime();
+    const isFuture = targetMs > nowMs;
 
-    try {
-        const res = await fetch('https://dummyjson.com/quotes/random', { cache: 'no-store' });
-        if (res.ok) {
-            const data = await res.json();
-            if (data && data.quote && data.author) {
-                if (quoteTextElem) quoteTextElem.innerText = `"${data.quote}"`;
-                if (authorNameElem) authorNameElem.innerText = data.author;
-                if (authorImgElem) {
-                    authorImgElem.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.author)}&background=6366f1&color=fff&bold=true`;
-                }
-                if (refreshBtn) {
-                    setTimeout(() => refreshBtn.classList.remove('animate-spin'), 400);
-                }
-                return;
+    let start = new Date(isFuture ? nowMs : targetMs);
+    let end = new Date(isFuture ? targetMs : nowMs);
+
+    let cur = new Date(start.getTime());
+
+    // 1. Years
+    let years = 0;
+    while (true) {
+        let next = new Date(cur.getTime());
+        next.setFullYear(next.getFullYear() + 1);
+        if (next.getTime() <= end.getTime()) {
+            cur = next;
+            years++;
+        } else {
+            break;
+        }
+    }
+
+    // 2. Months
+    let months = 0;
+    while (true) {
+        let next = new Date(cur.getTime());
+        next.setMonth(next.getMonth() + 1);
+        if (next.getTime() <= end.getTime()) {
+            cur = next;
+            months++;
+        } else {
+            break;
+        }
+    }
+
+    // 3. Days
+    let days = 0;
+    while (true) {
+        let next = new Date(cur.getTime());
+        next.setDate(next.getDate() + 1);
+        if (next.getTime() <= end.getTime()) {
+            cur = next;
+            days++;
+        } else {
+            break;
+        }
+    }
+
+    // Remainder
+    let remMs = end.getTime() - cur.getTime();
+    if (remMs < 0) remMs = 0;
+    let totalSecs = Math.floor(remMs / 1000);
+    let hours = Math.floor(totalSecs / 3600);
+    let minutes = Math.floor((totalSecs % 3600) / 60);
+    let seconds = totalSecs % 60;
+
+    return {
+        isFuture,
+        years,
+        months,
+        days,
+        hours,
+        minutes,
+        seconds,
+        totalDiffMs: Math.abs(targetMs - nowMs)
+    };
+}
+
+function getDashboardZeroSuppressedUnits(delta) {
+    if (!delta) return [];
+    const all = [
+        { key: 'years', label: 'Years', short: 'YRS', value: delta.years },
+        { key: 'months', label: 'Months', short: 'MO', value: delta.months },
+        { key: 'days', label: 'Days', short: 'DAYS', value: delta.days },
+        { key: 'hours', label: 'Hours', short: 'HRS', value: delta.hours },
+        { key: 'minutes', label: 'Minutes', short: 'MIN', value: delta.minutes },
+        { key: 'seconds', label: 'Seconds', short: 'SEC', value: delta.seconds }
+    ];
+
+    let firstIdx = all.findIndex(u => u.value > 0);
+    if (firstIdx === -1) {
+        firstIdx = all.length - 1;
+    }
+    return all.slice(firstIdx);
+}
+
+function formatDashboardZeroSuppressedString(delta) {
+    if (!delta) return '';
+    const units = getDashboardZeroSuppressedUnits(delta);
+    return units.map(u => `${u.value}${u.key === 'months' ? 'mo' : (u.key === 'years' ? 'y' : (u.key === 'days' ? 'd' : (u.key === 'hours' ? 'h' : (u.key === 'minutes' ? 'm' : 's'))))}`).join(' ');
+}
+
+function getDashboardEventGridClass(count) {
+    if (count <= 1) return 'grid-cols-1 max-w-[120px]';
+    if (count === 2) return 'grid-cols-2 max-w-[240px]';
+    if (count === 3) return 'grid-cols-3 max-w-[360px]';
+    if (count === 4) return 'grid-cols-4';
+    if (count === 5) return 'grid-cols-5 max-sm:grid-cols-3';
+    return 'grid-cols-3 sm:grid-cols-6';
+}
+
+function renderDashboardEventTickerTiles(delta) {
+    const units = getDashboardZeroSuppressedUnits(delta);
+    const valColor = delta.isFuture ? 'text-emerald-300' : 'text-amber-300';
+    const gridColsClass = getDashboardEventGridClass(units.length);
+    const valFontSize = units.length >= 5 ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl';
+    const labelFontSize = 'text-[8px] sm:text-[9px]';
+    const tilePadding = units.length >= 5 ? 'px-1 py-1.5 sm:px-2 sm:py-2' : 'px-2 py-2 sm:px-2.5 sm:py-2.5';
+
+    const tiles = units.map(u => `
+        <div class="flex flex-col items-center justify-center bg-slate-950/90 border border-slate-700/80 rounded-xl ${tilePadding} min-w-0 flex-1 shadow-md shadow-black/40 overflow-hidden">
+            <span class="font-mono ${valFontSize} font-black ${valColor} leading-none tracking-tight truncate w-full text-center">${String(u.value).padStart(2, '0')}</span>
+            <span class="${labelFontSize} font-bold uppercase tracking-wider text-slate-400 mt-1 truncate w-full text-center">${u.short}</span>
+        </div>
+    `).join('');
+
+    return `<div class="grid ${gridColsClass} gap-1.5 sm:gap-2 w-full pt-1">${tiles}</div>`;
+}
+
+function renderDashboardEventCard(event, now = new Date()) {
+    const delta = calculateDashboardEventDelta(event.target_datetime, now);
+    const isFuture = delta ? delta.isFuture : true;
+    const color = event.color || '#8b5cf6';
+    const icon = event.icon || 'fa-calendar-check';
+    const category = event.category || 'General';
+
+    const statusPill = isFuture
+        ? `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span></span>`
+        : `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span></span>`;
+
+    const tilesHtml = renderDashboardEventTickerTiles(delta);
+    const str = formatDashboardZeroSuppressedString(delta);
+    const stringHtml = isFuture
+        ? `<span class="text-emerald-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In ${escapeHtml(str)}</span>`
+        : `<span class="text-amber-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i>${escapeHtml(str)} ago</span>`;
+
+    let displayDt = event.target_datetime_display;
+    if (!displayDt && event.target_datetime) {
+        const d = new Date(event.target_datetime);
+        displayDt = d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    return `
+    <div class="dash-event-card relative rounded-2xl bg-slate-900/80 border border-slate-700/60 hover:border-violet-500/40 p-4 space-y-3 shadow-lg flex flex-col justify-between transition-all hover:translate-y-[-2px]"
+         style="border-top: 3px solid ${escapeAttr(color)};"
+         data-event-id="${event.id}">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between gap-2">
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1"
+                  style="background-color: ${escapeAttr(color)}20; color: ${escapeAttr(color)}; border: 1px solid ${escapeAttr(color)}40;">
+                <i class="fa-solid ${escapeAttr(icon)} text-[9px]"></i>
+                <span>${escapeHtml(category)}</span>
+            </span>
+            ${statusPill}
+        </div>
+
+        <!-- Big Title -->
+        <div class="space-y-2 flex-1">
+            <h3 class="text-base sm:text-lg font-bold text-white leading-tight break-words" title="${escapeAttr(event.title)}">
+                ${escapeHtml(event.title)}
+            </h3>
+
+            <!-- Big Visual Count Timer -->
+            <div class="dash-event-ticker-tiles w-full">
+                ${tilesHtml}
+            </div>
+
+            <!-- Readout -->
+            <div class="dash-event-ticker-string text-xs font-semibold pt-0.5">
+                ${stringHtml}
+            </div>
+        </div>
+
+        <!-- Target Date -->
+        <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+            <span class="flex items-center gap-1.5">
+                <i class="fa-regular fa-calendar text-slate-500"></i>
+                <span>${escapeHtml(displayDt || 'No target date')}</span>
+            </span>
+            <span class="text-[10px] text-slate-500 font-medium">${isFuture ? 'Target' : 'Achieved'}</span>
+        </div>
+    </div>`;
+}
+
+function updateDashboardEventTimers() {
+    const now = new Date();
+    document.querySelectorAll('.dash-event-card[data-event-id]').forEach(card => {
+        const id = parseInt(card.getAttribute('data-event-id'));
+        const ev = (window.dashboardEvents || []).find(e => e.id === id);
+        if (!ev) return;
+
+        const delta = calculateDashboardEventDelta(ev.target_datetime, now);
+        if (!delta) return;
+
+        const tilesEl = card.querySelector('.dash-event-ticker-tiles');
+        if (tilesEl) {
+            tilesEl.innerHTML = renderDashboardEventTickerTiles(delta);
+        }
+
+        const strEl = card.querySelector('.dash-event-ticker-string');
+        if (strEl) {
+            const str = formatDashboardZeroSuppressedString(delta);
+            strEl.innerHTML = delta.isFuture
+                ? `<span class="text-emerald-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In ${escapeHtml(str)}</span>`
+                : `<span class="text-amber-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i>${escapeHtml(str)} ago</span>`;
+        }
+
+        const pillEl = card.querySelector('.dash-event-pill');
+        if (pillEl) {
+            if (delta.isFuture) {
+                pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+                pillEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span>';
+            } else {
+                pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1';
+                pillEl.innerHTML = '<i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span>';
             }
         }
-    } catch (e) {
-        console.warn('Online quote API call failed, using fallback collection', e);
+    });
+}
+
+function initDashboardEvents() {
+    const grid = document.getElementById('dashboard-events-grid');
+    const emptyState = document.getElementById('dashboard-events-empty');
+    if (!grid) return;
+
+    if (!window.dashboardEvents || !window.dashboardEvents.length) {
+        grid.innerHTML = '';
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
     }
 
-    const item = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
-    if (quoteTextElem) quoteTextElem.innerText = `"${item.quote}"`;
-    if (authorNameElem) authorNameElem.innerText = item.author;
-    if (authorImgElem) authorImgElem.src = item.image;
+    if (emptyState) emptyState.classList.add('hidden');
+    const now = new Date();
+    grid.innerHTML = window.dashboardEvents.map(e => renderDashboardEventCard(e, now)).join('');
 
-    if (refreshBtn) {
-        setTimeout(() => refreshBtn.classList.remove('animate-spin'), 400);
+    if (window.dashboardEventTimerInterval) {
+        clearInterval(window.dashboardEventTimerInterval);
     }
+    window.dashboardEventTimerInterval = setInterval(updateDashboardEventTimers, 1000);
+}
+
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escapeAttr(str) {
+    return String(str || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDashboardEvents);
+} else {
+    initDashboardEvents();
 }
 </script>
 {% endblock %}

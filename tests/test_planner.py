@@ -681,11 +681,10 @@ class PlannerTestCase(unittest.TestCase):
         self.assertTrue(len(day_items) > 0)
         self.assertTrue(day_items[0].get('remind_me'))
 
-        # Check Dashboard view includes the reminder in active panel
-        dash_res = self.client.get('/dashboard')
-        self.assertEqual(dash_res.status_code, 200)
-        self.assertIn('Project Presentation Review', dash_res.get_data(as_text=True))
-        self.assertIn('Remind Me', dash_res.get_data(as_text=True))
+        # Check Monthly view includes the reminder item
+        monthly_res = self.client.get(f'/monthly?year={today.year}&month={today.month}')
+        self.assertEqual(monthly_res.status_code, 200)
+        self.assertIn('Project Presentation Review', monthly_res.get_data(as_text=True))
 
     def test_yearly_annual_event_dashboard_reminder(self):
         self.register_and_login()
@@ -702,11 +701,10 @@ class PlannerTestCase(unittest.TestCase):
         }, follow_redirects=True)
         self.assertEqual(res.status_code, 200)
 
-        # Check Dashboard shows Annual Event reminder
-        dash_res = self.client.get('/dashboard')
-        self.assertEqual(dash_res.status_code, 200)
-        self.assertIn('Annual Company Summit', dash_res.get_data(as_text=True))
-        self.assertIn('Annual Event', dash_res.get_data(as_text=True))
+        # Check Yearly view shows the event
+        yearly_res = self.client.get(f'/yearly?year={today.year}')
+        self.assertEqual(yearly_res.status_code, 200)
+        self.assertIn('Annual Company Summit', yearly_res.get_data(as_text=True))
 
     def test_weekly_goals_and_shopping_ajax(self):
         self.register_and_login()

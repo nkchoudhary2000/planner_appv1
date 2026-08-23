@@ -4,7 +4,7 @@ from authlib.integrations.flask_client import OAuth
 from flask import url_for, current_app
 from sqlalchemy.orm.attributes import flag_modified
 from app import db
-from app.models import User, DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, PlanningTask
+from app.models import User, DailyPlan, MonthlyPlan, YearlyPlan, WeeklyPlan, PlanningTask, PlanningEvent
 
 # Admin email — same constant used in admin/routes.py
 ADMIN_EMAIL = 'niraj.choudhary1995@gmail.com'
@@ -39,6 +39,7 @@ def export_user_data_payload(user):
     monthly_plans = MonthlyPlan.query.filter_by(user_id=user.id).all()
     yearly_plans = YearlyPlan.query.filter_by(user_id=user.id).all()
     planning_tasks = PlanningTask.query.filter_by(user_id=user.id).all()
+    planning_events = PlanningEvent.query.filter_by(user_id=user.id).all()
 
     payload = {
         "app": "Chronos Planner",
@@ -107,6 +108,19 @@ def export_user_data_payload(user):
                 "sort_order": pt.sort_order
             }
             for pt in planning_tasks
+        ],
+        "planning_events": [
+            {
+                "id": pe.id,
+                "title": pe.title,
+                "target_datetime": pe.target_datetime.isoformat() if pe.target_datetime else '',
+                "category": pe.category,
+                "notes": pe.notes or '',
+                "color": pe.color,
+                "icon": pe.icon,
+                "sort_order": pe.sort_order
+            }
+            for pe in planning_events
         ]
     }
     return payload
@@ -128,6 +142,7 @@ def export_full_db_payload():
         monthly_plans = MonthlyPlan.query.filter_by(user_id=u.id).all()
         yearly_plans = YearlyPlan.query.filter_by(user_id=u.id).all()
         planning_tasks = PlanningTask.query.filter_by(user_id=u.id).all()
+        planning_events = PlanningEvent.query.filter_by(user_id=u.id).all()
 
         return {
             "id": u.id,
@@ -207,6 +222,21 @@ def export_full_db_payload():
                 }
                 for pt in planning_tasks
             ],
+            "planning_events": [
+                {
+                    "id": pe.id,
+                    "title": pe.title,
+                    "target_datetime": pe.target_datetime.isoformat() if pe.target_datetime else None,
+                    "category": pe.category,
+                    "notes": pe.notes or '',
+                    "color": pe.color,
+                    "icon": pe.icon,
+                    "sort_order": pe.sort_order,
+                    "created_at": pe.created_at.isoformat() if pe.created_at else None,
+                    "updated_at": pe.updated_at.isoformat() if pe.updated_at else None,
+                }
+                for pe in planning_events
+            ],
         }
 
     return {
@@ -248,6 +278,7 @@ def import_user_data_payload(user, payload):
         'monthly': 0,
         'yearly': 0,
         'tasks': 0,
+        'events': 0,
         'tags': 0
     }
 
@@ -385,6 +416,31 @@ def import_user_data_payload(user, payload):
             pt.sort_order = int(pt_data.get('sort_order', 0))
             flag_modified(pt, 'tags')
             stats['tasks'] += 1
+
+    # Restore Planning Event Time-Trackers
+    planning_events_data = user_payload.get('planning_events', [])
+    if planning_events_data:
+        for pe_data in planning_events_data:
+            pe_id = pe_data.get('id')
+            pe = None
+            if pe_id:
+                pe = PlanningEvent.query.filter_by(id=pe_id, user_id=user.id).first()
+            if not pe:
+                pe = PlanningEvent(user_id=user.id, title=pe_data.get('title', ''), target_datetime=datetime.utcnow())
+                db.session.add(pe)
+            pe.title = pe_data.get('title', '')
+            t_dt = pe_data.get('target_datetime')
+            if t_dt:
+                try:
+                    pe.target_datetime = datetime.fromisoformat(t_dt.replace('Z', '+00:00')).replace(tzinfo=None)
+                except Exception:
+                    pass
+            pe.category = pe_data.get('category', 'General')
+            pe.notes = pe_data.get('notes', '')
+            pe.color = pe_data.get('color', '#8b5cf6')
+            pe.icon = pe_data.get('icon', 'fa-calendar-check')
+            pe.sort_order = int(pe_data.get('sort_order', 0))
+            stats['events'] += 1
 
     user.last_drive_sync = datetime.utcnow()
     db.session.commit()
