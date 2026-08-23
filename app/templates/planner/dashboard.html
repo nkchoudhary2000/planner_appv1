@@ -1123,6 +1123,9 @@ function calculateDashboardEventDelta(targetDateStr, now = new Date()) {
     let minutes = Math.floor((totalSecs % 3600) / 60);
     let seconds = totalSecs % 60;
 
+    const totalDiffMs = Math.abs(targetMs - nowMs);
+    const totalDays = Math.floor(totalDiffMs / (1000 * 60 * 60 * 24));
+
     return {
         isFuture,
         years,
@@ -1131,7 +1134,8 @@ function calculateDashboardEventDelta(targetDateStr, now = new Date()) {
         hours,
         minutes,
         seconds,
-        totalDiffMs: Math.abs(targetMs - nowMs)
+        totalDays,
+        totalDiffMs
     };
 }
 
@@ -1157,6 +1161,21 @@ function formatDashboardZeroSuppressedString(delta) {
     if (!delta) return '';
     const units = getDashboardZeroSuppressedUnits(delta);
     return units.map(u => `${u.value}${u.key === 'months' ? 'mo' : (u.key === 'years' ? 'y' : (u.key === 'days' ? 'd' : (u.key === 'hours' ? 'h' : (u.key === 'minutes' ? 'm' : 's'))))}`).join(' ');
+}
+
+function renderDashboardEventTotalDaysBadgeHtml(delta) {
+    if (!delta) return '';
+    const isFuture = delta.isFuture;
+    const sign = isFuture ? '-' : '+';
+    const totalDays = delta.totalDays || 0;
+    const badgeColor = isFuture 
+        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
+        : 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+
+    return `<span class="dash-event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border ${badgeColor} flex items-center gap-1 shadow-sm" title="Total Days: ${sign}${totalDays}">
+        <i class="fa-regular fa-calendar-days text-[9px]"></i>
+        <span>${sign}${totalDays}d</span>
+    </span>`;
 }
 
 function getDashboardEventGridClass(count) {
@@ -1197,6 +1216,7 @@ function renderDashboardEventCard(event, now = new Date()) {
         ? `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>⏳ Countdown</span></span>`
         : `<span class="dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span></span>`;
 
+    const totalDaysBadge = renderDashboardEventTotalDaysBadgeHtml(delta);
     const tilesHtml = renderDashboardEventTickerTiles(delta);
     const str = formatDashboardZeroSuppressedString(delta);
     const stringHtml = isFuture
@@ -1215,13 +1235,16 @@ function renderDashboardEventCard(event, now = new Date()) {
          data-event-id="${event.id}">
         
         <!-- Header -->
-        <div class="flex items-center justify-between gap-2">
-            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1"
-                  style="background-color: ${escapeAttr(color)}20; color: ${escapeAttr(color)}; border: 1px solid ${escapeAttr(color)}40;">
-                <i class="fa-solid ${escapeAttr(icon)} text-[9px]"></i>
-                <span>${escapeHtml(category)}</span>
-            </span>
-            ${statusPill}
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1"
+                      style="background-color: ${escapeAttr(color)}20; color: ${escapeAttr(color)}; border: 1px solid ${escapeAttr(color)}40;">
+                    <i class="fa-solid ${escapeAttr(icon)} text-[9px]"></i>
+                    <span>${escapeHtml(category)}</span>
+                </span>
+                ${statusPill}
+                ${totalDaysBadge}
+            </div>
         </div>
 
         <!-- Big Title -->
@@ -1284,6 +1307,18 @@ function updateDashboardEventTimers() {
                 pillEl.className = 'dash-event-pill text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1';
                 pillEl.innerHTML = '<i class="fa-solid fa-clock-rotate-left text-[9px]"></i><span>⏱️ Elapsed</span>';
             }
+        }
+
+        const totalDaysEl = card.querySelector('.dash-event-total-days-badge');
+        if (totalDaysEl) {
+            const sign = delta.isFuture ? '-' : '+';
+            const totalDays = delta.totalDays || 0;
+            const badgeColor = delta.isFuture 
+                ? 'dash-event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30 flex items-center gap-1 shadow-sm' 
+                : 'dash-event-total-days-badge text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-300 border-amber-500/30 flex items-center gap-1 shadow-sm';
+            totalDaysEl.className = badgeColor;
+            totalDaysEl.title = `Total Days: ${sign}${totalDays}`;
+            totalDaysEl.innerHTML = `<i class="fa-regular fa-calendar-days text-[9px]"></i><span>${sign}${totalDays}d</span>`;
         }
     });
 }
