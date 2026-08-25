@@ -130,26 +130,90 @@ function sortDashboardTasksInDOM() {
 }
 
 // AJAX Habit Day Toggle
-async function toggleHabitDay(year, month, habitId, day, cellElement) {
+async function toggleHabitDay(year, month, habitId, day, cellElement, options = {}) {
     try {
+        const payload = { year, month, habit_id: habitId, day };
+        if (options.subHabitId) payload.sub_habit_id = options.subHabitId;
+        if (options.delta !== undefined) payload.delta = options.delta;
+        if (options.count !== undefined) payload.count = options.count;
+
         const response = await fetch('/api/monthly/habit/toggle', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ year, month, habit_id: habitId, day })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
         if (data.success) {
-            if (data.checked) {
-                cellElement.classList.remove('habit-cell-inactive');
-                cellElement.classList.add('habit-cell-active');
-                cellElement.innerText = day;
+            if (data.type === 'counter') {
+                const count = data.count || 0;
+                const target = data.target_count || 1;
+                cellElement.classList.remove('habit-cell-inactive', 'habit-cell-active', 'habit-cell-counter-met', 'habit-cell-counter-partial');
+                if (count >= target && target > 0) {
+                    cellElement.classList.add('habit-cell-counter-met');
+                    cellElement.innerText = count;
+                } else if (count > 0) {
+                    cellElement.classList.add('habit-cell-counter-partial');
+                    cellElement.innerText = count;
+                } else {
+                    cellElement.classList.add('habit-cell-inactive');
+                    cellElement.innerText = '•';
+                }
+            } else if (data.type === 'sub_habits') {
+                if (options.subHabitId) {
+                    // Child sub-habit cell
+                    if (data.sub_checked) {
+                        cellElement.classList.remove('habit-cell-inactive');
+                        cellElement.classList.add('habit-cell-active');
+                        cellElement.innerText = day;
+                    } else {
+                        cellElement.classList.remove('habit-cell-active');
+                        cellElement.classList.add('habit-cell-inactive');
+                        cellElement.innerText = '•';
+                    }
+                    // Update parent row summary cell
+                    const parentRow = document.getElementById(`monthly-habit-row-${habitId}`);
+                    if (parentRow) {
+                        const parentCell = parentRow.querySelector(`[data-day="${day}"]`);
+                        if (parentCell) {
+                            parentCell.classList.remove('habit-cell-inactive', 'habit-cell-sub-full', 'habit-cell-sub-partial');
+                            if (data.all_done) {
+                                parentCell.classList.add('habit-cell-sub-full');
+                                parentCell.innerText = '✓';
+                            } else if (data.completed_sub_count > 0) {
+                                parentCell.classList.add('habit-cell-sub-partial');
+                                parentCell.innerText = `${data.completed_sub_count}/${data.total_sub_count}`;
+                            } else {
+                                parentCell.classList.add('habit-cell-inactive');
+                                parentCell.innerText = '•';
+                            }
+                        }
+                    }
+                } else {
+                    // Parent row toggle all
+                    cellElement.classList.remove('habit-cell-inactive', 'habit-cell-sub-full', 'habit-cell-sub-partial');
+                    if (data.checked) {
+                        cellElement.classList.add('habit-cell-sub-full');
+                        cellElement.innerText = '✓';
+                    } else {
+                        cellElement.classList.add('habit-cell-inactive');
+                        cellElement.innerText = '•';
+                    }
+                }
             } else {
-                cellElement.classList.remove('habit-cell-active');
-                cellElement.classList.add('habit-cell-inactive');
-                cellElement.innerText = '•';
+                // Standard boolean habit
+                if (data.checked) {
+                    cellElement.classList.remove('habit-cell-inactive');
+                    cellElement.classList.add('habit-cell-active');
+                    cellElement.innerText = day;
+                } else {
+                    cellElement.classList.remove('habit-cell-active');
+                    cellElement.classList.add('habit-cell-inactive');
+                    cellElement.innerText = '•';
+                }
             }
+
             // Hook: update Habit Momentum Chart if it's present on the page
             if (typeof window.updateMomentumChartAfterToggle === 'function') {
                 window.updateMomentumChartAfterToggle(habitId, day, data.checked);

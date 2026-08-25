@@ -40,38 +40,137 @@ It includes:
 
 ## 3. Endpoints Reference
 
-### 3.1 Toggle Habit Day Completion (Granular API)
-Direct, ultra-fast toggle endpoint for checking or unchecking a habit on a specific day of the month.
+### 3.1 Toggle Habit Day (Granular API)
+Direct, ultra-fast toggle endpoint for updating a habit on a specific day of the month. Supports **Standard Checkboxes**, **Numeric Counters** (e.g. coffee cups, water glasses), and **Sub-Habits Groups** (e.g. medicines/vitamins).
 
 - **Method**: `POST`
 - **Path**: `/api/monthly/habit/toggle`
-- **Request Body (`application/json`)**:
-  ```json
-  {
-    "year": 2026,
-    "month": 8,
-    "habit_id": "1724581111000",
-    "day": 25
-  }
-  ```
-  | Field | Type | Required | Description |
-  | :--- | :--- | :--- | :--- |
-  | `year` | `integer` | Yes | Calendar year (e.g. `2026`) |
-  | `month` | `integer` | Yes | Calendar month (`1` to `12`) |
-  | `habit_id` | `string` | Yes | Habit unique ID |
-  | `day` | `integer` | Yes | Day of the month (`1` to `31`) |
+- **Request Body Examples (`application/json`)**:
+
+#### A. Standard Boolean Checkbox Habit
+```json
+{
+  "year": 2026,
+  "month": 8,
+  "habit_id": "1724581111000",
+  "day": 25
+}
+```
+
+#### B. Numeric Counter Habit (Increment / Decrement / Set Value)
+```json
+{
+  "year": 2026,
+  "month": 8,
+  "habit_id": "1724582222000",
+  "day": 25,
+  "delta": 1
+}
+```
+*Or set explicit count: `{"year": 2026, "month": 8, "habit_id": "...", "day": 25, "count": 3}`*
+
+#### C. Sub-Habits Group Habit (Toggle specific medicine/sub-item)
+```json
+{
+  "year": 2026,
+  "month": 8,
+  "habit_id": "1724583333000",
+  "day": 25,
+  "sub_habit_id": "sh_1"
+}
+```
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `year` | `integer` | Yes | Calendar year (e.g. `2026`) |
+| `month` | `integer` | Yes | Calendar month (`1` to `12`) |
+| `habit_id` | `string` | Yes | Habit unique ID |
+| `day` | `integer` | Yes | Day of the month (`1` to `31`) |
+| `delta` | `integer` | No | For counter habits (`+1` or `-1`) |
+| `count` | `integer` | No | For counter habits: explicit count |
+| `sub_habit_id` | `string` | No | For sub-habits: target sub-item ID |
 
 #### Response (`200 OK`)
 ```json
+// For Counter Habit:
 {
   "success": true,
-  "checked": true
+  "habit_id": "1724582222000",
+  "day": 25,
+  "type": "counter",
+  "count": 3,
+  "unit": "cups",
+  "target_count": 2,
+  "checked": true,
+  "daily_counts": { "25": 3 }
+}
+
+// For Sub-Habits Habit:
+{
+  "success": true,
+  "habit_id": "1724583333000",
+  "day": 25,
+  "type": "sub_habits",
+  "sub_habit_id": "sh_1",
+  "sub_checked": true,
+  "completed_sub_ids": ["sh_1", "sh_2"],
+  "completed_sub_count": 2,
+  "total_sub_count": 3,
+  "all_done": false,
+  "checked": false
 }
 ```
 
 ---
 
-### 3.2 Yearly Habit Momentum Aggregation
+### 3.2 Reorder & Auto-Arrange Habits (Granular API)
+Reorder habits in the monthly plan. Supports moving a habit up/down, supplying a custom ID array, or auto-arranging habits (`type_standard`: Checklists top ➔ Sub-habits middle ➔ Counters bottom; `alphabetical`; `completion`).
+
+- **Method**: `POST`
+- **Path**: `/api/monthly/habit/reorder`
+- **Request Body Examples (`application/json`)**:
+
+#### Option A: Move a Specific Habit Up / Down
+```json
+{
+  "year": 2026,
+  "month": 8,
+  "habit_id": "1724581111000",
+  "direction": "up"
+}
+```
+
+#### Option B: Auto-Arrange by Strategy
+```json
+{
+  "year": 2026,
+  "month": 8,
+  "arrange_by": "type_standard"
+}
+```
+*Supported `arrange_by` values: `"type_standard"` (Checklists ➔ Sub-Habits ➔ Counters), `"alphabetical"`, `"completion"`.*
+
+#### Option C: Supply Full Custom Array Order
+```json
+{
+  "year": 2026,
+  "month": 8,
+  "order": ["1724581111000", "1724583333000", "1724582222000"]
+}
+```
+
+#### Response (`200 OK`)
+```json
+{
+  "success": true,
+  "habits": [ ... ],
+  "message": "Habits reordered successfully"
+}
+```
+
+---
+
+### 3.3 Yearly Habit Momentum Aggregation
 Retrieve aggregated 12-month habit performance across the year for heatmaps, streak charts, and momentum gauges.
 
 - **Method**: `GET`
@@ -221,23 +320,72 @@ Remove a milestone from the monthly plan.
 ---
 
 ### 3.9 Add Habit to Monthly Tracker
-Create a new habit column/row for the current month.
+Create a new habit in the monthly tracker. Supports 3 habit types:
+1. `boolean`: Standard checkbox habit (e.g. "Morning Walk").
+2. `counter`: Numeric counter habit (e.g. "Drink Coffee" with unit "cups" and target 2/day).
+3. `sub_habits`: Sub-habits checklist group (e.g. "Take Medicine" with individual sub-items "Vitamin D", "Omega 3").
+
+- **Method**: `POST`
+- **Path**: `/monthly?year=YYYY&month=MM`
+- **Request Body Examples (`application/json`)**:
+
+#### Example 1: Add Standard Checkbox Habit
+```json
+{
+  "action": "add_habit",
+  "habit_name": "Morning Walk",
+  "habit_type": "boolean",
+  "category": "Fitness"
+}
+```
+
+#### Example 2: Add Numeric Counter Habit
+```json
+{
+  "action": "add_habit",
+  "habit_name": "Drink Coffee",
+  "habit_type": "counter",
+  "category": "Health",
+  "unit": "cups",
+  "target_count": 2
+}
+```
+
+#### Example 3: Add Sub-Habits Group Habit
+```json
+{
+  "action": "add_habit",
+  "habit_name": "Daily Medicine & Supplements",
+  "habit_type": "sub_habits",
+  "category": "Health",
+  "sub_habits": "Vitamin D, Omega 3, Iron, Blood Pressure"
+}
+```
+
+---
+
+### 3.10 Manage Sub-Habits / Edit Habit
+Update the list of sub-items (e.g. add/remove specific medicines) or update target count/unit for an existing habit.
 
 - **Method**: `POST`
 - **Path**: `/monthly?year=YYYY&month=MM`
 - **Request Body (`application/json`)**:
   ```json
   {
-    "action": "add_habit",
-    "habit_name": "Zero Sugar Day",
-    "category": "Health"
+    "action": "manage_sub_habits",
+    "habit_id": "1724583333000",
+    "sub_habits": [
+      { "id": "sh_1", "name": "Vitamin D" },
+      { "id": "sh_2", "name": "Omega 3" },
+      { "id": "sh_3", "name": "Iron Supplement" }
+    ]
   }
   ```
 
 ---
 
-### 3.10 Delete Habit from Monthly Tracker
-Delete a habit from the tracker.
+### 3.11 Delete Habit from Monthly Tracker
+Delete a habit (and all its sub-habit items) from the tracker.
 
 - **Method**: `POST`
 - **Path**: `/monthly?year=YYYY&month=MM`
@@ -251,7 +399,7 @@ Delete a habit from the tracker.
 
 ---
 
-### 3.11 Save Calendar Day Event / Sticker / Image
+### 3.12 Save Calendar Day Event / Sticker / Image
 Attach a custom event item, emoji sticker, or image banner to a specific day on the monthly grid.
 
 - **Method**: `POST`
@@ -270,7 +418,7 @@ Attach a custom event item, emoji sticker, or image banner to a specific day on 
 
 ---
 
-### 3.12 Delete Calendar Day Item or Sticker
+### 3.13 Delete Calendar Day Item or Sticker
 - **Delete Calendar Event Item**:
   ```json
   {
@@ -289,7 +437,7 @@ Attach a custom event item, emoji sticker, or image banner to a specific day on 
 
 ---
 
-### 3.13 Save Monthly Reflection Notes
+### 3.14 Save Monthly Reflection Notes
 Save monthly notes or retrospective thoughts.
 
 - **Method**: `POST`
@@ -304,8 +452,8 @@ Save monthly notes or retrospective thoughts.
 
 ---
 
-### 3.14 Export Monthly Plan to Excel
-Download formatted Excel (`.xlsx`) sheet for the month.
+### 3.15 Export Monthly Plan to Excel
+Download formatted Excel (`.xlsx`) sheet for the month with full habit breakdown.
 
 - **Method**: `GET`
 - **Path**: `/monthly/export_excel?year=YYYY&month=MM`
@@ -331,17 +479,35 @@ export interface MonthlyMilestone {
   completed: boolean;
 }
 
+export type HabitType = 'boolean' | 'counter' | 'sub_habits';
+
+export interface SubHabitItem {
+  id: string;
+  name: string;
+}
+
 export interface MonthlyHabit {
   id: string;
   name: string;
+  type?: HabitType;
   category?: string;
-  completed_days: number[]; // array of day integers e.g. [1, 2, 5, 12, 25]
+  completed_days: number[]; // days meeting completion criteria
+  
+  // For 'counter' habits:
+  unit?: string; // e.g. "cups", "glasses", "pages"
+  target_count?: number; // daily target
+  daily_counts?: Record<string, number>; // e.g. { "1": 2, "2": 3 }
+
+  // For 'sub_habits' habits:
+  sub_habits?: SubHabitItem[]; // list of sub-items e.g. [{ id: "sh_1", name: "Vitamin D" }]
+  daily_sub_completions?: Record<string, string[]>; // e.g. { "1": ["sh_1", "sh_2"] }
 }
 
 export interface CalendarDayItem {
   id: string;
   text: string;
   type: 'event' | 'deadline' | 'meeting' | 'reminder';
+  remind_me?: boolean;
 }
 
 export interface CalendarDayData {
@@ -357,7 +523,7 @@ export interface MonthlyPlanData {
   goals: MonthlyGoal[];
   milestones: MonthlyMilestone[];
   habits: MonthlyHabit[];
-  calendar_days: Record<string, CalendarDayData>; // keys are day strings: "1", "2", ... "31"
+  calendar_days: Record<string, CalendarDayData>;
   notes: string;
 }
 
@@ -405,11 +571,78 @@ class MonthlyApiService {
     return data;
   }
 
-  // Toggle habit day checkbox
-  public static toggleHabitDay(year: number, month: number, habitId: string, day: number) {
-    return this.request<{ success: boolean; checked: boolean }>('/api/monthly/habit/toggle', {
+  // Toggle habit day (Standard, Counter, or Sub-Habit)
+  public static toggleHabitDay(year: number, month: number, habitId: string, day: number, options?: { delta?: number; count?: number; subHabitId?: string }) {
+    return this.request('/api/monthly/habit/toggle', {
       method: 'POST',
-      body: JSON.stringify({ year, month, habit_id: habitId, day }),
+      body: JSON.stringify({
+        year,
+        month,
+        habit_id: habitId,
+        day,
+        delta: options?.delta,
+        count: options?.count,
+        sub_habit_id: options?.subHabitId,
+      }),
+    });
+  }
+
+  // Add new habit
+  public static addHabit(year: number, month: number, payload: {
+    name: string;
+    type?: HabitType;
+    category?: string;
+    unit?: string;
+    targetCount?: number;
+    subHabits?: string | string[];
+  }) {
+    return this.request(`/monthly?year=${year}&month=${month}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'add_habit',
+        habit_name: payload.name,
+        habit_type: payload.type || 'boolean',
+        category: payload.category || 'General',
+        unit: payload.unit,
+        target_count: payload.targetCount,
+        sub_habits: payload.subHabits,
+      }),
+    });
+  }
+
+  // Manage sub-habits
+  public static manageSubHabits(year: number, month: number, habitId: string, subHabits: Array<{ id?: string; name: string } | string>) {
+    return this.request(`/monthly?year=${year}&month=${month}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'manage_sub_habits',
+        habit_id: habitId,
+        sub_habits: subHabits,
+      }),
+    });
+  }
+
+  // Move habit up or down
+  public static moveHabit(year: number, month: number, habitId: string, direction: 'up' | 'down') {
+    return this.request('/api/monthly/habit/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ year, month, habit_id: habitId, direction }),
+    });
+  }
+
+  // Auto-arrange habits by strategy
+  public static autoArrangeHabits(year: number, month: number, strategy: 'type_standard' | 'alphabetical' | 'completion') {
+    return this.request('/api/monthly/habit/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ year, month, arrange_by: strategy }),
+    });
+  }
+
+  // Custom habit reorder by ID list
+  public static reorderHabits(year: number, month: number, order: string[]) {
+    return this.request('/api/monthly/habit/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ year, month, order }),
     });
   }
 
@@ -417,22 +650,6 @@ class MonthlyApiService {
   public static getYearlyHabitMomentum(year?: number) {
     const query = year ? `?year=${year}` : '';
     return this.request<{ success: boolean; data: HabitMomentumMonth[] }>(`/api/monthly/habit/momentum-yearly${query}`);
-  }
-
-  // Add goal
-  public static addGoal(year: number, month: number, title: string, category: string = 'General', deadline?: string) {
-    return this.request(`/monthly?year=${year}&month=${month}`, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'add_goal', goal_title: title, category, deadline }),
-    });
-  }
-
-  // Add habit
-  public static addHabit(year: number, month: number, habitName: string, category: string = 'General') {
-    return this.request(`/monthly?year=${year}&month=${month}`, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'add_habit', habit_name: habitName, category }),
-    });
   }
 }
 

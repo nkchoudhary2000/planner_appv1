@@ -609,15 +609,25 @@ def monthly():
 
         inherited_habits = []
         if prev_plan and prev_plan.habits:
-            inherited_habits = [
-                {
+            for idx, h in enumerate(prev_plan.habits):
+                if not h.get('name', '').strip():
+                    continue
+                new_h = {
                     'id': str(int(datetime.utcnow().timestamp() * 1000) + idx),
                     'name': h.get('name', ''),
+                    'type': h.get('type', 'boolean'),
+                    'category': h.get('category', 'General'),
                     'completed_days': []          # fresh slate for the new month
                 }
-                for idx, h in enumerate(prev_plan.habits)
-                if h.get('name', '').strip()
-            ]
+                if h.get('type') == 'counter':
+                    new_h['unit'] = h.get('unit', 'times')
+                    new_h['target_count'] = h.get('target_count', 1)
+                    new_h['daily_counts'] = {}
+                elif h.get('type') == 'sub_habits':
+                    new_h['sub_habits'] = [dict(s) for s in h.get('sub_habits', [])]
+                    new_h['daily_sub_completions'] = {}
+
+                inherited_habits.append(new_h)
 
         plan = MonthlyPlan(
             user_id=current_user.id,
@@ -1010,19 +1020,36 @@ def export_monthly_excel():
 
     # Habits Sheet
     days_in_month = calendar.monthrange(selected_year, selected_month)[1]
-    habit_headers = ["Habit ID", "Habit Name", "Total Days Completed", "Completion Pct", "Completed Days"]
+    habit_headers = ["Habit ID", "Habit Name", "Type", "Unit / Sub-Items", "Total Days Completed", "Completion Pct", "Log Summary"]
     habits_rows = [habit_headers]
     if plan and plan.habits:
         for h in plan.habits:
             cdays = h.get('completed_days', [])
             c_count = len(cdays)
             pct = f"{int(c_count / days_in_month * 100)}%" if days_in_month > 0 else "0%"
+            h_type = h.get('type', 'boolean')
+            
+            if h_type == 'counter':
+                sub_detail = f"Unit: {h.get('unit', 'times')} (Target: {h.get('target_count', 1)}/day)"
+                daily_counts = h.get('daily_counts', {})
+                total_units = sum(int(v) for v in daily_counts.values() if isinstance(v, (int, float)))
+                log_summary = f"Total: {total_units} {h.get('unit', 'times')} across {c_count} active days"
+            elif h_type == 'sub_habits':
+                sub_names = [s.get('name', '') for s in h.get('sub_habits', []) if isinstance(s, dict)]
+                sub_detail = f"Sub-items: {', '.join(sub_names)}"
+                log_summary = f"Completed all sub-items on: {', '.join(str(d) for d in sorted(cdays)) if cdays else 'None'}"
+            else:
+                sub_detail = "Standard Checkbox"
+                log_summary = ", ".join(str(d) for d in sorted(cdays)) if cdays else "None"
+
             habits_rows.append([
                 str(h.get('id', '')),
                 str(h.get('name', '')),
+                h_type.replace('_', ' ').capitalize(),
+                sub_detail,
                 c_count,
                 pct,
-                ", ".join(str(d) for d in sorted(cdays))
+                log_summary
             ])
 
     # Milestones Sheet

@@ -1892,16 +1892,135 @@ def api_monthly_post():
 
     elif action == 'add_habit':
         habit_name = (json_data.get('habit_name') or request.form.get('habit_name', '')).strip()
+        habit_type = (json_data.get('habit_type') or request.form.get('habit_type', 'boolean')).strip().lower()
+        if habit_type not in ['boolean', 'counter', 'sub_habits']:
+            habit_type = 'boolean'
+
+        category = (json_data.get('category') or request.form.get('category', 'General')).strip()
+
         if habit_name:
-            habits.append({
+            new_habit = {
                 'id': str(int(datetime.utcnow().timestamp() * 1000)),
                 'name': habit_name,
+                'type': habit_type,
+                'category': category,
                 'completed_days': []
-            })
+            }
+
+            if habit_type == 'counter':
+                unit = (json_data.get('unit') or request.form.get('unit', 'times')).strip()
+                try:
+                    target_count = int(json_data.get('target_count') or request.form.get('target_count', 1))
+                except (ValueError, TypeError):
+                    target_count = 1
+                new_habit['unit'] = unit or 'times'
+                new_habit['target_count'] = max(1, target_count)
+                new_habit['daily_counts'] = {}
+
+            elif habit_type == 'sub_habits':
+                sub_habits_raw = json_data.get('sub_habits') or request.form.get('sub_habits')
+                sub_habits_list = []
+                if isinstance(sub_habits_raw, list):
+                    for idx, s in enumerate(sub_habits_raw):
+                        s_name = s.get('name', '') if isinstance(s, dict) else str(s).strip()
+                        if s_name:
+                            s_id = s.get('id') if (isinstance(s, dict) and s.get('id')) else f"sh_{int(datetime.utcnow().timestamp() * 1000) + idx}"
+                            sub_habits_list.append({'id': str(s_id), 'name': s_name})
+                elif isinstance(sub_habits_raw, str):
+                    for idx, s_name in enumerate(sub_habits_raw.split(',')):
+                        s_name = s_name.strip()
+                        if s_name:
+                            sub_habits_list.append({'id': f"sh_{int(datetime.utcnow().timestamp() * 1000) + idx}", 'name': s_name})
+                new_habit['sub_habits'] = sub_habits_list
+                new_habit['daily_sub_completions'] = {}
+
+            habits.append(new_habit)
             plan.habits = habits
             flag_modified(plan, 'habits')
             db.session.commit()
             flash('New habit added!', 'success')
+
+    elif action in ['update_habit', 'manage_sub_habits']:
+        habit_id = json_data.get('habit_id') or request.form.get('habit_id')
+        for h in habits:
+            if h.get('id') == habit_id:
+                if 'habit_name' in json_data or 'habit_name' in request.form:
+                    h['name'] = (json_data.get('habit_name') or request.form.get('habit_name', h.get('name'))).strip()
+                if 'category' in json_data or 'category' in request.form:
+                    h['category'] = (json_data.get('category') or request.form.get('category', h.get('category', 'General'))).strip()
+                if 'unit' in json_data or 'unit' in request.form:
+                    h['unit'] = (json_data.get('unit') or request.form.get('unit', h.get('unit', 'times'))).strip()
+                if 'target_count' in json_data or 'target_count' in request.form:
+                    try:
+                        h['target_count'] = max(1, int(json_data.get('target_count') or request.form.get('target_count', h.get('target_count', 1))))
+                    except (ValueError, TypeError):
+                        pass
+                if 'sub_habits' in json_data or 'sub_habits' in request.form:
+                    sub_habits_raw = json_data.get('sub_habits') or request.form.get('sub_habits')
+                    sub_habits_list = []
+                    if isinstance(sub_habits_raw, list):
+                        for idx, s in enumerate(sub_habits_raw):
+                            s_name = s.get('name', '') if isinstance(s, dict) else str(s).strip()
+                            if s_name:
+                                s_id = s.get('id') if (isinstance(s, dict) and s.get('id')) else f"sh_{int(datetime.utcnow().timestamp() * 1000) + idx}"
+                                sub_habits_list.append({'id': str(s_id), 'name': s_name})
+                    elif isinstance(sub_habits_raw, str):
+                        for idx, s_name in enumerate(sub_habits_raw.split(',')):
+                            s_name = s_name.strip()
+                            if s_name:
+                                sub_habits_list.append({'id': f"sh_{int(datetime.utcnow().timestamp() * 1000) + idx}", 'name': s_name})
+                    h['sub_habits'] = sub_habits_list
+                break
+        plan.habits = habits
+        flag_modified(plan, 'habits')
+        db.session.commit()
+        flash('Habit updated!', 'success')
+
+    elif action in ['reorder_habits', 'reorder_habit']:
+        order = json_data.get('order') or request.form.getlist('order')
+        move_id = json_data.get('habit_id') or json_data.get('move_id') or request.form.get('habit_id')
+        direction = json_data.get('direction') or request.form.get('direction')  # 'up' or 'down'
+        arrange_by = json_data.get('arrange_by') or request.form.get('arrange_by')  # 'type_standard', 'alphabetical', 'completion'
+
+        if order and isinstance(order, list):
+            habit_map = {str(h.get('id')): h for h in habits}
+            reordered = []
+            for hid in order:
+                hid_str = str(hid)
+                if hid_str in habit_map:
+                    reordered.append(habit_map.pop(hid_str))
+            reordered.extend(habit_map.values())
+            plan.habits = reordered
+            flag_modified(plan, 'habits')
+            db.session.commit()
+            habits = plan.habits
+        elif move_id and direction in ['up', 'down']:
+            move_id_str = str(move_id)
+            idx = next((i for i, h in enumerate(habits) if str(h.get('id')) == move_id_str), -1)
+            if idx != -1:
+                target_idx = idx - 1 if direction == 'up' else idx + 1
+                if 0 <= target_idx < len(habits):
+                    habits[idx], habits[target_idx] = habits[target_idx], habits[idx]
+                    plan.habits = habits
+                    flag_modified(plan, 'habits')
+                    db.session.commit()
+        elif arrange_by == 'type_standard':
+            # Checklists (boolean) top -> Sub-habits middle -> Counters bottom
+            type_weights = {'boolean': 0, 'sub_habits': 1, 'counter': 2}
+            plan.habits = sorted(habits, key=lambda h: type_weights.get(h.get('type', 'boolean'), 0))
+            flag_modified(plan, 'habits')
+            db.session.commit()
+            habits = plan.habits
+        elif arrange_by == 'alphabetical':
+            plan.habits = sorted(habits, key=lambda h: str(h.get('name', '')).lower())
+            flag_modified(plan, 'habits')
+            db.session.commit()
+            habits = plan.habits
+        elif arrange_by == 'completion':
+            plan.habits = sorted(habits, key=lambda h: len(h.get('completed_days', [])), reverse=True)
+            flag_modified(plan, 'habits')
+            db.session.commit()
+            habits = plan.habits
 
     elif action == 'delete_habit':
         habit_id = json_data.get('habit_id') or request.form.get('habit_id')
@@ -1993,6 +2112,14 @@ def api_monthly_post():
             resp_data['habit'] = habits[-1]
             resp_data['days_in_month'] = days_in_m
             resp_data['message'] = 'Habit added!'
+        elif action in ['update_habit', 'manage_sub_habits']:
+            habit_id = json_data.get('habit_id') or request.form.get('habit_id')
+            target_h = next((h for h in habits if h.get('id') == habit_id), None)
+            resp_data['habit'] = target_h
+            resp_data['message'] = 'Habit updated successfully!'
+        elif action in ['reorder_habits', 'reorder_habit']:
+            resp_data['habits'] = plan.habits
+            resp_data['message'] = 'Habits reordered successfully!'
         elif action == 'delete_habit':
             resp_data['habit_id'] = json_data.get('habit_id') or request.form.get('habit_id')
             resp_data['message'] = 'Habit deleted.'
@@ -2001,11 +2128,11 @@ def api_monthly_post():
     return redirect(url_for('planner_ui.monthly', year=selected_year, month=selected_month))
 
 
-@planner_api.route('/api/monthly/habit/toggle', methods=['POST'])
+@planner_api.route('/api/monthly/habit/reorder', methods=['POST'])
 @token_required
-def api_toggle_habit_day():
+def api_reorder_monthly_habits():
     """
-    Toggle a specific day completion status for a habit.
+    Reorder habits in a monthly plan. Supports moving by ID list, move up/down, or auto-arranging.
     ---
     tags:
       - Monthly Planner
@@ -2015,6 +2142,116 @@ def api_toggle_habit_day():
     parameters:
       - in: body
         name: body
+        schema:
+          type: object
+          required:
+            - year
+            - month
+          properties:
+            year:
+              type: integer
+            month:
+              type: integer
+            order:
+              type: array
+              items:
+                type: string
+              description: Ordered list of habit IDs
+            habit_id:
+              type: string
+              description: Specific habit ID to move
+            direction:
+              type: string
+              enum: [up, down]
+              description: Direction to move habit
+            arrange_by:
+              type: string
+              enum: [type_standard, alphabetical, completion]
+              description: Auto-arrange strategy (e.g. type_standard: Checklists -> Sub-habits -> Counters)
+    responses:
+      200:
+        description: Habits reordered successfully
+      400:
+        description: Missing parameters
+      401:
+        description: Unauthorized
+      404:
+        description: Plan not found
+    """
+    user = get_current_user_safe()
+    data = request.get_json() or {}
+    year = data.get('year')
+    month = data.get('month')
+
+    if not year or not month:
+        return jsonify({'success': False, 'message': 'Missing year or month'}), 400
+
+    plan = MonthlyPlan.query.filter_by(user_id=user.id, year=int(year), month=int(month)).first()
+    if not plan:
+        return jsonify({'success': False, 'message': 'Monthly plan not found'}), 404
+
+    habits = plan.habits or []
+    order = data.get('order')
+    move_id = data.get('habit_id') or data.get('move_id')
+    direction = data.get('direction')
+    arrange_by = data.get('arrange_by')
+
+    if order and isinstance(order, list):
+        habit_map = {str(h.get('id')): h for h in habits}
+        reordered = []
+        for hid in order:
+            hid_str = str(hid)
+            if hid_str in habit_map:
+                reordered.append(habit_map.pop(hid_str))
+        reordered.extend(habit_map.values())
+        plan.habits = reordered
+        flag_modified(plan, 'habits')
+        db.session.commit()
+    elif move_id and direction in ['up', 'down']:
+        move_id_str = str(move_id)
+        idx = next((i for i, h in enumerate(habits) if str(h.get('id')) == move_id_str), -1)
+        if idx != -1:
+            target_idx = idx - 1 if direction == 'up' else idx + 1
+            if 0 <= target_idx < len(habits):
+                habits[idx], habits[target_idx] = habits[target_idx], habits[idx]
+                plan.habits = habits
+                flag_modified(plan, 'habits')
+                db.session.commit()
+    elif arrange_by == 'type_standard':
+        type_weights = {'boolean': 0, 'sub_habits': 1, 'counter': 2}
+        plan.habits = sorted(habits, key=lambda h: type_weights.get(h.get('type', 'boolean'), 0))
+        flag_modified(plan, 'habits')
+        db.session.commit()
+    elif arrange_by == 'alphabetical':
+        plan.habits = sorted(habits, key=lambda h: str(h.get('name', '')).lower())
+        flag_modified(plan, 'habits')
+        db.session.commit()
+    elif arrange_by == 'completion':
+        plan.habits = sorted(habits, key=lambda h: len(h.get('completed_days', [])), reverse=True)
+        flag_modified(plan, 'habits')
+        db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'habits': plan.habits,
+        'message': 'Habits reordered successfully'
+    })
+
+
+@planner_api.route('/api/monthly/habit/toggle', methods=['POST'])
+@token_required
+def api_toggle_habit_day():
+    """
+    Toggle a specific day completion status for a habit (Boolean, Counter, or Sub-Habits).
+    ---
+    tags:
+      - Monthly Planner
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    parameters:
+      - in: body
+      - name: body
         schema:
           type: object
           required:
@@ -2031,9 +2268,18 @@ def api_toggle_habit_day():
               type: string
             day:
               type: integer
+            delta:
+              type: integer
+              description: For counter habits (+1 or -1)
+            count:
+              type: integer
+              description: Explicit count value for counter habits
+            sub_habit_id:
+              type: string
+              description: Target sub-habit item ID for sub_habits type
     responses:
       200:
-        description: Habit day toggled successfully
+        description: Habit day toggled/updated successfully
       400:
         description: Missing parameters
       401:
@@ -2051,32 +2297,140 @@ def api_toggle_habit_day():
     if not all([year, month, habit_id, day]):
         return jsonify({'success': False, 'message': 'Missing arguments'}), 400
 
+    try:
+        day_int = int(day)
+        day_str = str(day_int)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Invalid day value'}), 400
+
     plan = MonthlyPlan.query.filter_by(user_id=user.id, year=int(year), month=int(month)).first()
     if not plan:
         return jsonify({'success': False, 'message': 'Plan not found'}), 404
 
     habits = plan.habits or []
-    updated = False
-    is_checked = False
+    target_habit = None
 
     for h in habits:
         if h.get('id') == habit_id:
-            completed = h.get('completed_days', [])
-            if day in completed:
-                completed.remove(day)
-                is_checked = False
-            else:
-                completed.append(day)
-                is_checked = True
-            h['completed_days'] = completed
-            updated = True
+            target_habit = h
             break
 
-    if updated:
-        plan.habits = habits
-        flag_modified(plan, 'habits')
-        db.session.commit()
-        return jsonify({'success': True, 'checked': is_checked})
+    if not target_habit:
+        return jsonify({'success': False, 'message': 'Habit not found'}), 404
+
+    h_type = target_habit.get('type', 'boolean')
+    completed_days = target_habit.get('completed_days', [])
+    if not isinstance(completed_days, list):
+        completed_days = []
+
+    resp_payload = {'success': True, 'habit_id': habit_id, 'day': day_int, 'type': h_type}
+
+    # Case 1: Numeric Counter Habit
+    if h_type == 'counter':
+        daily_counts = target_habit.get('daily_counts', {})
+        if not isinstance(daily_counts, dict):
+            daily_counts = {}
+
+        target_count = target_habit.get('target_count', 1)
+        current_count = int(daily_counts.get(day_str, 0))
+
+        if 'count' in data:
+            new_count = max(0, int(data['count']))
+        elif 'delta' in data:
+            new_count = max(0, current_count + int(data['delta']))
+        else:
+            # Default click toggle: if count > 0, reset to 0; if 0, set to target_count (or 1)
+            new_count = 0 if current_count > 0 else max(1, target_count)
+
+        if new_count > 0:
+            daily_counts[day_str] = new_count
+            if day_int not in completed_days:
+                completed_days.append(day_int)
+        else:
+            daily_counts.pop(day_str, None)
+            if day_int in completed_days:
+                completed_days.remove(day_int)
+
+        target_habit['daily_counts'] = daily_counts
+        target_habit['completed_days'] = completed_days
+
+        resp_payload['count'] = new_count
+        resp_payload['unit'] = target_habit.get('unit', 'times')
+        resp_payload['target_count'] = target_count
+        resp_payload['checked'] = (new_count >= target_count if target_count > 1 else new_count > 0)
+        resp_payload['daily_counts'] = daily_counts
+
+    # Case 2: Sub-Habits Group Habit
+    elif h_type == 'sub_habits':
+        sub_habits = target_habit.get('sub_habits', [])
+        daily_sub_completions = target_habit.get('daily_sub_completions', {})
+        if not isinstance(daily_sub_completions, dict):
+            daily_sub_completions = {}
+
+        sub_list = list(daily_sub_completions.get(day_str, []))
+        sub_habit_id = data.get('sub_habit_id')
+
+        if sub_habit_id:
+            if sub_habit_id in sub_list:
+                sub_list.remove(sub_habit_id)
+                sub_checked = False
+            else:
+                sub_list.append(sub_habit_id)
+                sub_checked = True
+        else:
+            # Toggle all sub-habits at once
+            all_ids = [s.get('id') for s in sub_habits if isinstance(s, dict) and s.get('id')]
+            if len(sub_list) >= len(all_ids) and len(all_ids) > 0:
+                sub_list = []
+                sub_checked = False
+            else:
+                sub_list = all_ids
+                sub_checked = True
+
+        if sub_list:
+            daily_sub_completions[day_str] = sub_list
+        else:
+            daily_sub_completions.pop(day_str, None)
+
+        total_subs = len(sub_habits)
+        comp_count = len(sub_list)
+        all_done = (comp_count == total_subs) and total_subs > 0
+
+        if all_done or (comp_count > 0 and total_subs == 0):
+            if day_int not in completed_days:
+                completed_days.append(day_int)
+        else:
+            if day_int in completed_days:
+                completed_days.remove(day_int)
+
+        target_habit['daily_sub_completions'] = daily_sub_completions
+        target_habit['completed_days'] = completed_days
+
+        resp_payload['sub_habit_id'] = sub_habit_id
+        resp_payload['sub_checked'] = sub_checked if sub_habit_id else None
+        resp_payload['completed_sub_ids'] = sub_list
+        resp_payload['completed_sub_count'] = comp_count
+        resp_payload['total_sub_count'] = total_subs
+        resp_payload['all_done'] = all_done
+        resp_payload['checked'] = all_done
+
+    # Case 3: Standard Boolean Checkbox Habit (Default)
+    else:
+        if day_int in completed_days:
+            completed_days.remove(day_int)
+            is_checked = False
+        else:
+            completed_days.append(day_int)
+            is_checked = True
+
+        target_habit['completed_days'] = completed_days
+        resp_payload['checked'] = is_checked
+
+    plan.habits = habits
+    flag_modified(plan, 'habits')
+    db.session.commit()
+
+    return jsonify(resp_payload)
 
     return jsonify({'success': False, 'message': 'Habit not found'}), 404
 
