@@ -2356,6 +2356,85 @@ def api_yearly_post():
 # PLANNING TASKS (BACKLOG) REST API ENDPOINTS
 # ============================================================================
 
+@planner_api.route('/api/planning/tasks', methods=['GET'])
+@planner_api.route('/api/planning', methods=['GET'])
+@token_required
+def api_planning_get_tasks():
+    """
+    Get all planning backlog tasks, with optional filtering by status (all, pending, completed).
+    ---
+    tags:
+      - Planning Tasks Backlog
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    parameters:
+      - in: query
+        name: status
+        type: string
+        enum: [all, pending, completed]
+        default: all
+        description: Filter tasks by status (all, pending, completed)
+    responses:
+      200:
+        description: List of planning tasks and summary counts
+      401:
+        description: Unauthorized
+    """
+    user = get_current_user_safe()
+    status_filter = request.args.get('status', 'all').lower()
+
+    if status_filter == 'pending':
+        tasks = (
+            PlanningTask.query
+            .filter_by(user_id=user.id, completed=False)
+            .order_by(PlanningTask.sort_order.asc(), PlanningTask.created_at.asc())
+            .all()
+        )
+    elif status_filter == 'completed':
+        tasks = (
+            PlanningTask.query
+            .filter_by(user_id=user.id, completed=True)
+            .order_by(PlanningTask.updated_at.desc(), PlanningTask.id.desc())
+            .all()
+        )
+    else:
+        pending = (
+            PlanningTask.query
+            .filter_by(user_id=user.id, completed=False)
+            .order_by(PlanningTask.sort_order.asc(), PlanningTask.created_at.asc())
+            .all()
+        )
+        completed = (
+            PlanningTask.query
+            .filter_by(user_id=user.id, completed=True)
+            .order_by(PlanningTask.updated_at.desc(), PlanningTask.id.desc())
+            .all()
+        )
+        total_pending = len(pending)
+        total_completed = len(completed)
+        return jsonify({
+            'success': True,
+            'tasks': [t.to_dict() for t in (pending + completed)],
+            'pending_tasks': [t.to_dict() for t in pending],
+            'completed_tasks': [t.to_dict() for t in completed],
+            'total_pending': total_pending,
+            'total_completed': total_completed,
+            'total_tasks': total_pending + total_completed
+        })
+
+    total_pending = PlanningTask.query.filter_by(user_id=user.id, completed=False).count()
+    total_completed = PlanningTask.query.filter_by(user_id=user.id, completed=True).count()
+
+    return jsonify({
+        'success': True,
+        'tasks': [t.to_dict() for t in tasks],
+        'total_pending': total_pending,
+        'total_completed': total_completed,
+        'total_tasks': total_pending + total_completed
+    })
+
+
 @planner_api.route('/api/planning/completed', methods=['GET'])
 @token_required
 def api_planning_completed_page():
