@@ -1,5 +1,6 @@
 import unittest
 import json
+from unittest.mock import patch, MagicMock
 from app import create_app, db
 from app.models import User, MonthlyPlan
 from config import Config
@@ -318,6 +319,123 @@ class AdvancedHabitsTestCase(unittest.TestCase):
         self.assertEqual(types, ['boolean', 'sub_habits', 'counter'])
         self.assertEqual(names, ['Morning Jog', 'Medicines', 'Coffee'])
 
+    @patch('app.planner_api.fetch_monthly_github_commits')
+    def test_sync_github_commits(self, mock_fetch):
+        """Test syncing GitHub public commits into the Habit Tracker Matrix."""
+        mock_fetch.return_value = {
+            'success': True,
+            'username': 'nkchoudhary2000',
+            'year': 2026,
+            'month': 8,
+            'daily_counts': {'1': 3, '5': 1, '25': 4},
+            'total_commits': 8,
+            'active_days': [1, 5, 25],
+            'message': 'Synced 8 commits across 3 active days in 8/2026.'
+        }
+
+        res = self.client.post('/api/monthly/habit/sync-github', headers=self.headers, json={
+            'year': 2026,
+            'month': 8,
+            'username': 'nkchoudhary2000'
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['total_commits'], 8)
+        self.assertEqual(data['active_days'], [1, 5, 25])
+
+        # Verify habit was created in database
+        plan = MonthlyPlan.query.filter_by(user_id=self.user.id, year=2026, month=8).first()
+        gh_habit = next((h for h in plan.habits if h.get('is_github') or h.get('name') == 'GitHub Commits'), None)
+        self.assertIsNotNone(gh_habit)
+        self.assertEqual(gh_habit['type'], 'counter')
+        self.assertEqual(gh_habit['unit'], 'commits')
+        self.assertEqual(gh_habit['daily_counts'], {'1': 3, '5': 1, '25': 4})
+        self.assertEqual(gh_habit['completed_days'], [1, 5, 25])
+
+        # Verify user model saved github_username
+        user = User.query.get(self.user.id)
+        self.assertEqual(user.github_username, 'nkchoudhary2000')
+
+    @patch('urllib.request.urlopen')
+    def test_fetch_monthly_github_commits_service(self, mock_urlopen):
+        """Test the low-level GitHub service parsing of PushEvents."""
+        from app.services.github_service import fetch_monthly_github_commits
+
+        fake_events = [
+            {
+                'type': 'PushEvent',
+                'created_at': '2026-08-25T10:00:00Z',
+                'payload': {
+                    'commits': [{'sha': '111'}, {'sha': '222'}]
+                }
+            },
+            {
+                'type': 'PushEvent',
+                'created_at': '2026-08-25T14:30:00Z',
+                'payload': {
+                    'commits': [{'sha': '333'}]
+                }
+            },
+            {
+                'type': 'PushEvent',
+                'created_at': '2026-08-01T09:15:00Z',
+                'payload': {
+                    'commits': [{'sha': '444'}, {'sha': '555'}]
+                }
+            },
+            {
+                'type': 'WatchEvent',
+                'created_at': '2026-08-20T12:00:00Z'
+            }
+        ]
+
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read.return_value = json.dumps(fake_events).encode('utf-8')
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        result = fetch_monthly_github_commits('testuser', 2026, 8)
+        self.assertTrue(result['success'])
+        self.assertEqual(result['total_commits'], 5)
+        self.assertEqual(result['daily_counts'], {'25': 3, '1': 2})
+        self.assertEqual(result['active_days'], [1, 25])
+
+    def test_edit_habit_name_and_category(self):
+        """Test editing a habit name, category, and target counts."""
+        # Add habit
+        r = self.client.post('/monthly?year=2026&month=8', headers=self.headers, json={
+            'action': 'add_habit',
+            'habit_name': 'Original Name',
+            'habit_type': 'counter',
+            'category': 'Health',
+            'target_count': 1,
+            'unit': 'times'
+        })
+        habit_id = r.get_json()['habit']['id']
+
+        # Edit habit
+        res_edit = self.client.post('/monthly?year=2026&month=8', headers=self.headers, json={
+            'action': 'update_habit',
+            'habit_id': habit_id,
+            'habit_name': 'Updated Habit Name',
+            'category': 'Productivity',
+            'target_count': 3,
+            'unit': 'glasses'
+        })
+        self.assertEqual(res_edit.status_code, 200)
+        self.assertTrue(res_edit.get_json()['success'])
+
+        plan = MonthlyPlan.query.filter_by(user_id=self.user.id, year=2026, month=8).first()
+        updated_h = next((h for h in plan.habits if h['id'] == habit_id), None)
+        self.assertIsNotNone(updated_h)
+        self.assertEqual(updated_h['name'], 'Updated Habit Name')
+        self.assertEqual(updated_h['category'], 'Productivity')
+        self.assertEqual(updated_h['target_count'], 3)
+        self.assertEqual(updated_h['unit'], 'glasses')
+
 if __name__ == '__main__':
     unittest.main()
+
 

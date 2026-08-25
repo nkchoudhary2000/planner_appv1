@@ -170,7 +170,63 @@ Reorder habits in the monthly plan. Supports moving a habit up/down, supplying a
 
 ---
 
-### 3.3 Yearly Habit Momentum Aggregation
+### 3.3 Sync Daily Public GitHub Commits
+Fetch public git push events and commit counts for the target month from GitHub API and automatically update or create the `GitHub Commits` counter habit in the matrix.
+
+- **Method**: `POST`
+- **Path**: `/api/monthly/habit/sync-github`
+- **Headers**:
+  ```http
+  Authorization: Bearer <API_OR_JWT_TOKEN>
+  Content-Type: application/json
+  ```
+- **Request Body (`application/json`)**:
+  ```json
+  {
+    "year": 2026,
+    "month": 8,
+    "username": "nkchoudhary2000"
+  }
+  ```
+  | Field | Type | Required | Description |
+  | :--- | :--- | :--- | :--- |
+  | `year` | `integer` | Yes | Calendar year (e.g. `2026`) |
+  | `month` | `integer` | Yes | Calendar month (`1` to `12`) |
+  | `username` | `string` | No | GitHub username (uses saved `user.github_username` if omitted) |
+
+#### Response (`200 OK`)
+```json
+{
+  "success": true,
+  "username": "nkchoudhary2000",
+  "total_commits": 18,
+  "active_days": [1, 5, 8, 12, 19, 25],
+  "daily_counts": {
+    "1": 3,
+    "5": 1,
+    "8": 4,
+    "12": 2,
+    "19": 5,
+    "25": 3
+  },
+  "habit": {
+    "id": "1724585555000",
+    "name": "GitHub Commits",
+    "type": "counter",
+    "unit": "commits",
+    "target_count": 1,
+    "category": "Productivity",
+    "is_github": true,
+    "completed_days": [1, 5, 8, 12, 19, 25],
+    "daily_counts": { "1": 3, "5": 1, "8": 4, "12": 2, "19": 5, "25": 3 }
+  },
+  "message": "Synced 18 commits across 6 active days in 8/2026."
+}
+```
+
+---
+
+### 3.4 Yearly Habit Momentum Aggregation
 Retrieve aggregated 12-month habit performance across the year for heatmaps, streak charts, and momentum gauges.
 
 - **Method**: `GET`
@@ -643,6 +699,22 @@ class MonthlyApiService {
     return this.request('/api/monthly/habit/reorder', {
       method: 'POST',
       body: JSON.stringify({ year, month, order }),
+    });
+  }
+
+  // Sync GitHub commit activity
+  public static syncGitHubCommits(year: number, month: number, username?: string) {
+    return this.request<{
+      success: boolean;
+      username: string;
+      total_commits: number;
+      active_days: number[];
+      daily_counts: Record<string, number>;
+      habit: MonthlyHabit;
+      message: string;
+    }>('/api/monthly/habit/sync-github', {
+      method: 'POST',
+      body: JSON.stringify({ year, month, username }),
     });
   }
 

@@ -159,6 +159,9 @@ def create_app(config_class=Config):
                 if 'api_token_created_at' not in columns:
                     with db.engine.begin() as conn:
                         conn.execute(text('ALTER TABLE "user" ADD COLUMN api_token_created_at TIMESTAMP NULL'))
+                if 'github_username' not in columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN github_username VARCHAR(100) NULL'))
 
             if 'daily_plan' in tables:
                 columns = [c['name'] for c in inspector.get_columns('daily_plan')]

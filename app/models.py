@@ -32,6 +32,9 @@ class User(UserMixin, db.Model):
     api_token = db.Column(db.String(128), unique=True, nullable=True, index=True)
     api_token_created_at = db.Column(db.DateTime, nullable=True)
 
+    # GitHub Integration
+    github_username = db.Column(db.String(100), nullable=True)
+
 
     daily_plans = db.relationship('DailyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     monthly_plans = db.relationship('MonthlyPlan', backref='owner', lazy='dynamic', cascade='all, delete-orphan')

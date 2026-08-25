@@ -14,6 +14,7 @@ from app.services.cascade_service import (
     get_weekly_todos_for_date,
     get_all_cascaded_items_for_daily
 )
+from app.services.github_service import fetch_monthly_github_commits
 from app.planner_helpers import (
     DEFAULT_TAGS,
     get_current_user_safe,
@@ -1900,7 +1901,7 @@ def api_monthly_post():
 
         if habit_name:
             new_habit = {
-                'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                'id': f"{int(datetime.utcnow().timestamp() * 1000)}_{len(habits) + 1}",
                 'name': habit_name,
                 'type': habit_type,
                 'category': category,
@@ -2022,6 +2023,69 @@ def api_monthly_post():
             db.session.commit()
             habits = plan.habits
 
+    elif action == 'sync_github':
+        username = (json_data.get('github_username') or json_data.get('username') or request.form.get('github_username') or request.form.get('username') or '').strip()
+        if username:
+            user.github_username = username
+            db.session.commit()
+
+        target_username = user.github_username
+        if not target_username:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
+                return jsonify({'success': False, 'message': 'GitHub username is required.'}), 400
+            flash('GitHub username is required.', 'danger')
+            return redirect(url_for('planner_ui.monthly', year=selected_year, month=selected_month))
+
+        sync_res = fetch_monthly_github_commits(target_username, selected_year, selected_month)
+        if not sync_res.get('success'):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json or request.form.get('is_ajax') == 'true':
+                return jsonify({'success': False, 'message': sync_res.get('message', 'Failed to sync GitHub commits')}), 400
+            flash(sync_res.get('message', 'Failed to sync GitHub commits'), 'danger')
+            return redirect(url_for('planner_ui.monthly', year=selected_year, month=selected_month))
+
+        # Locate or create GitHub Commits habit
+        target_habit = None
+        for h in habits:
+            if h.get('is_github') or h.get('name', '').lower() in ['github commits', 'daily git commits', 'git commits']:
+                target_habit = h
+                break
+
+        if not target_habit:
+            target_habit = {
+                'id': str(int(datetime.utcnow().timestamp() * 1000)),
+                'name': 'GitHub Commits',
+                'type': 'counter',
+                'unit': 'commits',
+                'target_count': 1,
+                'category': 'Productivity',
+                'is_github': True,
+                'daily_counts': {},
+                'completed_days': []
+            }
+            habits.append(target_habit)
+        else:
+            target_habit['type'] = 'counter'
+            target_habit['unit'] = target_habit.get('unit', 'commits')
+            target_habit['target_count'] = target_habit.get('target_count', 1)
+            target_habit['is_github'] = True
+
+        gh_counts = sync_res.get('daily_counts', {})
+        daily_counts = target_habit.get('daily_counts', {})
+        for day_k, cnt in gh_counts.items():
+            daily_counts[day_k] = cnt
+        target_habit['daily_counts'] = daily_counts
+
+        cdays = set(target_habit.get('completed_days', []))
+        for day_k, cnt in daily_counts.items():
+            if cnt >= target_habit.get('target_count', 1) or cnt > 0:
+                cdays.add(int(day_k))
+        target_habit['completed_days'] = sorted(list(cdays))
+
+        plan.habits = habits
+        flag_modified(plan, 'habits')
+        db.session.commit()
+        flash(sync_res.get('message', 'GitHub commits synced!'), 'success')
+
     elif action == 'delete_habit':
         habit_id = json_data.get('habit_id') or request.form.get('habit_id')
         plan.habits = [h for h in habits if h.get('id') != habit_id]
@@ -2120,6 +2184,12 @@ def api_monthly_post():
         elif action in ['reorder_habits', 'reorder_habit']:
             resp_data['habits'] = plan.habits
             resp_data['message'] = 'Habits reordered successfully!'
+        elif action == 'sync_github':
+            resp_data['habits'] = plan.habits
+            resp_data['username'] = target_username
+            resp_data['total_commits'] = sync_res.get('total_commits', 0)
+            resp_data['active_days'] = sync_res.get('active_days', [])
+            resp_data['message'] = sync_res.get('message', 'GitHub commits synced successfully!')
         elif action == 'delete_habit':
             resp_data['habit_id'] = json_data.get('habit_id') or request.form.get('habit_id')
             resp_data['message'] = 'Habit deleted.'
@@ -2235,6 +2305,123 @@ def api_reorder_monthly_habits():
         'success': True,
         'habits': plan.habits,
         'message': 'Habits reordered successfully'
+    })
+
+
+@planner_api.route('/api/monthly/habit/sync-github', methods=['POST'])
+@token_required
+def api_sync_github_habits():
+    """
+    Sync public GitHub commit activity for the target month into the Habit Tracker Matrix.
+    ---
+    tags:
+      - Monthly Planner
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - year
+            - month
+          properties:
+            year:
+              type: integer
+            month:
+              type: integer
+            username:
+              type: string
+              description: GitHub username (will be saved to user profile if provided)
+    responses:
+      200:
+        description: GitHub commits synced successfully
+      400:
+        description: Missing parameters or invalid GitHub username
+      401:
+        description: Unauthorized
+      404:
+        description: Plan not found
+    """
+    user = get_current_user_safe()
+    data = request.get_json() or {}
+    year = data.get('year')
+    month = data.get('month')
+    username = (data.get('username') or data.get('github_username') or '').strip()
+
+    if not year or not month:
+        return jsonify({'success': False, 'message': 'Missing year or month'}), 400
+
+    if username:
+        user.github_username = username
+        db.session.commit()
+
+    target_username = user.github_username
+    if not target_username:
+        return jsonify({'success': False, 'message': 'GitHub username is required.'}), 400
+
+    plan = MonthlyPlan.query.filter_by(user_id=user.id, year=int(year), month=int(month)).first()
+    if not plan:
+        plan = MonthlyPlan(user_id=user.id, year=int(year), month=int(month), habits=[], goals=[], milestones=[], notes='', calendar_days={})
+        db.session.add(plan)
+        db.session.commit()
+
+    sync_res = fetch_monthly_github_commits(target_username, int(year), int(month))
+    if not sync_res.get('success'):
+        return jsonify({'success': False, 'message': sync_res.get('message', 'Failed to fetch GitHub commits')}), 400
+
+    habits = plan.habits or []
+    target_habit = None
+    for h in habits:
+        if h.get('is_github') or h.get('name', '').lower() in ['github commits', 'daily git commits', 'git commits']:
+            target_habit = h
+            break
+
+    if not target_habit:
+        target_habit = {
+            'id': str(int(datetime.utcnow().timestamp() * 1000)),
+            'name': 'GitHub Commits',
+            'type': 'counter',
+            'unit': 'commits',
+            'target_count': 1,
+            'category': 'Productivity',
+            'is_github': True,
+            'daily_counts': {},
+            'completed_days': []
+        }
+        habits.append(target_habit)
+    else:
+        target_habit['type'] = 'counter'
+        target_habit['unit'] = target_habit.get('unit', 'commits')
+        target_habit['target_count'] = target_habit.get('target_count', 1)
+        target_habit['is_github'] = True
+
+    gh_counts = sync_res.get('daily_counts', {})
+    daily_counts = target_habit.get('daily_counts', {})
+    for day_k, cnt in gh_counts.items():
+        daily_counts[day_k] = cnt
+    target_habit['daily_counts'] = daily_counts
+
+    cdays = set(target_habit.get('completed_days', []))
+    for day_k, cnt in daily_counts.items():
+        if cnt >= target_habit.get('target_count', 1) or cnt > 0:
+            cdays.add(int(day_k))
+    target_habit['completed_days'] = sorted(list(cdays))
+
+    plan.habits = habits
+    flag_modified(plan, 'habits')
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'username': target_username,
+        'habit': target_habit,
+        'total_commits': sync_res.get('total_commits', 0),
+        'active_days': sync_res.get('active_days', []),
+        'daily_counts': target_habit['daily_counts'],
+        'message': sync_res.get('message', 'GitHub commits synced successfully')
     })
 
 

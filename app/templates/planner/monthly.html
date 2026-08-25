@@ -545,13 +545,21 @@
                 </button>
             </div>
 
-            <!-- Quick Arrangement & Auto-Sort Options -->
+            <!-- Quick Arrangement & GitHub Sync Options -->
             <div class="flex items-center space-x-2">
+                <!-- Sync GitHub Commits -->
+                <button type="button" onclick="openGitHubSyncModal('{{ current_user.github_username or '' }}')"
+                    class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm"
+                    title="Sync public GitHub commits to your habit matrix">
+                    <i class="fa-brands fa-github text-sm text-white"></i>
+                    <span>Sync GitHub</span>
+                </button>
+
                 <button type="button" onclick="autoArrangeHabits('type_standard', {{ selected_year }}, {{ selected_month }})"
                     class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600 hover:text-white border border-slate-700 text-indigo-300 text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm"
                     title="Auto-Arrange: Checklists on top, Sub-Habits in middle, Numeric Counters at bottom">
                     <i class="fa-solid fa-layer-group text-xs"></i>
-                    <span>Auto-Arrange (Checklists ➔ Sub-Habits ➔ Counters)</span>
+                    <span>Auto-Arrange</span>
                 </button>
 
                 <div class="relative group/sort">
@@ -636,8 +644,13 @@
                                     {% endif %}
                                 </div>
 
-                                <!-- Left Sticky Actions: Move Up, Move Down, Delete (No horizontal scroll needed) -->
+                                <!-- Left Sticky Actions: Edit, Move Up, Move Down, Delete (No horizontal scroll needed) -->
                                 <div class="flex items-center space-x-0.5 flex-shrink-0">
+                                    <button type="button" onclick="openEditHabitModal('{{ habit.id }}', '{{ habit.name|escape }}', '{{ habit.get('category', 'General')|escape }}', '{{ h_type }}', '{{ habit.get('unit', 'times')|escape }}', {{ habit.get('target_count', 1)|int }})"
+                                        class="text-slate-400 hover:text-amber-300 p-1 rounded transition-colors"
+                                        title="Edit Habit">
+                                        <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                                    </button>
                                     <button type="button" onclick="moveHabitRow('{{ habit.id }}', 'up', {{ selected_year }}, {{ selected_month }})"
                                         class="text-slate-400 hover:text-indigo-300 p-1 rounded transition-colors"
                                         title="Move Up">
@@ -821,6 +834,135 @@
                     <button type="button" onclick="saveCounterModalValue()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-500/20 transition-all">Save Count</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal for GitHub Commits Sync -->
+    <div id="github-sync-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+        <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-5 animate-floatToastIn">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-white">
+                        <i class="fa-brands fa-github text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Sync GitHub Commits</h3>
+                        <p class="text-xs text-slate-400">Sync public daily commit activity into your Habit Matrix</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeGitHubSyncModal()" class="text-slate-400 hover:text-white transition-colors p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="github-sync-form" onsubmit="handleSyncGitHubAJAX(event, {{ selected_year }}, {{ selected_month }})" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">GitHub Username</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 text-xs">
+                            github.com/
+                        </div>
+                        <input type="text" id="github-sync-username-input" name="github_username"
+                            value="{{ current_user.github_username or '' }}"
+                            placeholder="e.g. nkchoudhary2000" required
+                            class="w-full bg-slate-800 border border-slate-700 rounded-xl pl-24 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1.5 flex items-center space-x-1">
+                        <i class="fa-solid fa-circle-info text-[10px] text-indigo-400"></i>
+                        <span>Fetches all public Git push events and commit counts for {{ selected_month }}/{{ selected_year }}.</span>
+                    </p>
+                </div>
+
+                <div id="github-sync-status" class="hidden p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-slate-300 space-y-1">
+                    <!-- Dynamic status message injected during/after sync -->
+                </div>
+
+                <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-700/60">
+                    <button type="button" onclick="closeGitHubSyncModal()"
+                        class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors">
+                        Close
+                    </button>
+                    <button type="submit" id="github-sync-submit-btn"
+                        class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-500/20 transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-rotate text-xs"></i>
+                        <span>Sync Now</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Editing Habit Details & Name -->
+    <div id="edit-habit-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+        <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-5 animate-floatToastIn">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/60">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                        <i class="fa-solid fa-pen-to-square text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Edit Habit</h3>
+                        <p class="text-xs text-slate-400">Update name, category, or daily targets</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeEditHabitModal()" class="text-slate-400 hover:text-white transition-colors p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="edit-habit-form" onsubmit="handleUpdateHabitAJAX(event, {{ selected_year }}, {{ selected_month }})" class="space-y-4">
+                <input type="hidden" name="action" value="update_habit">
+                <input type="hidden" name="habit_id" id="edit-habit-id" value="">
+                <input type="hidden" name="habit_type" id="edit-habit-type" value="boolean">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Habit Name</label>
+                    <input type="text" id="edit-habit-name-input" name="habit_name" required
+                        placeholder="e.g. Read 20 pages or Drink Coffee..."
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Category</label>
+                    <select id="edit-habit-category-select" name="category"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="Health">Health & Wellness</option>
+                        <option value="Productivity">Productivity</option>
+                        <option value="Mindset">Mindset & Mental</option>
+                        <option value="Fitness">Fitness & Sport</option>
+                        <option value="Learning">Learning & Skills</option>
+                        <option value="Personal">Personal</option>
+                        <option value="Finance">Finance</option>
+                        <option value="General">General</option>
+                    </select>
+                </div>
+
+                <!-- Optional Counter Fields for Counter habits -->
+                <div id="edit-habit-counter-fields" class="hidden grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Daily Target</label>
+                        <input type="number" id="edit-habit-target-input" name="target_count" min="1" max="999" value="1"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Unit</label>
+                        <input type="text" id="edit-habit-unit-input" name="unit" placeholder="e.g. cups, pages, commits"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-700/60">
+                    <button type="button" onclick="closeEditHabitModal()"
+                        class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" id="edit-habit-submit-btn"
+                        class="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-md shadow-amber-500/20 transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-check text-xs"></i>
+                        <span>Save Changes</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1602,6 +1744,180 @@
                 }
             } catch (err) {
                 console.error('Error auto-arranging habits:', err);
+            }
+        }
+
+        // Edit Habit Modal & Handlers
+        function openEditHabitModal(habitId, habitName, category, habitType, unit, targetCount) {
+            const modal = document.getElementById('edit-habit-modal');
+            const idInput = document.getElementById('edit-habit-id');
+            const nameInput = document.getElementById('edit-habit-name-input');
+            const catSelect = document.getElementById('edit-habit-category-select');
+            const typeInput = document.getElementById('edit-habit-type');
+            const counterFields = document.getElementById('edit-habit-counter-fields');
+            const targetInput = document.getElementById('edit-habit-target-input');
+            const unitInput = document.getElementById('edit-habit-unit-input');
+
+            if (idInput) idInput.value = habitId;
+            if (nameInput) nameInput.value = habitName || '';
+            if (catSelect) catSelect.value = category || 'General';
+            if (typeInput) typeInput.value = habitType || 'boolean';
+
+            if (counterFields) {
+                if (habitType === 'counter') {
+                    counterFields.classList.remove('hidden');
+                    if (targetInput) targetInput.value = targetCount || 1;
+                    if (unitInput) unitInput.value = unit || 'times';
+                } else {
+                    counterFields.classList.add('hidden');
+                }
+            }
+
+            if (modal) modal.classList.remove('hidden');
+            if (nameInput) setTimeout(() => nameInput.focus(), 100);
+        }
+
+        function closeEditHabitModal() {
+            const modal = document.getElementById('edit-habit-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        async function handleUpdateHabitAJAX(e, year, month) {
+            e.preventDefault();
+            const habitId = document.getElementById('edit-habit-id')?.value;
+            const habitName = document.getElementById('edit-habit-name-input')?.value.trim();
+            const category = document.getElementById('edit-habit-category-select')?.value;
+            const habitType = document.getElementById('edit-habit-type')?.value;
+            const targetCount = parseInt(document.getElementById('edit-habit-target-input')?.value, 10) || 1;
+            const unit = document.getElementById('edit-habit-unit-input')?.value.trim() || 'times';
+
+            if (!habitId || !habitName) return;
+
+            const submitBtn = document.getElementById('edit-habit-submit-btn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Saving...</span>';
+            }
+
+            try {
+                const payload = {
+                    action: 'update_habit',
+                    habit_id: habitId,
+                    habit_name: habitName,
+                    category: category,
+                    target_count: targetCount,
+                    unit: unit
+                };
+
+                const response = await fetch(`/monthly?year=${year}&month=${month}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    closeEditHabitModal();
+                    if (window.showToast) showToast('Habit updated successfully!', 'success');
+                    
+                    // Immediately update habit row in DOM
+                    const row = document.getElementById(`monthly-habit-row-${habitId}`);
+                    if (row) {
+                        const nameSpan = row.querySelector('.truncate.font-semibold');
+                        if (nameSpan) {
+                            nameSpan.textContent = habitName;
+                            nameSpan.title = habitName;
+                        }
+                        row.setAttribute('data-habit-name', habitName.toLowerCase());
+                    }
+                    setTimeout(() => window.location.reload(), 300);
+                } else {
+                    if (window.showToast) showToast(data.message || 'Failed to update habit', 'danger');
+                }
+            } catch (err) {
+                console.error('Error updating habit:', err);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-check text-xs"></i> <span>Save Changes</span>';
+                }
+            }
+        }
+
+        // GitHub Commit Activity Sync Modal & Handlers
+        function openGitHubSyncModal(savedUsername) {
+            const modal = document.getElementById('github-sync-modal');
+            const input = document.getElementById('github-sync-username-input');
+            const statusDiv = document.getElementById('github-sync-status');
+            if (input && savedUsername) input.value = savedUsername;
+            if (statusDiv) statusDiv.classList.add('hidden');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeGitHubSyncModal() {
+            const modal = document.getElementById('github-sync-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        async function handleSyncGitHubAJAX(e, year, month) {
+            e.preventDefault();
+            const input = document.getElementById('github-sync-username-input');
+            const username = input ? input.value.trim() : '';
+            if (!username) return;
+
+            const submitBtn = document.getElementById('github-sync-submit-btn');
+            const statusDiv = document.getElementById('github-sync-status');
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Syncing...</span>';
+            }
+
+            if (statusDiv) {
+                statusDiv.classList.remove('hidden');
+                statusDiv.innerHTML = `<span class="text-indigo-300"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Contacting GitHub API for @${escapeHTML(username)}...</span>`;
+            }
+
+            try {
+                const response = await fetch('/api/monthly/habit/sync-github', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({
+                        year: year,
+                        month: month,
+                        username: username
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `
+                            <div class="text-emerald-400 font-semibold flex items-center space-x-1.5">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>${escapeHTML(data.message)}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Total commits: <strong class="text-white">${data.total_commits}</strong> across <strong class="text-white">${(data.active_days || []).length}</strong> active days.</p>
+                        `;
+                    }
+                    if (window.showToast) showToast(data.message || 'GitHub commits synced successfully!', 'success');
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `<span class="text-rose-400"><i class="fa-solid fa-circle-exclamation mr-1"></i> ${escapeHTML(data.message || 'Failed to sync GitHub commits')}</span>`;
+                    }
+                    if (window.showToast) showToast(data.message || 'GitHub sync failed', 'danger');
+                }
+            } catch (err) {
+                console.error('Error syncing GitHub commits:', err);
+                if (statusDiv) {
+                    statusDiv.innerHTML = `<span class="text-rose-400"><i class="fa-solid fa-circle-exclamation mr-1"></i> Network error syncing GitHub</span>`;
+                }
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-rotate text-xs"></i> <span>Sync Now</span>';
+                }
             }
         }
 
