@@ -226,7 +226,55 @@ Fetch public git push events and commit counts for the target month from GitHub 
 
 ---
 
-### 3.4 Yearly Habit Momentum Aggregation
+### 3.4 Import / Copy Habits from Previous Month
+Import habits defined in the previous month into the current target month. Automatically generates fresh completion slates (empty `completed_days`, `daily_counts`, and `daily_sub_completions`), handles duplicate names by adding `(Copy)` markers, and preserves previous month data completely undisturbed.
+
+- **Method**: `POST`
+- **Path**: `/api/monthly/habit/copy-previous`
+- **Headers**:
+  ```http
+  Authorization: Bearer <API_OR_JWT_TOKEN>
+  Content-Type: application/json
+  ```
+- **Request Body (`application/json`)**:
+  ```json
+  {
+    "year": 2026,
+    "month": 9
+  }
+  ```
+
+#### Response (`200 OK`)
+```json
+{
+  "success": true,
+  "imported_count": 3,
+  "habits": [
+    {
+      "id": "1724589999000_1",
+      "name": "Morning Walk",
+      "type": "boolean",
+      "category": "Fitness",
+      "completed_days": []
+    },
+    {
+      "id": "1724589999000_2",
+      "name": "Drink Coffee (Copy)",
+      "type": "counter",
+      "category": "Health",
+      "unit": "cups",
+      "target_count": 2,
+      "daily_counts": {},
+      "completed_days": []
+    }
+  ],
+  "message": "Successfully imported 3 habit(s) from August 2026!"
+}
+```
+
+---
+
+### 3.5 Yearly Habit Momentum Aggregation
 Retrieve aggregated 12-month habit performance across the year for heatmaps, streak charts, and momentum gauges.
 
 - **Method**: `GET`

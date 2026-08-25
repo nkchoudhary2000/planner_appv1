@@ -416,3 +416,128 @@ def create_styled_excel(title, sheets_data):
     wb.save(output)
     output.seek(0)
     return output
+
+
+def copy_habits_from_previous_month(user_id, target_year, target_month):
+    """
+    Copies habits from the previous month into the target month's MonthlyPlan.
+    - Generates fresh habit entries with empty completions for the target month.
+    - If a habit name already exists in target month, renames duplicate with ' (Copy)' marker.
+    - Keeps previous month's plan, completions, and logs completely undisturbed.
+    Returns dict: {'success': bool, 'message': str, 'imported_count': int, 'habits': list, 'target_plan': MonthlyPlan}
+    """
+    if target_month == 1:
+        prev_year, prev_month = target_year - 1, 12
+    else:
+        prev_year, prev_month = target_year, target_month - 1
+
+    prev_month_name = calendar.month_name[prev_month]
+
+    prev_plan = MonthlyPlan.query.filter_by(
+        user_id=user_id, year=prev_year, month=prev_month
+    ).first()
+
+    if not prev_plan or not prev_plan.habits:
+        return {
+            'success': False,
+            'message': f'No habits found in previous month ({prev_month_name} {prev_year}).',
+            'imported_count': 0,
+            'habits': []
+        }
+
+    valid_prev_habits = [h for h in prev_plan.habits if (h.get('name') or '').strip()]
+    if not valid_prev_habits:
+        return {
+            'success': False,
+            'message': f'No valid habits found in previous month ({prev_month_name} {prev_year}).',
+            'imported_count': 0,
+            'habits': []
+        }
+
+    plan = MonthlyPlan.query.filter_by(
+        user_id=user_id, year=target_year, month=target_month
+    ).first()
+
+    if not plan:
+        plan = MonthlyPlan(
+            user_id=user_id,
+            year=target_year,
+            month=target_month,
+            goals=[],
+            habits=[],
+            milestones=[],
+            calendar_days={},
+            notes=''
+        )
+        db.session.add(plan)
+
+    current_habits = list(plan.habits or [])
+    existing_names_lower = [h.get('name', '').strip().lower() for h in current_habits if h.get('name')]
+
+    new_habits_added = []
+    base_ts = int(datetime.utcnow().timestamp() * 1000)
+
+    for idx, prev_h in enumerate(valid_prev_habits):
+        orig_name = prev_h.get('name', '').strip()
+        
+        # Check if already exists in target month -> append '(Copy)' suffix
+        if orig_name.lower() in existing_names_lower:
+            candidate_name = f"{orig_name} (Copy)"
+            copy_counter = 2
+            while candidate_name.lower() in existing_names_lower:
+                candidate_name = f"{orig_name} (Copy {copy_counter})"
+                copy_counter += 1
+            final_name = candidate_name
+        else:
+            final_name = orig_name
+
+        existing_names_lower.append(final_name.lower())
+
+        h_type = (prev_h.get('type') or 'boolean').strip().lower()
+        if h_type not in ['boolean', 'counter', 'sub_habits']:
+            h_type = 'boolean'
+
+        new_h = {
+            'id': f"{base_ts}_{len(current_habits) + 1 + idx}",
+            'name': final_name,
+            'type': h_type,
+            'category': prev_h.get('category', 'General'),
+            'completed_days': []  # Fresh slate for target month
+        }
+
+        if prev_h.get('is_github'):
+            new_h['is_github'] = True
+
+        if h_type == 'counter':
+            new_h['unit'] = prev_h.get('unit', 'times')
+            new_h['target_count'] = max(1, int(prev_h.get('target_count', 1)))
+            new_h['daily_counts'] = {}  # Fresh slate
+        elif h_type == 'sub_habits':
+            sub_list = []
+            for s_idx, s in enumerate(prev_h.get('sub_habits', [])):
+                if isinstance(s, dict):
+                    s_name = (s.get('name') or '').strip()
+                else:
+                    s_name = str(s).strip()
+                if s_name:
+                    sub_list.append({
+                        'id': f"sh_{base_ts}_{idx}_{s_idx + 1}",
+                        'name': s_name
+                    })
+            new_h['sub_habits'] = sub_list
+            new_h['daily_sub_completions'] = {}  # Fresh slate
+
+        current_habits.append(new_h)
+        new_habits_added.append(new_h)
+
+    plan.habits = current_habits
+    flag_modified(plan, 'habits')
+    db.session.commit()
+
+    return {
+        'success': True,
+        'message': f'Successfully imported {len(new_habits_added)} habit(s) from {prev_month_name} {prev_year}!',
+        'imported_count': len(new_habits_added),
+        'habits': plan.habits
+    }
+

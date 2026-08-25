@@ -435,7 +435,178 @@ class AdvancedHabitsTestCase(unittest.TestCase):
         self.assertEqual(updated_h['target_count'], 3)
         self.assertEqual(updated_h['unit'], 'glasses')
 
+    def test_copy_habits_from_previous_month_fresh_slate_and_preservation(self):
+        """Test importing habits from previous month with fresh completion slates and non-disturbed previous month data."""
+        # 1. Setup Month 8 (August 2026) with completed habits
+        plan_aug = MonthlyPlan(
+            user_id=self.user.id,
+            year=2026,
+            month=8,
+            habits=[
+                {
+                    'id': 'h_walk',
+                    'name': 'Morning Walk',
+                    'type': 'boolean',
+                    'category': 'Fitness',
+                    'completed_days': [1, 2, 5]
+                },
+                {
+                    'id': 'h_coffee',
+                    'name': 'Drink Coffee',
+                    'type': 'counter',
+                    'unit': 'cups',
+                    'target_count': 2,
+                    'category': 'Health',
+                    'daily_counts': {'1': 2, '2': 1},
+                    'completed_days': [1]
+                },
+                {
+                    'id': 'h_meds',
+                    'name': 'Medications',
+                    'type': 'sub_habits',
+                    'category': 'Health',
+                    'sub_habits': [{'id': 'sh1', 'name': 'Vitamin D'}, {'id': 'sh2', 'name': 'Iron'}],
+                    'daily_sub_completions': {'1': ['sh1', 'sh2']},
+                    'completed_days': [1]
+                }
+            ],
+            goals=[],
+            milestones=[]
+        )
+        db.session.add(plan_aug)
+        db.session.commit()
+
+        # 2. Call /api/monthly/habit/copy-previous for Month 9 (September 2026)
+        res = self.client.post('/api/monthly/habit/copy-previous', headers=self.headers, json={
+            'year': 2026,
+            'month': 9
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['imported_count'], 3)
+        self.assertIn('August 2026', data['message'])
+
+        # 3. Verify Target Month 9 habits have fresh completion slates
+        plan_sep = MonthlyPlan.query.filter_by(user_id=self.user.id, year=2026, month=9).first()
+        self.assertIsNotNone(plan_sep)
+        self.assertEqual(len(plan_sep.habits), 3)
+
+        # Check Habit 1 (Boolean)
+        h1 = next(h for h in plan_sep.habits if h['name'] == 'Morning Walk')
+        self.assertEqual(h1['completed_days'], [])
+        self.assertNotEqual(h1['id'], 'h_walk')
+
+        # Check Habit 2 (Counter)
+        h2 = next(h for h in plan_sep.habits if h['name'] == 'Drink Coffee')
+        self.assertEqual(h2['completed_days'], [])
+        self.assertEqual(h2['daily_counts'], {})
+        self.assertEqual(h2['target_count'], 2)
+        self.assertEqual(h2['unit'], 'cups')
+
+        # Check Habit 3 (Sub-habits)
+        h3 = next(h for h in plan_sep.habits if h['name'] == 'Medications')
+        self.assertEqual(h3['completed_days'], [])
+        self.assertEqual(h3['daily_sub_completions'], {})
+        self.assertEqual(len(h3['sub_habits']), 2)
+        self.assertEqual(h3['sub_habits'][0]['name'], 'Vitamin D')
+        self.assertEqual(h3['sub_habits'][1]['name'], 'Iron')
+
+        # 4. Verify Previous Month 8 remains 100% UNTOUCHED
+        plan_aug_refreshed = MonthlyPlan.query.filter_by(user_id=self.user.id, year=2026, month=8).first()
+        self.assertEqual(plan_aug_refreshed.habits[0]['completed_days'], [1, 2, 5])
+        self.assertEqual(plan_aug_refreshed.habits[1]['daily_counts'], {'1': 2, '2': 1})
+        self.assertEqual(plan_aug_refreshed.habits[1]['completed_days'], [1])
+        self.assertEqual(plan_aug_refreshed.habits[2]['daily_sub_completions'], {'1': ['sh1', 'sh2']})
+
+    def test_copy_habits_duplicate_naming_with_copy_marker(self):
+        """Test that importing habits when a duplicate already exists renames with '(Copy)' marker."""
+        # 1. Setup Month 8 with Morning Walk and Read Book
+        plan_aug = MonthlyPlan(
+            user_id=self.user.id,
+            year=2026,
+            month=8,
+            habits=[
+                {'id': 'h1', 'name': 'Morning Walk', 'type': 'boolean', 'category': 'Fitness', 'completed_days': [1]},
+                {'id': 'h2', 'name': 'Read Book', 'type': 'boolean', 'category': 'Learning', 'completed_days': [2]}
+            ]
+        )
+        # 2. Setup Month 9 already having Morning Walk
+        plan_sep = MonthlyPlan(
+            user_id=self.user.id,
+            year=2026,
+            month=9,
+            habits=[
+                {'id': 'h_sep_1', 'name': 'Morning Walk', 'type': 'boolean', 'category': 'Fitness', 'completed_days': []}
+            ]
+        )
+        db.session.add_all([plan_aug, plan_sep])
+        db.session.commit()
+
+        # 3. Copy habits from Aug into Sep
+        res = self.client.post('/api/monthly/habit/copy-previous', headers=self.headers, json={
+            'year': 2026,
+            'month': 9
+        })
+        self.assertEqual(res.status_code, 200)
+
+        plan_sep_updated = MonthlyPlan.query.filter_by(user_id=self.user.id, year=2026, month=9).first()
+        habit_names = [h['name'] for h in plan_sep_updated.habits]
+        self.assertIn('Morning Walk', habit_names)
+        self.assertIn('Morning Walk (Copy)', habit_names)
+        self.assertIn('Read Book', habit_names)
+
+        # 4. Copying again produces '(Copy 2)'
+        res2 = self.client.post('/api/monthly/habit/copy-previous', headers=self.headers, json={
+            'year': 2026,
+            'month': 9
+        })
+        self.assertEqual(res2.status_code, 200)
+        plan_sep_updated2 = MonthlyPlan.query.filter_by(user_id=self.user.id, year=2026, month=9).first()
+        habit_names2 = [h['name'] for h in plan_sep_updated2.habits]
+        self.assertIn('Morning Walk (Copy 2)', habit_names2)
+
+    def test_copy_habits_no_habits_in_previous_month(self):
+        """Test copying habits when previous month has no habits returns a clear message."""
+        res = self.client.post('/api/monthly/habit/copy-previous', headers=self.headers, json={
+            'year': 2026,
+            'month': 9
+        })
+        self.assertEqual(res.status_code, 400)
+        data = res.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('No habits found in previous month', data['message'])
+
+    def test_copy_habits_via_monthly_form_action(self):
+        """Test copy previous habits via /monthly POST action."""
+        # 1. Setup Month 8
+        plan_aug = MonthlyPlan(
+            user_id=self.user.id,
+            year=2026,
+            month=8,
+            habits=[
+                {'id': 'h1', 'name': 'Yoga', 'type': 'boolean', 'category': 'Health', 'completed_days': [10]}
+            ]
+        )
+        db.session.add(plan_aug)
+        db.session.commit()
+
+        # 2. Call /monthly with action=copy_previous_habits
+        res = self.client.post('/monthly?year=2026&month=9', headers=self.headers, json={
+            'action': 'copy_previous_habits'
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['imported_count'], 1)
+
+        plan_sep = MonthlyPlan.query.filter_by(user_id=self.user.id, year=2026, month=9).first()
+        self.assertEqual(len(plan_sep.habits), 1)
+        self.assertEqual(plan_sep.habits[0]['name'], 'Yoga')
+        self.assertEqual(plan_sep.habits[0]['completed_days'], [])
+
 if __name__ == '__main__':
     unittest.main()
+
 
 

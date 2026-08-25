@@ -24,7 +24,8 @@ from app.planner_helpers import (
     format_time_12h,
     process_task_spillovers,
     populate_daily_defaults,
-    carry_forward_unbought_shopping_items
+    carry_forward_unbought_shopping_items,
+    copy_habits_from_previous_month
 )
 
 planner_api = Blueprint('planner_api', __name__)
@@ -2086,6 +2087,14 @@ def api_monthly_post():
         db.session.commit()
         flash(sync_res.get('message', 'GitHub commits synced!'), 'success')
 
+    elif action in ['copy_previous_habits', 'copy_previous', 'get_previous_habits']:
+        copy_res = copy_habits_from_previous_month(user.id, selected_year, selected_month)
+        if copy_res.get('success'):
+            habits = plan.habits or []
+            flash(copy_res.get('message'), 'success')
+        else:
+            flash(copy_res.get('message'), 'info')
+
     elif action == 'delete_habit':
         habit_id = json_data.get('habit_id') or request.form.get('habit_id')
         plan.habits = [h for h in habits if h.get('id') != habit_id]
@@ -2190,12 +2199,71 @@ def api_monthly_post():
             resp_data['total_commits'] = sync_res.get('total_commits', 0)
             resp_data['active_days'] = sync_res.get('active_days', [])
             resp_data['message'] = sync_res.get('message', 'GitHub commits synced successfully!')
+        elif action in ['copy_previous_habits', 'copy_previous', 'get_previous_habits']:
+            resp_data['habits'] = plan.habits
+            resp_data['imported_count'] = copy_res.get('imported_count', 0) if 'copy_res' in locals() else len(plan.habits)
+            resp_data['message'] = copy_res.get('message', 'Habits copied successfully!') if 'copy_res' in locals() else 'Habits copied from previous month.'
+            resp_data['success'] = copy_res.get('success', True) if 'copy_res' in locals() else True
         elif action == 'delete_habit':
             resp_data['habit_id'] = json_data.get('habit_id') or request.form.get('habit_id')
             resp_data['message'] = 'Habit deleted.'
 
         return jsonify(resp_data)
     return redirect(url_for('planner_ui.monthly', year=selected_year, month=selected_month))
+
+
+@planner_api.route('/api/monthly/habit/copy-previous', methods=['POST'])
+@token_required
+def api_copy_previous_monthly_habits():
+    """
+    Import and copy habits from the previous month into the target month's habit matrix.
+    Generates fresh completion slates and duplicates existing names with (Copy).
+    ---
+    tags:
+      - Monthly Planner
+    security:
+      - Bearer: []
+      - ApiKeyAuth: []
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - year
+            - month
+          properties:
+            year:
+              type: integer
+            month:
+              type: integer
+    responses:
+      200:
+        description: Habits copied successfully
+      400:
+        description: Missing or invalid parameters / No habits found in previous month
+      401:
+        description: Unauthorized
+    """
+    user = get_current_user_safe()
+    data = request.get_json(silent=True) or {}
+    year = data.get('year') or request.args.get('year')
+    month = data.get('month') or request.args.get('month')
+
+    if not year or not month:
+        today = get_today_date()
+        year = year or today.year
+        month = month or today.month
+
+    try:
+        year_int = int(year)
+        month_int = int(month)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Invalid year or month'}), 400
+
+    result = copy_habits_from_previous_month(user.id, year_int, month_int)
+    status_code = 200 if result.get('success') else 400
+    return jsonify(result), status_code
 
 
 @planner_api.route('/api/monthly/habit/reorder', methods=['POST'])

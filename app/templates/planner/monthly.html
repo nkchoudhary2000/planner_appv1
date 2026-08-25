@@ -545,8 +545,16 @@
                 </button>
             </div>
 
-            <!-- Quick Arrangement & GitHub Sync Options -->
+            <!-- Quick Arrangement, Previous Month Import & GitHub Sync Options -->
             <div class="flex items-center space-x-2">
+                <!-- Get / Copy Habits from Previous Month -->
+                <button type="button" id="copy-prev-habits-btn" onclick="copyHabitsFromPreviousMonth({{ selected_year }}, {{ selected_month }})"
+                    class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white border border-slate-700 text-emerald-300 text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm"
+                    title="Get and import habits from previous month with fresh completion slates">
+                    <i class="fa-solid fa-cloud-arrow-down text-xs"></i>
+                    <span>Get From Prev Month</span>
+                </button>
+
                 <!-- Sync GitHub Commits -->
                 <button type="button" onclick="openGitHubSyncModal('{{ current_user.github_username or '' }}')"
                     class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm"
@@ -746,8 +754,13 @@
             </table>
         </div>
         {% else %}
-        <div id="no-habits-msg" class="text-center py-8 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80">
+        <div id="no-habits-msg" class="text-center py-8 bg-slate-800/30 rounded-xl border border-dashed border-slate-700/80 space-y-3">
             <p class="text-slate-400 text-sm">No habits created for {{ month_name }} yet.</p>
+            <button type="button" onclick="copyHabitsFromPreviousMonth({{ selected_year }}, {{ selected_month }})"
+                class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm transition-all">
+                <i class="fa-solid fa-cloud-arrow-down text-sm"></i>
+                <span>Get Habits from Previous Month</span>
+            </button>
         </div>
         {% endif %}
     </div>
@@ -1744,6 +1757,40 @@
                 }
             } catch (err) {
                 console.error('Error auto-arranging habits:', err);
+            }
+        }
+
+        // Copy / Import Habits from Previous Month
+        async function copyHabitsFromPreviousMonth(year, month) {
+            const btn = document.getElementById('copy-prev-habits-btn');
+            const originalHTML = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Importing...</span>';
+            }
+
+            try {
+                const response = await fetch('/api/monthly/habit/copy-previous', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ year: year, month: month })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    if (window.showToast) showToast(data.message || 'Habits imported from previous month!', 'success');
+                    setTimeout(() => window.location.reload(), 400);
+                } else {
+                    if (window.showToast) showToast(data.message || 'Failed to import habits', 'danger');
+                }
+            } catch (err) {
+                console.error('Error importing habits from previous month:', err);
+                if (window.showToast) showToast('Network error importing habits from previous month', 'danger');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                }
             }
         }
 
